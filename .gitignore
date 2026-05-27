@@ -1,0 +1,34 @@
+# === SECRETS ===
+.env
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+*.egg
+
+# === Episode data (large, user-specific) ===
+episode_*.json
+episode_*_panels/
+archive/
+series_config.json
+
+# === Reference face images (user-specific, large) ===
+*_face.png
+*_ref.png
+
+# === Test scripts & generated test output ===
+test_*.py
+test_*.png
+surplus_direct_test.png
+
+# === Misc ===
+*.log
+.DS_Store
+Thumbs.db

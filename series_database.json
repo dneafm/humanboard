@@ -1,0 +1,897 @@
+{
+  "version": 1,
+  "active_series_id": "active",
+  "series": [
+    {
+      "id": "active",
+      "name": "Cường Series",
+      "context": "Ancient Huế, Vietnam, with a gentle, serene, and slightly nostalgic atmosphere, featuring traditional architecture, tranquil rivers, lush greenery, and subtle modern elements, bathed in soft, warm daylight and cool shadows.",
+      "setting_context": "Ancient Huế, Vietnam, with a gentle, serene, and slightly nostalgic atmosphere, featuring traditional architecture, tranquil rivers, lush greenery, and subtle modern elements, bathed in soft, warm daylight and cool shadows.",
+      "protagonist_name": "Cường",
+      "protagonist_description": "Cường (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 28-year-old male, short neat black hair, clear dark eyes, wearing a clean but casual t-shirt and jeans, perhaps with a subtle tech-themed accessory like a smart watch or minimalist ring, calm demeanor)",
+      "master_style_suffix": "[, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3]",
+      "character_ids": [
+        "characters_cường",
+        "characters_thảo",
+        "characters_mai"
+      ],
+      "asset_ids": [
+        "settings_bối_cảnh_chính"
+      ],
+      "episode_ids": [
+        "episode_1",
+        "episode_2",
+        "episode_3",
+        "episode_4",
+        "episode_5",
+        "episode_6"
+      ],
+      "updated_at": "2026-05-27T10:12:52.286657+00:00"
+    }
+  ],
+  "characters": [
+    {
+      "id": "characters_cường",
+      "series_id": "active",
+      "category": "characters",
+      "name": "Cường",
+      "description": "Cường (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 28-year-old male, short neat black hair, clear dark eyes, wearing a clean but casual t-shirt and jeans, perhaps with a subtle tech-themed accessory like a smart watch or minimalist ring, calm demeanor)",
+      "image_refs": [
+        {
+          "path": "/cường_face.png",
+          "source": "input",
+          "exists": true
+        },
+        {
+          "path": "/episode_1_panels/panel_1.png",
+          "source": "episode",
+          "exists": true,
+          "episode_number": 1,
+          "frame_number": 1
+        },
+        {
+          "path": "/episode_1_panels/panel_2.png",
+          "source": "episode",
+          "exists": true,
+          "episode_number": 1,
+          "frame_number": 2
+        },
+        {
+          "path": "/episode_1_panels/panel_3.png",
+          "source": "episode",
+          "exists": true,
+          "episode_number": 1,
+          "frame_number": 3
+        },
+        {
+          "path": "/episode_1_panels/panel_4.png",
+          "source": "episode",
+          "exists": true,
+          "episode_number": 1,
+          "frame_number": 4
+        },
+        {
+          "path": "/episode_2_panels/panel_1.png",
+          "source": "episode",
+          "exists": false,
+          "episode_number": 2,
+          "frame_number": 1
+        },
+        {
+          "path": "/episode_2_panels/panel_2.png",
+          "source": "episode",
+          "exists": false,
+          "episode_number": 2,
+          "frame_number": 2
+        },
+        {
+          "path": "/episode_2_panels/panel_3.png",
+          "source": "episode",
+          "exists": false,
+          "episode_number": 2,
+          "frame_number": 3
+        },
+        {
+          "path": "/episode_2_panels/panel_4.png",
+          "source": "episode",
+          "exists": false,
+          "episode_number": 2,
+          "frame_number": 4
+        },
+        {
+          "path": "/episode_3_panels/panel_1.png",
+          "source": "episode",
+          "exists": true,
+          "episode_number": 3,
+          "frame_number": 1
+        },
+        {
+          "path": "/episode_3_panels/panel_2.png",
+          "source": "episode",
+          "exists": true,
+          "episode_number": 3,
+          "frame_number": 2
+        },
+        {
+          "path": "/episode_3_panels/panel_3.png",
+          "source": "episode",
+          "exists": true,
+          "episode_number": 3,
+          "frame_number": 3
+        },
+        {
+          "path": "/episode_3_panels/panel_4.png",
+          "source": "episode",
+          "exists": true,
+          "episode_number": 3,
+          "frame_number": 4
+        }
+      ],
+      "aliases": [
+        "Cường"
+      ],
+      "updated_at": "2026-05-27T10:12:52.287664+00:00"
+    },
+    {
+      "id": "characters_thảo",
+      "series_id": "active",
+      "category": "characters",
+      "name": "Thảo",
+      "description": "community manager",
+      "image_refs": [
+        {
+          "path": "/thảo_face.png",
+          "source": "input",
+          "exists": true
+        },
+        {
+          "path": "/episode_3_panels/panel_1.png",
+          "source": "episode",
+          "exists": true,
+          "episode_number": 3,
+          "frame_number": 1
+        },
+        {
+          "path": "/episode_3_panels/panel_2.png",
+          "source": "episode",
+          "exists": true,
+          "episode_number": 3,
+          "frame_number": 2
+        },
+        {
+          "path": "/episode_3_panels/panel_4.png",
+          "source": "episode",
+          "exists": true,
+          "episode_number": 3,
+          "frame_number": 4
+        },
+        {
+          "path": "/episode_6_panels/panel_2.png",
+          "source": "episode",
+          "exists": false,
+          "episode_number": 6,
+          "frame_number": 2
+        },
+        {
+          "path": "/episode_6_panels/panel_3.png",
+          "source": "episode",
+          "exists": false,
+          "episode_number": 6,
+          "frame_number": 3
+        },
+        {
+          "path": "/episode_6_panels/panel_4.png",
+          "source": "episode",
+          "exists": false,
+          "episode_number": 6,
+          "frame_number": 4
+        }
+      ],
+      "aliases": [
+        "Thảo"
+      ],
+      "updated_at": "2026-05-27T10:12:52.287664+00:00"
+    },
+    {
+      "id": "characters_mai",
+      "series_id": "active",
+      "category": "characters",
+      "name": "Mai",
+      "description": "admin",
+      "image_refs": [
+        {
+          "path": "/mai_face.png",
+          "source": "input",
+          "exists": true
+        },
+        {
+          "path": "/episode_6_panels/panel_1.png",
+          "source": "episode",
+          "exists": false,
+          "episode_number": 6,
+          "frame_number": 1
+        },
+        {
+          "path": "/episode_6_panels/panel_2.png",
+          "source": "episode",
+          "exists": false,
+          "episode_number": 6,
+          "frame_number": 2
+        },
+        {
+          "path": "/episode_6_panels/panel_3.png",
+          "source": "episode",
+          "exists": false,
+          "episode_number": 6,
+          "frame_number": 3
+        },
+        {
+          "path": "/episode_6_panels/panel_4.png",
+          "source": "episode",
+          "exists": false,
+          "episode_number": 6,
+          "frame_number": 4
+        }
+      ],
+      "aliases": [
+        "Mai"
+      ],
+      "updated_at": "2026-05-27T10:12:52.287664+00:00"
+    }
+  ],
+  "assets": [
+    {
+      "id": "settings_bối_cảnh_chính",
+      "series_id": "active",
+      "category": "settings",
+      "name": "Bối Cảnh Chính",
+      "description": "Ancient Huế, Vietnam, with a gentle, serene, and slightly nostalgic atmosphere, featuring traditional architecture, tranquil rivers, lush greenery, and subtle modern elements, bathed in soft, warm daylight and cool shadows.",
+      "image_refs": [
+        {
+          "path": "/bối_cảnh_chính_ref.png",
+          "source": "input",
+          "exists": false
+        }
+      ],
+      "aliases": [
+        "Bối Cảnh Chính"
+      ],
+      "updated_at": "2026-05-27T10:12:52.287664+00:00"
+    }
+  ],
+  "episodes": [
+    {
+      "id": "episode_1",
+      "series_id": "active",
+      "episode_number": 1,
+      "title": "Tập 1: Pha Một Khởi Đầu Mới",
+      "topic": "",
+      "summary": "Sau tập này, bạn sẽ học cách tự tay xây một góc pha cà phê thư giãn để tìm lại bình yên.",
+      "caption_post": "Chào mừng các bạn đến với series 'Cường, Huế và cafe máy xúc'! 👋 Sau những cuộc tình tan vỡ ở chốn phồn hoa, Cường – một dev smart contract – quyết định tìm về Huế mộng mơ, nơi anh hy vọng sẽ tìm lại được sự bình yên cho tâm hồn. Tập đầu tiên, Cường bắt tay vào xây dựng một góc pha cà phê nhỏ của riêng mình. Đây không chỉ là một dự án DIY, mà còn là hành trình tìm lại sự tĩnh tâm qua từng thao tác tỉ mỉ. Liệu tách cà phê tự tay pha có giúp Cường hàn gắn những đổ vỡ và bắt đầu một khởi đầu mới không? Cùng theo dõi nhé! #CườngHuếVàCafeMáyXúc #DIYCoffeeCorner #KhởiĐầuMới #HuếMộngMơ #HealingJourney #SmartContractDev",
+      "prompt_text": "",
+      "frames": [
+        {
+          "frame_number": 1,
+          "panel_type": "The Problem",
+          "prompt_text": "Cường (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 28-year-old male, short neat black hair, clear dark eyes, wearing a clean but casual t-shirt and jeans, perhaps with a subtle tech-themed accessory like a smart watch or minimalist ring, calm demeanor) looking contemplative, gazing out a window onto a serene Huế street with traditional houses and lush trees, a single, empty coffee cup beside him, hinting at his unsettled mind. Ancient Huế, Vietnam, with a gentle, serene, and slightly nostalgic atmosphere, featuring traditional architecture, tranquil rivers, lush greenery, and subtle modern elements, bathed in soft, warm daylight and cool shadows. A sense of quiet longing. [, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3]",
+          "text_overlay_vietnamese": "Những đổ vỡ cứ đeo bám. Huế yên bình có đủ xoa dịu không?",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "Những đổ vỡ cứ đeo bám.",
+              "position": "top-left"
+            },
+            {
+              "type": "thought",
+              "character": "Cường",
+              "text": "Huế yên bình có đủ xoa dịu không?",
+              "position": "bottom-right"
+            }
+          ],
+          "image_path": "/episode_1_panels/panel_1.png",
+          "image_exists": true
+        },
+        {
+          "frame_number": 2,
+          "panel_type": "The Build",
+          "prompt_text": "Close-up of Cường's (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 28-year-old male, short neat black hair, clear dark eyes, wearing a clean but casual t-shirt and jeans, perhaps with a subtle tech-themed accessory like a smart watch or minimalist ring, calm demeanor) hands, focused and careful, sanding a piece of recycled pallet wood, sawdust lightly dusting his hands. Various woodworking tools (saw, ruler, brush) are neatly arranged on a workbench in a bright, simple workshop corner in Huế. Ancient Huế, Vietnam, with a gentle, serene, and slightly nostalgic atmosphere, featuring traditional architecture, tranquil rivers, lush greenery, and subtle modern elements, bathed in soft, warm daylight and cool shadows. Clear and detailed focus on the craft. [, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3]",
+          "text_overlay_vietnamese": "Tận dụng gỗ pallet, đo cắt tỉ mỉ. Từng mảnh ghép, từng nét sơn.",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "Tận dụng gỗ pallet, đo cắt tỉ mỉ.",
+              "position": "top-left"
+            },
+            {
+              "type": "dialogue",
+              "character": "Cường",
+              "text": "Từng mảnh ghép, từng nét sơn.",
+              "position": "bottom-right"
+            }
+          ],
+          "image_path": "/episode_1_panels/panel_2.png",
+          "image_exists": true
+        },
+        {
+          "frame_number": 3,
+          "panel_type": "The Concept",
+          "prompt_text": "Cường (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 28-year-old male, short neat black hair, clear dark eyes, wearing a clean but casual t-shirt and jeans, perhaps with a subtle tech-themed accessory like a smart watch or minimalist ring, calm demeanor) observing his nearly finished simple wooden coffee station in a corner of his room, a thoughtful and slightly hopeful expression on his face. Soft, warm sunlight illuminates the space, highlighting the textures of the wood and the peaceful atmosphere. Ancient Huế, Vietnam, with a gentle, serene, and slightly nostalgic atmosphere, featuring traditional architecture, tranquil rivers, lush greenery, and subtle modern elements, bathed in soft, warm daylight and cool shadows. A sense of quiet progress and inner reflection. [, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3]",
+          "text_overlay_vietnamese": "Sự tập trung vào từng chi tiết nhỏ. Tìm lại sự tĩnh tâm.",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "Sự tập trung vào từng chi tiết nhỏ.",
+              "position": "top-left"
+            },
+            {
+              "type": "thought",
+              "character": "Cường",
+              "text": "Tìm lại sự tĩnh tâm.",
+              "position": "bottom-right"
+            }
+          ],
+          "image_path": "/episode_1_panels/panel_3.png",
+          "image_exists": true
+        },
+        {
+          "frame_number": 4,
+          "panel_type": "The Result",
+          "prompt_text": "A beautifully composed still life of the finished simple wooden coffee station in a cozy Huế apartment. A steaming cup of traditionally brewed Vietnamese coffee, a small potted plant, a book, and a well-organized set of brewing tools are arranged on the station. Soft light catches the steam from the coffee, creating a serene and inviting atmosphere. Ancient Huế, Vietnam, with a gentle, serene, and slightly nostalgic atmosphere, featuring traditional architecture, tranquil rivers, lush greenery, and subtle modern elements, bathed in soft, warm daylight and cool shadows. Focus on the details and tranquility. [, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3]",
+          "text_overlay_vietnamese": "Góc cà phê nhỏ đã hoàn thành! Hương thơm lan tỏa, lòng nhẹ nhõm.",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "✅ Góc cà phê nhỏ đã hoàn thành!",
+              "position": "top-left"
+            },
+            {
+              "type": "shout",
+              "character": "Cường",
+              "text": "Hương thơm lan tỏa, lòng nhẹ nhõm.",
+              "position": "bottom-right"
+            }
+          ],
+          "image_path": "/episode_1_panels/panel_4.png",
+          "image_exists": true
+        }
+      ],
+      "matched_asset_ids": [
+        "characters_cường"
+      ],
+      "mentions_primary_character": true,
+      "created_at": "2026-05-27T07:55:30.570941+00:00",
+      "updated_at": "2026-05-27T10:12:52.289663+00:00"
+    },
+    {
+      "id": "episode_2",
+      "series_id": "active",
+      "episode_number": 2,
+      "title": "Hệ Thống Tái Chế Nước Xám Đa Nhiệm",
+      "topic": "",
+      "summary": "Người đọc sẽ học cách xây dựng một hệ thống tái chế nước xám đơn giản để tưới cho hai khu vườn khác nhau, tối ưu hóa nguồn nước.",
+      "caption_post": "Hành trình tự chủ của Cường tiếp tục với một bài toán quen thuộc: làm sao để tối ưu hóa nguồn lực cho nhiều 'nhiệm vụ' cùng lúc? Thay vì lãng phí nước thải sinh hoạt, Cường đã tự tay xây dựng một hệ thống lọc nước xám đơn giản nhưng hiệu quả, không chỉ tiết kiệm nước mà còn giúp tưới đều cho hai khu vườn khác nhau. Giống như quản lý hai dự án song song, điều quan trọng là phân bổ tài nguyên hợp lý để mọi thứ đều phát triển xanh tốt. Cùng xem Cường đã làm thế nào nhé! #CyberHomestead #DIYVietNam #NuocXam #TaiCheNuoc #TuoiCayThongMinh #HueEco #TuCanBang #Homesteading",
+      "prompt_text": "",
+      "frames": [
+        {
+          "frame_number": 1,
+          "panel_type": "The Problem",
+          "prompt_text": "Cường (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 28-year-old male, short neat black hair, clear dark eyes, wearing a clean but casual t-shirt and jeans, perhaps with a subtle tech-themed accessory like a smart watch or minimalist ring, calm demeanor) standing outdoors in a serene garden in Ancient Huế, Vietnam, looking at a drainpipe where greywater is flowing out onto a stone path, then gesturing towards two slightly dry, distinct garden beds nearby. Traditional wooden architecture and lush greenery in the background, bathed in soft, warm daylight and cool shadows. high-quality graphic novel wide-angle illustration, a hand-drawn young Southeast Asian man named Cường (stylized graphic novel style, clean ink outlines, cel-shaded, 28-year-old male, short neat black hair, clear dark eyes, wearing a clean but casual t-shirt and jeans, perhaps with a subtle tech-themed accessory like a smart watch or minimalist ring, calm demeanor) standing outdoors near a simple DIY rural setup, lush garden or forest background with warm afternoon light,[, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3]",
+          "text_overlay_vietnamese": "Nước thải sinh hoạt đổ đi. Hai luống rau cần tưới riêng.",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "Nước thải sinh hoạt đổ đi.",
+              "position": "top-left"
+            },
+            {
+              "type": "dialogue",
+              "character": "Cường",
+              "text": "Hai luống rau cần tưới riêng.",
+              "position": "bottom-right"
+            }
+          ],
+          "image_path": "/episode_2_panels/panel_1.png",
+          "image_exists": false
+        },
+        {
+          "frame_number": 2,
+          "panel_type": "The Build",
+          "prompt_text": "Cường's hands (clean ink outlines, cel-shaded skin, wearing a clean but casual t-shirt cuffs) carefully layering gravel and sand into a plastic bucket with drainage holes, beside it are PVC pipes and a simple two-way valve on a rustic wooden workbench. The background is a blurred traditional workshop in Ancient Huế, Vietnam, bathed in soft, warm daylight and cool shadows. high-quality graphic novel extreme close-up macro illustration, Cường's hands (clean ink outlines, cel-shaded skin, wearing a clean but casual t-shirt cuffs) working carefully with simple DIY tools on a weathered wooden workbench, sharp focus on hands,[, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3]",
+          "text_overlay_vietnamese": "Lọc nước xám, chia hai ngả. Như quản lý 'đa nhiệm' vậy.",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "Lọc nước xám, chia hai ngả.",
+              "position": "top-left"
+            },
+            {
+              "type": "dialogue",
+              "character": "Cường",
+              "text": "Như quản lý 'đa nhiệm' vậy.",
+              "position": "bottom-right"
+            }
+          ],
+          "image_path": "/episode_2_panels/panel_2.png",
+          "image_exists": false
+        },
+        {
+          "frame_number": 3,
+          "panel_type": "The Concept",
+          "prompt_text": "Cường (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 28-year-old male, short neat black hair, clear dark eyes, wearing a clean but casual t-shirt and jeans, perhaps with a subtle tech-themed accessory like a smart watch or minimalist ring, calm demeanor) seated at a worn wooden table inside a serene traditional Huế house, looking out a large window at a lush, vibrant garden. Warm golden twilight light streams in, highlighting the intricate wooden details of the room. Ancient Huế, Vietnam, with a gentle, serene, and slightly nostalgic atmosphere, featuring traditional architecture, tranquil rivers, lush greenery, and subtle modern elements, bathed in soft, warm daylight and cool shadows. high-quality graphic novel indoor illustration, Cường (stylized graphic novel style, clean ink outlines, cel-shaded, 28-year-old male, short neat black hair, clear dark eyes, wearing a clean but casual t-shirt and jeans, perhaps with a subtle tech-themed accessory like a smart watch or minimalist ring, calm demeanor) seated at a worn wooden table facing a large window, warm golden twilight light streaming in, lush misty forest visible outside,[, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3]",
+          "text_overlay_vietnamese": "Phân bổ nguồn lực hợp lý. Tối ưu hóa mọi thứ.",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "Phân bổ nguồn lực hợp lý.",
+              "position": "top-left"
+            },
+            {
+              "type": "dialogue",
+              "character": "Cường",
+              "text": "Tối ưu hóa mọi thứ.",
+              "position": "bottom-right"
+            }
+          ],
+          "image_path": "/episode_2_panels/panel_3.png",
+          "image_exists": false
+        },
+        {
+          "frame_number": 4,
+          "panel_type": "The Result",
+          "prompt_text": "A hand-drawn journal log on aged cream paper with neat ink handwriting, showing 'Hệ thống tái chế nước xám - Kết quả:' and bullet points like '✅ Tiết kiệm 30 lít/ngày', '✅ Vườn cây xanh tốt đều', resting on a weathered wooden desk beside a small ceramic mug and a tiny succulent plant. A subtle modern smartwatch lies next to the journal. Ancient Huế, Vietnam, with a gentle, serene, and slightly nostalgic atmosphere, featuring traditional architecture, tranquil rivers, lush greenery, and subtle modern elements, bathed in soft, warm daylight and cool shadows. high-quality graphic novel close-up still-life illustration, a hand-drawn journal log on aged cream paper with neat ink handwriting, green checkmark, resting on a weathered wooden desk beside a small ceramic mug and a tiny succulent plant, warm late-afternoon window light,[, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3]",
+          "text_overlay_vietnamese": "Hệ thống nước xám hoàn hảo! Luôn có cách tốt hơn!",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "✅ Tiết kiệm 30 lít/ngày.",
+              "position": "top-left"
+            },
+            {
+              "type": "dialogue",
+              "character": "Cường",
+              "text": "Luôn có cách tốt hơn!",
+              "position": "bottom-right"
+            }
+          ],
+          "image_path": "/episode_2_panels/panel_4.png",
+          "image_exists": false
+        }
+      ],
+      "matched_asset_ids": [
+        "characters_cường"
+      ],
+      "mentions_primary_character": true,
+      "created_at": "2026-05-27T08:10:05.793290+00:00",
+      "updated_at": "2026-05-27T10:12:52.291133+00:00"
+    },
+    {
+      "id": "episode_3",
+      "series_id": "active",
+      "episode_number": 3,
+      "title": "Thảo: Lời Khai Của Hai Công Việc",
+      "topic": "",
+      "summary": "Thảo chia sẻ cách cô ấy cân bằng hai công việc, và Cường suy ngẫm về sự cần thiết của thời gian nghỉ ngơi.",
+      "caption_post": "Cường đã có một cuộc gặp gỡ đầy suy ngẫm với Thảo, người đồng nghiệp cũ, tại một quán cà phê yên bình ở Huế. Thảo đã chia sẻ cách cô ấy xoay sở với hai công việc cùng lúc, ví von kinh nghiệm quản lý thời gian như lập trình đa luồng. Cuộc trò chuyện đã khiến Cường suy ngẫm về áp lực công việc và tầm quan trọng của sự cân bằng, nhận ra rằng nghỉ ngơi cũng quan trọng như việc code vậy. #CyberHomestead #Solarpunk #HuyetLapTrinhVien #CanBangCuocSong #HoiAn",
+      "prompt_text": "",
+      "frames": [
+        {
+          "frame_number": 1,
+          "panel_type": "The Problem",
+          "prompt_text": "Ancient Huế, Vietnam, with a gentle, serene, and slightly nostalgic atmosphere, featuring traditional architecture, tranquil rivers, lush greenery, and subtle modern elements, bathed in soft, warm daylight and cool shadows. high-quality graphic novel wide-angle illustration, Cường (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 28-year-old male, short neat black hair, clear dark eyes, wearing a clean but casual t-shirt and jeans, perhaps with a subtle tech-themed accessory like a smart watch or minimalist ring, calm demeanor) standing outdoors near a simple DIY rural setup, lush garden or forest background with warm afternoon light, [, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3]",
+          "text_overlay_vietnamese": "Cường gặp Thảo, đồng nghiệp cũ, ở quán cà phê quen thuộc tại Huế.",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "Cường gặp Thảo, đồng nghiệp cũ.",
+              "position": "top-left"
+            },
+            {
+              "type": "dialogue",
+              "character": "Cường",
+              "text": "Thảo? Sao lại ở đây?",
+              "position": "bottom-right"
+            }
+          ],
+          "image_path": "/episode_3_panels/panel_1.png",
+          "image_exists": true
+        },
+        {
+          "frame_number": 2,
+          "panel_type": "The Build",
+          "prompt_text": "Ancient Huế, Vietnam, with a gentle, serene, and slightly nostalgic atmosphere, featuring traditional architecture, tranquil rivers, lush greenery, and subtle modern elements, bathed in soft, warm daylight and cool shadows. high-quality graphic novel extreme close-up macro illustration, Cường's hands (a stylized graphic novel illustration, clean ink outlines, cel-shaded skin, wearing a clean but casual t-shirt and jeans, perhaps with a subtle tech-themed accessory like a smart watch or minimalist ring) working carefully with simple DIY tools on a weathered wooden workbench, sharp focus on hands, [, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3]",
+          "text_overlay_vietnamese": "Thảo chia sẻ bí quyết quản lý thời gian, hoàn thành 2 job cùng lúc.",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "Quản lý thời gian như lập trình đa luồng.",
+              "position": "top-left"
+            },
+            {
+              "type": "dialogue",
+              "character": "Thảo",
+              "text": "Ưu tiên tác vụ, code gọn gàng.",
+              "position": "bottom-right"
+            }
+          ],
+          "image_path": "/episode_3_panels/panel_2.png",
+          "image_exists": true
+        },
+        {
+          "frame_number": 3,
+          "panel_type": "The Concept",
+          "prompt_text": "Ancient Huế, Vietnam, with a gentle, serene, and slightly nostalgic atmosphere, featuring traditional architecture, tranquil rivers, lush greenery, and subtle modern elements, bathed in soft, warm daylight and cool shadows. high-quality graphic novel indoor illustration, Cường (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 28-year-old male, short neat black hair, clear dark eyes, wearing a clean but casual t-shirt and jeans, perhaps with a subtle tech-themed accessory like a smart watch or minimalist ring, calm demeanor) seated at a worn wooden table facing a large window, warm golden twilight light streaming in, lush misty forest visible outside, [, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3]",
+          "text_overlay_vietnamese": "Cường suy ngẫm về áp lực công việc và tầm quan trọng của sự cân bằng.",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "Áp lực công việc, rủi ro 'burnout'.",
+              "position": "top-left"
+            },
+            {
+              "type": "dialogue",
+              "character": "Cường",
+              "text": "Cần cân bằng, không thể code mãi.",
+              "position": "bottom-right"
+            }
+          ],
+          "image_path": "/episode_3_panels/panel_3.png",
+          "image_exists": true
+        },
+        {
+          "frame_number": 4,
+          "panel_type": "The Result",
+          "prompt_text": "Ancient Huế, Vietnam, with a gentle, serene, and slightly nostalgic atmosphere, featuring traditional architecture, tranquil rivers, lush greenery, and subtle modern elements, bathed in soft, warm daylight and cool shadows. high-quality graphic novel close-up still-life illustration, a hand-drawn journal log on aged cream paper with neat ink handwriting, green checkmark, resting on a weathered wooden desk beside a small ceramic mug and a tiny succulent plant, warm late-afternoon window light, [, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3]",
+          "text_overlay_vietnamese": "Cuộc trò chuyện kết thúc. Cường học được bài học về sự cân bằng.",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "✅ Bài học về cân bằng cuộc sống.",
+              "position": "top-left"
+            },
+            {
+              "type": "dialogue",
+              "character": "Cường",
+              "text": "Cảm ơn Thảo. Tôi cần nghỉ ngơi.",
+              "position": "bottom-right"
+            }
+          ],
+          "image_path": "/episode_3_panels/panel_4.png",
+          "image_exists": true
+        }
+      ],
+      "matched_asset_ids": [
+        "characters_cường",
+        "characters_thảo"
+      ],
+      "mentions_primary_character": true,
+      "created_at": "2026-05-27T08:21:05.035645+00:00",
+      "updated_at": "2026-05-27T10:12:52.293139+00:00"
+    },
+    {
+      "id": "episode_4",
+      "series_id": "active",
+      "episode_number": 4,
+      "title": "Lọc Nước Thô Đơn Giản Cho Homestead",
+      "topic": "",
+      "summary": "Hướng dẫn xây dựng hệ thống lọc nước thô đơn giản bằng vật liệu giá rẻ để có nước sinh hoạt sạch cho homestead.",
+      "caption_post": "Nước sạch luôn là ưu tiên hàng đầu ở homestead! Tập này, Leo cùng Thảo giải quyết vấn đề nước sinh hoạt không đạt chuẩn bằng cách tự xây hệ thống lọc nước thô siêu tiết kiệm. Chỉ với vài vật liệu đơn giản và chi phí chưa đến 400k, chúng ta đã có một giải pháp hiệu quả, dễ bảo trì. Thảo cũng rất ấn tượng với khả năng 'debug' môi trường tự nhiên của Leo! Từ việc phân lớp vật liệu lọc như một 'Regex filter' đến hiểu sâu về cơ chế hoạt động, mọi thứ đều được giải thích rõ ràng. #CyberHomestead #DIYHomestead #LocNuoc #OffGridLiving #SustainableLiving #TechDIY #GiaRe",
+      "prompt_text": "",
+      "frames": [
+        {
+          "frame_number": 1,
+          "panel_type": "The Problem",
+          "prompt_text": "Leo (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 25-year-old Southeast Asian man, short slightly messy dark brown hair, calm friendly expression, dark grey hoodie) and Thảo (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 25-year-old female, long dark hair tied in a practical ponytail, wearing a simple linen shirt and jeans, friendly and curious expression) standing near a small, rustic pond or water source at the edge of the homestead, looking at the slightly murky water. The background features lush greenery and a hint of traditional Vietnamese architecture. Soft, warm daylight, high-quality graphic novel wide-angle illustration, a hand-drawn young Southeast Asian man named Leo (stylized graphic novel style, clean ink outlines, cel-shaded, 25-year-old, short slightly messy dark brown hair, calm friendly expression, dark grey hoodie) standing outdoors near a simple DIY rural setup, lush garden or forest background with warm afternoon light, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3",
+          "text_overlay_vietnamese": "Nguồn nước sinh hoạt chưa đạt chuẩn. Thảo hỏi Leo về cách lọc nước hiệu quả.",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "Nguồn nước sinh hoạt chưa đạt chuẩn.",
+              "position": "top-left"
+            },
+            {
+              "type": "dialogue",
+              "character": "Thảo",
+              "text": "Có cách nào lọc nước thô hiệu quả?",
+              "position": "bottom-right"
+            }
+          ],
+          "image_path": "/episode_4_panels/panel_1.png",
+          "image_exists": false
+        },
+        {
+          "frame_number": 2,
+          "panel_type": "The Build",
+          "prompt_text": "Leo's hands (clean ink outlines, cel-shaded skin, dark grey hoodie cuffs) carefully layering gravel, sand, charcoal, and a piece of cloth inside a cut-open plastic bucket. A PVC pipe piece is being inserted. The scene is on a rustic wooden workbench, with simple tools scattered around. high-quality graphic novel extreme close-up macro illustration, Leo's hands (clean ink outlines, cel-shaded skin, dark grey hoodie cuffs) working carefully with simple DIY tools on a weathered wooden workbench, sharp focus on hands, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3",
+          "text_overlay_vietnamese": "Vật liệu: 2 thùng 20L, ống PVC, cát, sỏi, than, vải. Tổng chi phí ~400k VNĐ (17 USD). Leo giải thích mỗi lớp lọc như một Regex filter.",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "Vật liệu: 2 thùng 20L, ống PVC, cát, sỏi, than, vải. ~400k VNĐ.",
+              "position": "top-left"
+            },
+            {
+              "type": "dialogue",
+              "character": "Leo",
+              "text": "Mỗi lớp như một Regex filter!",
+              "position": "bottom-right"
+            }
+          ],
+          "image_path": "/episode_4_panels/panel_2.png",
+          "image_exists": true
+        },
+        {
+          "frame_number": 3,
+          "panel_type": "The Concept",
+          "prompt_text": "Leo (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 25-year-old Southeast Asian man, short slightly messy dark brown hair, calm thoughtful expression, dark grey hoodie) and Thảo (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 25-year-old female, long dark hair tied in a practical ponytail, wearing a simple linen shirt and jeans, friendly and curious expression) are inside Leo's cozy cabin, seated at a worn wooden table. Leo gestures towards a simple diagram or a clear glass showing the layered filter concept. Warm golden twilight light streams in through a large window, revealing a lush misty forest outside. high-quality graphic novel indoor illustration, Leo (stylized graphic novel style, clean ink outlines, cel-shaded, 25-year-old Southeast Asian man, short slightly messy dark brown hair, calm thoughtful expression, dark grey hoodie) seated at a worn wooden table facing a large window, warm golden twilight light streaming in, lush misty forest visible outside, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3",
+          "text_overlay_vietnamese": "Lọc cơ học loại bỏ cặn bẩn lớn. Than hoạt tính khử mùi, màu. Leo so sánh với các tầng API xử lý request.",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "Lọc cơ học loại bỏ cặn bẩn lớn. Than hoạt tính khử mùi, màu.",
+              "position": "top-left"
+            },
+            {
+              "type": "dialogue",
+              "character": "Leo",
+              "text": "Như các tầng API xử lý request.",
+              "position": "bottom-right"
+            }
+          ],
+          "image_path": "/episode_4_panels/panel_3.png",
+          "image_exists": false
+        },
+        {
+          "frame_number": 4,
+          "panel_type": "The Result",
+          "prompt_text": "A hand-drawn journal log on aged cream paper with neat ink handwriting. A schematic of the bucket filter is drawn with notes like 'Output: Nước sạch,' 'Flow Rate: 5L/min,' 'Cost: 17 USD.' A small glass of clear water sits next to the journal. The weathered wooden desk also holds a tiny succulent plant. Warm late-afternoon window light illuminates the scene. high-quality graphic novel close-up still-life illustration, a hand-drawn journal log on aged cream paper with neat ink handwriting, green checkmark, resting on a weathered wooden desk beside a small ceramic mug and a tiny succulent plant, warm late-afternoon window light, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3",
+          "text_overlay_vietnamese": "Hệ thống lọc đã hoàn thiện, dễ dàng bảo trì. Thảo thấy thật tiện lợi và hữu dụng.",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "✅ Hệ thống đã hoàn thiện, dễ dàng bảo trì.",
+              "position": "top-left"
+            },
+            {
+              "type": "dialogue",
+              "character": "Thảo",
+              "text": "Thật tiện lợi và hữu dụng!",
+              "position": "bottom-right"
+            }
+          ],
+          "image_path": "/episode_4_panels/panel_4.png",
+          "image_exists": true
+        }
+      ],
+      "matched_asset_ids": [
+        "characters_thảo"
+      ],
+      "mentions_primary_character": false,
+      "created_at": "2026-05-27T09:34:45.414244+00:00",
+      "updated_at": "2026-05-27T10:12:52.295510+00:00"
+    },
+    {
+      "id": "episode_5",
+      "series_id": "active",
+      "episode_number": 5,
+      "title": "Hệ Thống Tưới Nhỏ Giọt Tối Giản",
+      "topic": "",
+      "summary": "Học cách xây dựng hệ thống tưới nhỏ giọt tự động, tiết kiệm nước và công sức với vật liệu tái chế.",
+      "caption_post": "Tưới cây là một công việc cần mẫn, nhưng cũng rất tốn thời gian. Trong tập này, Leo đã giải quyết vấn đề bằng cách xây dựng một hệ thống tưới nhỏ giọt đơn giản, chi phí thấp từ vật liệu tái chế. Thật bất ngờ, anh gặp lại Mai và Thảo, hai người bạn cũ, trong khi đang thực hiện dự án này. Hệ thống không chỉ giúp tiết kiệm nước mà còn giải phóng thời gian cho Leo, chứng minh rằng sự tối giản và thông minh có thể mang lại hiệu quả lớn. #CyberHomestead #DIYVietNam #TướiNhỏGiọt #SốngXanh #CôngNghệNôngNghiệp",
+      "prompt_text": "",
+      "frames": [
+        {
+          "frame_number": 1,
+          "panel_type": "The Problem",
+          "prompt_text": "high-quality graphic novel wide-angle illustration, a hand-drawn young Southeast Asian man named Leo (stylized graphic novel style, clean ink outlines, cel-shaded, 25-year-old, short slightly messy dark brown hair, calm friendly expression, dark grey hoodie) standing outdoors near a simple DIY rural setup, lush garden or forest background with warm afternoon light, Mai (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 28-year-old woman, short neat bob hairstyle, clear focused eyes, wearing smart casual attire like a blazer over a t-shirt, observant demeanor) and Thảo (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 28-year-old woman, long flowing black hair, warm smile, wearing a practical but stylish jumpsuit, perhaps holding a tablet or notebook, friendly demeanor) standing near a small, dry garden bed, looking surprised at each other as Leo points to the garden, a small, wilting vegetable plant visible. A wooden sign on the side of the path reads 'Homestead'.[, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3]",
+          "text_overlay_vietnamese": "Tưới thủ công tốn thời gian quá. Sắp xếp lại cần hệ thống mới.",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "Tưới thủ công tốn thời gian quá.",
+              "position": "top-left"
+            },
+            {
+              "type": "dialogue",
+              "character": "Mai",
+              "text": "Thảo, cậu làm ở đây sao?",
+              "position": "bottom-left"
+            },
+            {
+              "type": "dialogue",
+              "character": "Thảo",
+              "text": "Mai! Không, tôi ghé Leo thôi.",
+              "position": "bottom-right"
+            },
+            {
+              "type": "dialogue",
+              "character": "Leo",
+              "text": "Sắp xếp lại cần hệ thống mới.",
+              "position": "top-right"
+            }
+          ],
+          "image_path": "/episode_5_panels/panel_1.png",
+          "image_exists": false
+        },
+        {
+          "frame_number": 2,
+          "panel_type": "The Build",
+          "prompt_text": "high-quality graphic novel extreme close-up macro illustration, Leo's hands (clean ink outlines, cel-shaded skin, dark grey hoodie cuffs) working carefully with simple DIY tools on a weathered wooden workbench, sharp focus on hands, Leo (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 25-year-old Southeast Asian man, short slightly messy dark brown hair, calm friendly expression, dark grey hoodie) is assembling a simple drip irrigation system using recycled plastic bottles, PVC pipes, small valves, and cotton strings, with Mai (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 28-year-old woman, short neat bob hairstyle, clear focused eyes, wearing smart casual attire like a blazer over a t-shirt, observant demeanor) and Thảo (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 28-year-old woman, long flowing black hair, warm smile, wearing a practical but stylish jumpsuit, perhaps holding a tablet or notebook, friendly demeanor) observing in the background, a wooden table with simple tools and a small pot of green herbs visible.[, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3]",
+          "text_overlay_vietnamese": "Nối chai nhựa, ống PVC, dây cotton. Như queue xử lý nước vậy.",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "Nối chai nhựa, ống PVC, dây cotton.",
+              "position": "top-left"
+            },
+            {
+              "type": "dialogue",
+              "character": "Thảo",
+              "text": "Như queue xử lý nước vậy.",
+              "position": "bottom-right"
+            },
+            {
+              "type": "dialogue",
+              "character": "Mai",
+              "text": "Ý tưởng rất hay!",
+              "position": "bottom-left"
+            }
+          ],
+          "image_path": "/episode_5_panels/panel_2.png",
+          "image_exists": false
+        },
+        {
+          "frame_number": 3,
+          "panel_type": "The Concept",
+          "prompt_text": "high-quality graphic novel indoor illustration, Leo (stylized graphic novel style, clean ink outlines, cel-shaded, 25-year-old Southeast Asian man, short slightly messy dark brown hair, calm thoughtful expression, dark grey hoodie) seated at a worn wooden table facing a large window, warm golden twilight light streaming in, lush misty forest visible outside, Leo (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 25-year-old Southeast Asian man, short slightly messy dark brown hair, calm friendly expression, dark grey hoodie) explains the simple gravity-fed drip system to Mai (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 28-year-old woman, short neat bob hairstyle, clear focused eyes, wearing smart casual attire like a blazer over a t-shirt, observant demeanor) and Thảo (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 28-year-old woman, long flowing black hair, warm smile, wearing a practical but stylish jumpsuit, perhaps holding a tablet or notebook, friendly demeanor) who are listening intently, perhaps pointing to a simplified diagram of water flow on a piece of paper on the table. The cabin is cozy and rustic.[, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3]",
+          "text_overlay_vietnamese": "Trọng lực đẩy nước đều. Tối ưu tài nguyên là chìa khóa.",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "Trọng lực đẩy nước đều.",
+              "position": "top-left"
+            },
+            {
+              "type": "dialogue",
+              "character": "Leo",
+              "text": "Tối ưu tài nguyên là chìa khóa.",
+              "position": "bottom-right"
+            },
+            {
+              "type": "dialogue",
+              "character": "Mai",
+              "text": "Hiệu quả hơn cả mong đợi.",
+              "position": "bottom-left"
+            }
+          ],
+          "image_path": "/episode_5_panels/panel_3.png",
+          "image_exists": false
+        },
+        {
+          "frame_number": 4,
+          "panel_type": "The Result",
+          "prompt_text": "high-quality graphic novel close-up still-life illustration, a hand-drawn journal log on aged cream paper with neat ink handwriting, green checkmark, resting on a weathered wooden desk beside a small ceramic mug and a tiny succulent plant, warm late-afternoon window light, The log shows results for the drip irrigation system: 'Water usage reduced by 50%', 'Plants healthier, less manual work', 'Cost: ~300,000 VND'. In the background, Leo (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 25-year-old Southeast Asian man, short slightly messy dark brown hair, calm friendly expression, dark grey hoodie) Mai (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 28-year-old woman, short neat bob hairstyle, clear focused eyes, wearing smart casual attire like a blazer over a t-shirt, observant demeanor) and Thảo (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 28-year-old woman, long flowing black hair, warm smile, wearing a practical but stylish jumpsuit, perhaps holding a tablet or notebook, friendly demeanor) are admiring the now lush, well-watered garden outside a window.[, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3]",
+          "text_overlay_vietnamese": "✅ Tiết kiệm nước 50%, tưới tự động. Dự án này thật sự hay!",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "✅ Tiết kiệm nước 50%.",
+              "position": "top-left"
+            },
+            {
+              "type": "narration",
+              "text": "✅ Tưới tự động.",
+              "position": "top-right"
+            },
+            {
+              "type": "dialogue",
+              "character": "Thảo",
+              "text": "Dự án này thật sự hay!",
+              "position": "bottom-right"
+            },
+            {
+              "type": "dialogue",
+              "character": "Mai",
+              "text": "Rất ấn tượng, Leo.",
+              "position": "bottom-left"
+            }
+          ],
+          "image_path": "/episode_5_panels/panel_4.png",
+          "image_exists": false
+        }
+      ],
+      "matched_asset_ids": [
+        "characters_thảo",
+        "characters_mai"
+      ],
+      "mentions_primary_character": false,
+      "created_at": "2026-05-27T09:38:14.114851+00:00",
+      "updated_at": "2026-05-27T10:12:52.297729+00:00"
+    },
+    {
+      "id": "episode_6",
+      "series_id": "active",
+      "episode_number": 6,
+      "title": "Mai Bất Ngờ Gặp Thảo",
+      "topic": "@Mai bất ngời gặp @Thảo đang làm job thứ 2 ở một công ty khác",
+      "summary": "Người đọc sẽ chứng kiến Mai bất ngờ gặp Thảo đang làm công việc thứ hai, một cái nhìn sâu sắc về sự cần cù và đa nhiệm trong cuộc sống hiện đại.",
+      "caption_post": "Trong tập 6, Mai đã có một cuộc gặp gỡ đầy bất ngờ khi ghé thăm một đối tác mới. Cô ấy đã phát hiện ra Thảo đang làm công việc thứ hai, một minh chứng cho sự chăm chỉ và khả năng đa nhiệm của cô. Điều này khiến Mai suy ngẫm về những nỗ lực mà mọi người đang bỏ ra trong cuộc sống. #HuếHiệnĐại #CuộcSốngViệcLàm #ĐaNhiệm #NghịLực #CườngSeries",
+      "prompt_text": "@Mai bất ngời gặp @Thảo đang làm job thứ 2 ở một công ty khác",
+      "frames": [
+        {
+          "frame_number": 1,
+          "panel_type": "Hook / Situation",
+          "prompt_text": "Ancient Huế, Vietnam, with a gentle, serene, and slightly nostalgic atmosphere, featuring traditional architecture, tranquil rivers, lush greenery, and subtle modern elements, bathed in soft, warm daylight and cool shadows. @Mai: admin, a stylized graphic novel illustration, clean ink outlines, cel-shaded, in a professional yet approachable outfit, looking observant as she enters a modern office lobby with traditional Huế architectural accents, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3",
+          "text_overlay_vietnamese": "Mai đến thăm một công ty đối tác mới ở Huế.",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "Mai visits a new partner company in Huế.",
+              "position": "top-left"
+            }
+          ],
+          "image_path": "/episode_6_panels/panel_1.png",
+          "image_exists": false
+        },
+        {
+          "frame_number": 2,
+          "panel_type": "Action / Complication",
+          "prompt_text": "Ancient Huế, Vietnam, with a gentle, serene, and slightly nostalgic atmosphere, featuring traditional architecture, tranquil rivers, lush greenery, and subtle modern elements, bathed in soft, warm daylight and cool shadows. @Mai: admin, a stylized graphic novel illustration, clean ink outlines, cel-shaded, looking surprised, peering across a busy office space towards @Thảo: community manager, a stylized graphic novel illustration, clean ink outlines, cel-shaded, working diligently at a reception desk or workstation, interacting with a customer, in a different uniform than usual, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3",
+          "text_overlay_vietnamese": "Cô bất ngờ thấy một gương mặt quen thuộc.",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "She suddenly spots a familiar face.",
+              "position": "top-left"
+            }
+          ],
+          "image_path": "/episode_6_panels/panel_2.png",
+          "image_exists": false
+        },
+        {
+          "frame_number": 3,
+          "panel_type": "Insight / Turning Point",
+          "prompt_text": "Ancient Huế, Vietnam, with a gentle, serene, and slightly nostalgic atmosphere, featuring traditional architecture, tranquil rivers, lush greenery, and subtle modern elements, bathed in soft, warm daylight and cool shadows. @Mai: admin, a stylized graphic novel illustration, clean ink outlines, cel-shaded, standing beside @Thảo: community manager, a stylized graphic novel illustration, clean ink outlines, cel-shaded, who is smiling slightly apologetically but also confidently, explaining her situation in a brief conversation, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3",
+          "text_overlay_vietnamese": "Thảo đang làm công việc thứ hai của mình.",
+          "text_overlays": [
+            {
+              "type": "dialogue",
+              "text": "Thảo... cậu làm ở đây sao?",
+              "position": "bottom-left"
+            },
+            {
+              "type": "dialogue",
+              "text": "À, ừ. Việc tay trái của tớ!",
+              "position": "bottom-right"
+            }
+          ],
+          "image_path": "/episode_6_panels/panel_3.png",
+          "image_exists": false
+        },
+        {
+          "frame_number": 4,
+          "panel_type": "Result / Emotional Beat",
+          "prompt_text": "Ancient Huế, Vietnam, with a gentle, serene, and slightly nostalgic atmosphere, featuring traditional architecture, tranquil rivers, lush greenery, and subtle modern elements, bathed in soft, warm daylight and cool shadows. @Mai: admin, a stylized graphic novel illustration, clean ink outlines, cel-shaded, looking thoughtful and impressed, observing @Thảo: community manager, a stylized graphic novel illustration, clean ink outlines, cel-shaded, returning to her work with a focused yet cheerful expression, conveying a sense of respect and understanding for Thảo's dedication, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3",
+          "text_overlay_vietnamese": "Sự chăm chỉ của Thảo khiến Mai suy ngẫm.",
+          "text_overlays": [
+            {
+              "type": "narration",
+              "text": "Thảo's diligence made Mai reflect.",
+              "position": "top-left"
+            }
+          ],
+          "image_path": "/episode_6_panels/panel_4.png",
+          "image_exists": false
+        }
+      ],
+      "matched_asset_ids": [
+        "characters_cường",
+        "characters_thảo",
+        "characters_mai"
+      ],
+      "mentions_primary_character": true,
+      "created_at": "2026-05-27T10:12:52.286658+00:00",
+      "updated_at": "2026-05-27T10:12:52.320356+00:00"
+    }
+  ],
+  "updated_at": "2026-05-27T10:12:52.320356+00:00"
+}

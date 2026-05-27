@@ -1,0 +1,2640 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comic Series Engine</title>
+    <!-- Modern Premium Font & Comic Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Comic+Neue:wght@700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #0a0e12;
+            --bg-surface: rgba(18, 26, 33, 0.7);
+            --bg-surface-solid: #121a21;
+            --accent-primary: #00ffd2;
+            --accent-secondary: #ff8c00;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border-glow: rgba(0, 255, 210, 0.2);
+            --border-muted: rgba(255, 255, 255, 0.08);
+            --shadow-glow: 0 0 20px rgba(0, 255, 210, 0.15);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            height: 100vh;
+            width: 100%;
+            max-width: 100vw;
+            overflow: hidden;
+            display: flex;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(0, 255, 210, 0.05) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(255, 140, 0, 0.03) 0px, transparent 50%);
+        }
+
+        /* Layout */
+        .sidebar {
+            width: 320px;
+            background: var(--bg-surface);
+            backdrop-filter: blur(16px);
+            border-right: 1px solid var(--border-muted);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        .main-content {
+            flex-grow: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 24px;
+        }
+
+        /* Sidebar Elements */
+        .sidebar-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border-muted);
+        }
+
+        .sidebar-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            background: linear-gradient(90deg, var(--accent-primary), #00bfff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sidebar-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .generation-box {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-muted);
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .input-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+        }
+
+        input[type="text"] {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-muted);
+            border-radius: 8px;
+            padding: 10px 12px;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 10px rgba(0, 255, 210, 0.1);
+        }
+
+        .topic-input-wrap {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .mention-suggest {
+            position: absolute;
+            z-index: 80;
+            top: calc(100% + 6px);
+            left: 0;
+            right: 0;
+            display: none;
+            max-height: 260px;
+            overflow-y: auto;
+            border: 1px solid var(--border-muted);
+            border-radius: 8px;
+            background: rgba(5, 10, 14, 0.98);
+            box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
+        }
+
+        .mention-suggest.active {
+            display: block;
+        }
+
+        .mention-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .mention-item:last-child {
+            border-bottom: none;
+        }
+
+        .mention-item.active,
+        .mention-item:hover {
+            background: rgba(0, 255, 210, 0.08);
+        }
+
+        .mention-item-name {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            color: var(--text-main);
+            font-size: 0.84rem;
+            font-weight: 700;
+        }
+
+        .mention-item-kind {
+            color: var(--accent-primary);
+            font-size: 0.66rem;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+            white-space: nowrap;
+        }
+
+        .mention-item-desc {
+            margin-top: 3px;
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            line-height: 1.35;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--accent-primary), #00bfff);
+            color: #050a0e;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(0, 255, 210, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            border: 1px solid var(--border-muted);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: none;
+            border-color: var(--text-muted);
+        }
+
+        .episodes-list-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .episode-item {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-muted);
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .episode-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(0, 255, 210, 0.3);
+        }
+
+        .episode-item.active {
+            background: rgba(0, 255, 210, 0.03);
+            border-color: var(--accent-primary);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .episode-item-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .episode-item-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .badge {
+            background: rgba(255, 255, 255, 0.06);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+
+        .badge-ready {
+            background: rgba(0, 255, 210, 0.1);
+            color: var(--accent-primary);
+        }
+
+        /* Main Workspace Elements */
+        .workspace-header {
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .active-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .active-meta {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .workspace-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+            gap: 24px;
+            flex-grow: 1;
+            min-height: 0; /* Important for scroll container behavior */
+            overflow: hidden;
+        }
+
+        /* Comic Preview Frame (Insta/FB style device) */
+        .preview-pane {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-width: 0;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-muted);
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .carousel-container {
+            width: min(100%, 480px);
+            aspect-ratio: 4 / 3;
+            height: auto;
+            position: relative;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .carousel-slides {
+            display: flex;
+            width: 400%;
+            height: 100%;
+            transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        .slide {
+            width: 25%;
+            height: 100%;
+            position: relative;
+            flex-shrink: 0;
+            background: #111;
+        }
+
+        .slide-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            text-align: center;
+            background: linear-gradient(135deg, #111a22 0%, #080c10 100%);
+            border: 1px dashed rgba(0, 255, 210, 0.2);
+        }
+
+        .slide-placeholder-icon {
+            font-size: 2.5rem;
+            margin-bottom: 12px;
+            opacity: 0.7;
+        }
+
+        .slide-placeholder-text {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            line-height: 1.4;
+        }
+
+        .slide-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Comic Speech Bubbles and Narration Boxes */
+        .comic-overlay {
+            position: absolute;
+            z-index: 5;
+            color: #000000;
+            font-size: 0.8rem;
+            line-height: 1.3;
+            max-width: 65%;
+            pointer-events: none;
+            box-sizing: border-box;
+            filter: url(#hand-drawn-bubble);
+        }
+
+        .speech-bubble {
+            background: #ffffff;
+            border: 3px solid #000000;
+            box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.95);
+            padding: 8px 12px;
+            font-family: 'Architects Daughter', cursive, sans-serif;
+            font-weight: 700;
+        }
+
+        .thought-bubble {
+            background: #ffffff;
+            border: 3px solid #000000;
+            box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.95);
+            border-radius: 40px;
+            padding: 10px 14px;
+            font-family: 'Architects Daughter', cursive, sans-serif;
+            font-weight: 700;
+        }
+
+        /* Thought bubble trail dots */
+        .thought-dots {
+            position: absolute;
+            display: flex;
+            gap: 4px;
+            pointer-events: none;
+        }
+        .thought-dot {
+            background: #ffffff;
+            border: 3px solid #000000;
+            border-radius: 50%;
+            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.95);
+        }
+        .thought-dot.dot-1 { width: 12px; height: 12px; }
+        .thought-dot.dot-2 { width: 9px; height: 9px; }
+        .thought-dot.dot-3 { width: 6px; height: 6px; }
+
+        /* Positioning thought dots based on corner position */
+        .thought-dots.pos-bottom-right {
+            bottom: -22px;
+            left: 20px;
+            flex-direction: column-reverse;
+            align-items: flex-end;
+        }
+        .thought-dots.pos-bottom-left {
+            bottom: -22px;
+            right: 20px;
+            flex-direction: column-reverse;
+            align-items: flex-start;
+        }
+        .thought-dots.pos-top-right {
+            top: -22px;
+            left: 20px;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+        .thought-dots.pos-top-left {
+            top: -22px;
+            right: 20px;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        /* Jagged shout bubble style */
+        .shout-bubble {
+            background: #000000;
+            padding: 3px;
+            clip-path: polygon(
+                0% 15%, 12% 16%, 15% 0%, 28% 13%, 48% 6%, 53% 15%, 68% 8%, 73% 20%, 88% 12%, 86% 28%, 100% 30%, 88% 45%, 93% 60%, 83% 65%, 88% 85%, 73% 80%, 68% 100%, 53% 85%, 43% 95%, 38% 80%, 23% 90%, 18% 75%, 0% 85%, 6% 60%, 0% 50%, 8% 40%, 0% 30%
+            );
+        }
+        .shout-inner {
+            background: #ffea00;
+            color: #000000;
+            padding: 10px 16px;
+            font-family: 'Comic Neue', sans-serif;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            clip-path: polygon(
+                0% 15%, 12% 16%, 15% 0%, 28% 13%, 48% 6%, 53% 15%, 68% 8%, 73% 20%, 88% 12%, 86% 28%, 100% 30%, 88% 45%, 93% 60%, 83% 65%, 88% 85%, 73% 80%, 68% 100%, 53% 85%, 43% 95%, 38% 80%, 23% 90%, 18% 75%, 0% 85%, 6% 60%, 0% 50%, 8% 40%, 0% 30%
+            );
+        }
+        
+        /* Bubble tail pointers based on corner position - skewed inward toward character */
+        .speech-bubble.pos-bottom-right::after {
+            content: '';
+            position: absolute;
+            top: -12px;
+            left: 30px;
+            border-width: 0 10px 12px 10px;
+            border-style: solid;
+            border-color: transparent transparent #ffffff transparent;
+            display: block;
+            width: 0;
+        }
+        .speech-bubble.pos-bottom-right::before {
+            content: '';
+            position: absolute;
+            top: -16px;
+            left: 28px;
+            border-width: 0 12px 16px 12px;
+            border-style: solid;
+            border-color: transparent transparent #000000 transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.pos-bottom-left::after {
+            content: '';
+            position: absolute;
+            top: -12px;
+            right: 30px;
+            border-width: 0 10px 12px 10px;
+            border-style: solid;
+            border-color: transparent transparent #ffffff transparent;
+            display: block;
+            width: 0;
+        }
+        .speech-bubble.pos-bottom-left::before {
+            content: '';
+            position: absolute;
+            top: -16px;
+            right: 28px;
+            border-width: 0 12px 16px 12px;
+            border-style: solid;
+            border-color: transparent transparent #000000 transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.pos-top-left::after {
+            content: '';
+            position: absolute;
+            bottom: -12px;
+            right: 30px;
+            border-width: 12px 10px 0 10px;
+            border-style: solid;
+            border-color: #ffffff transparent transparent transparent;
+            display: block;
+            width: 0;
+        }
+        .speech-bubble.pos-top-left::before {
+            content: '';
+            position: absolute;
+            bottom: -16px;
+            right: 28px;
+            border-width: 16px 12px 0 12px;
+            border-style: solid;
+            border-color: #000000 transparent transparent transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.pos-top-right::after {
+            content: '';
+            position: absolute;
+            bottom: -12px;
+            left: 30px;
+            border-width: 12px 10px 0 10px;
+            border-style: solid;
+            border-color: #ffffff transparent transparent transparent;
+            display: block;
+            width: 0;
+        }
+        .speech-bubble.pos-top-right::before {
+            content: '';
+            position: absolute;
+            bottom: -16px;
+            left: 28px;
+            border-width: 16px 12px 0 12px;
+            border-style: solid;
+            border-color: #000000 transparent transparent transparent;
+            display: block;
+            width: 0;
+        }
+
+        .narration-box {
+            background: #fffbdf;
+            border: 3px solid #000000;
+            box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.95);
+            padding: 8px 12px;
+            font-family: 'Comic Neue', cursive, sans-serif;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Placement classes */
+        .pos-top-left { top: 16px; left: 16px; }
+        .pos-top-right { top: 16px; right: 16px; }
+        .pos-bottom-left { bottom: 16px; left: 16px; }
+        .pos-bottom-right { bottom: 16px; right: 16px; }
+        .pos-center { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+
+        .carousel-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 480px;
+            margin-top: 16px;
+        }
+
+        .carousel-dot-container {
+            display: flex;
+            gap: 8px;
+        }
+
+        .carousel-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .carousel-dot.active {
+            background: var(--accent-primary);
+            box-shadow: 0 0 8px var(--accent-primary);
+            width: 20px;
+            border-radius: 4px;
+        }
+
+        .arrow-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-muted);
+            color: var(--text-main);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .arrow-btn:hover {
+            background: var(--bg-surface-solid);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        /* Right Panel: Prompts and Captions */
+        .info-pane {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-width: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 4px;
+        }
+
+        .card {
+            background: var(--bg-surface);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border-muted);
+            border-radius: 12px;
+            padding: 20px;
+            min-width: 0;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-muted);
+        }
+
+        .card-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--accent-primary);
+        }
+
+        .prompt-text {
+            font-family: monospace;
+            font-size: 0.75rem;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-muted);
+            border-radius: 6px;
+            padding: 10px;
+            color: #a7f3d0;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 120px;
+            overflow-y: auto;
+            margin-top: 8px;
+        }
+
+        .caption-text {
+            font-size: 0.85rem;
+            line-height: 1.5;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-muted);
+            border-radius: 6px;
+            padding: 12px;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        /* Copy Button Icon */
+        .copy-btn {
+            font-size: 0.7rem;
+            color: var(--accent-primary);
+            cursor: pointer;
+            text-transform: uppercase;
+            font-weight: 600;
+            border: 1px solid var(--accent-primary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: transparent;
+            transition: all 0.2s ease;
+        }
+
+        .copy-btn:hover {
+            background: rgba(0, 255, 210, 0.1);
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(5, 10, 15, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .loading-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(0, 255, 210, 0.1);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+            box-shadow: 0 0 15px rgba(0, 255, 210, 0.2);
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: var(--accent-primary);
+            letter-spacing: 1px;
+        }
+
+        /* Notifications */
+        .notification-toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--bg-surface-solid);
+            border: 1px solid var(--accent-primary);
+            box-shadow: var(--shadow-glow);
+            border-radius: 8px;
+            padding: 16px 20px;
+            z-index: 99;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        .notification-toast.active {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .notification-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--accent-primary);
+            margin-bottom: 4px;
+        }
+
+        .notification-body {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .notification-link {
+            color: #00bfff;
+            text-decoration: none;
+            font-weight: 500;
+            margin-top: 6px;
+            display: inline-block;
+        }
+
+        .notification-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Empty state */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex-grow: 1;
+            opacity: 0.7;
+        }
+
+        /* Drawer Overlay */
+        .drawer-overlay {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            background: rgba(5, 10, 15, 0.8);
+            z-index: 999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            backdrop-filter: blur(6px);
+        }
+        .drawer-overlay.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+ 
+        /* Slide-out Drawer */
+        .drawer {
+            position: fixed;
+            inset: 0 0 0 auto;
+            width: min(560px, calc(100vw - 24px));
+            max-width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            background: #0e141a !important; /* Solid dark background matching theme to prevent bleed-through */
+            backdrop-filter: none !important;
+            border-left: 1px solid var(--border-glow);
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            z-index: 1000;
+            box-shadow: -10px 0px 40px rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            isolation: isolate;
+            overflow: hidden;
+        }
+        .drawer.open {
+            transform: translateX(0);
+        }
+
+        .drawer-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border-muted);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            flex-shrink: 0;
+            background: #0e141a;
+        }
+        .drawer-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--accent-primary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+            line-height: 1.25;
+        }
+        .drawer-close {
+            width: 36px;
+            height: 36px;
+            flex: 0 0 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-muted);
+            border-radius: 8px;
+            font-size: 1.35rem;
+            line-height: 1;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+        .drawer-close:hover {
+            color: #ff4500;
+        }
+
+        .drawer-body {
+            flex-grow: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            background: #0e141a;
+        }
+        .drawer-footer {
+            padding: 20px 24px;
+            border-top: 1px solid var(--border-muted);
+            display: flex;
+            gap: 12px;
+            background: #0e141a;
+            flex-shrink: 0;
+        }
+
+        /* Collapsible Accordion Drawers */
+        .accordion {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .accordion-item {
+            border: 1px solid var(--border-muted);
+            border-radius: 8px;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.01);
+            transition: all 0.25s ease;
+        }
+        .accordion-item.active {
+            border-color: var(--accent-primary);
+            background: rgba(0, 255, 210, 0.02);
+            box-shadow: 0 0 15px rgba(0, 255, 210, 0.05);
+        }
+        .accordion-header {
+            padding: 14px 18px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-main);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(255, 255, 255, 0.02);
+            transition: background 0.2s ease;
+            gap: 12px;
+        }
+        .accordion-header span:first-child {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+        .accordion-header:hover {
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--accent-primary);
+        }
+        .accordion-content {
+            max-height: 0;
+            padding: 0 18px;
+            overflow: hidden;
+            transition: max-height 0.3s cubic-bezier(0.25, 1, 0.5, 1), padding 0.3s ease;
+        }
+        .accordion-item.active .accordion-content {
+            max-height: 450px;
+            padding: 16px 18px;
+        }
+        .accordion-item .chevron {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            transition: transform 0.25s ease;
+        }
+        .accordion-item.active .chevron {
+            transform: rotate(180deg);
+            color: var(--accent-primary);
+        }
+
+        /* Drop Zone style for reference images */
+        .drop-zone {
+            height: 120px;
+            border: 2px dashed var(--border-muted);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            background: rgba(0, 0, 0, 0.2);
+            outline: none;
+            overflow: hidden;
+            margin-top: 4px;
+            user-select: none;
+        }
+        .drop-zone:hover, .drop-zone:focus {
+            border-color: var(--accent-primary);
+            color: var(--text-main);
+            background: rgba(0, 255, 210, 0.02);
+            box-shadow: 0 0 10px rgba(0, 255, 210, 0.1);
+        }
+        .drop-zone.drag-over {
+            border-color: var(--accent-primary);
+            background: rgba(0, 255, 210, 0.05);
+            color: var(--accent-primary);
+        }
+        .drop-zone-prompt {
+            pointer-events: none;
+            padding: 10px;
+        }
+        .drop-zone-preview {
+            display: none;
+            width: 100%;
+            height: 100%;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+        }
+        .drop-zone-preview img {
+            max-height: 110px;
+            max-width: 100%;
+            object-fit: contain;
+            border-radius: 4px;
+        }
+
+        @media (max-width: 1250px) {
+            .sidebar {
+                width: 280px;
+            }
+            .main-content {
+                padding: 18px;
+            }
+            .workspace-grid {
+                grid-template-columns: 1fr;
+                overflow-y: auto;
+                padding-right: 4px;
+            }
+            .preview-pane {
+                min-height: 420px;
+            }
+            .info-pane {
+                overflow: visible;
+                padding-right: 0;
+            }
+        }
+
+        @media (max-width: 820px) {
+            html,
+            body {
+                height: auto;
+                min-height: 100vh;
+                overflow-y: auto;
+            }
+            body {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                height: auto;
+                max-height: none;
+            }
+            .episodes-list-container {
+                max-height: 220px;
+            }
+            .main-content {
+                height: auto;
+                min-height: 0;
+                overflow: visible;
+                padding: 16px;
+            }
+            .workspace-tabs {
+                flex-wrap: wrap;
+            }
+            .workspace-tab {
+                flex: 1 1 220px;
+                text-align: center;
+            }
+            .preview-pane {
+                min-height: 0;
+                padding: 14px;
+            }
+            .drawer {
+                width: 100vw;
+                border-left: none;
+            }
+        }
+
+        /* ── WORKSPACE TABS ── */
+        .workspace-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-muted);
+            padding-bottom: 0;
+        }
+        .workspace-tab {
+            padding: 10px 20px;
+            border-radius: 8px 8px 0 0;
+            border: 1px solid transparent;
+            border-bottom: none;
+            font-size: 0.82rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: var(--text-muted);
+            background: transparent;
+            position: relative;
+            bottom: -1px;
+        }
+        .workspace-tab.active {
+            color: var(--accent-primary);
+            border-color: var(--border-muted);
+            background: var(--bg-base);
+            border-bottom-color: var(--bg-base);
+        }
+        .workspace-tab:hover:not(.active) {
+            color: var(--text-main);
+            background: rgba(255,255,255,0.03);
+        }
+        .tab-panel {
+            display: none;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+        .tab-panel.active {
+            display: flex;
+        }
+
+        /* ── LORE / ASSETS TAB ── */
+        .assets-outer {
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+            overflow-y: auto;
+            flex: 1;
+            padding-right: 4px;
+        }
+        .assets-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+        }
+        .assets-section-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--accent-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .assets-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 14px;
+            align-items: flex-start;
+        }
+        .asset-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-muted);
+            border-radius: 12px;
+            padding: 14px;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .asset-card:hover {
+            border-color: rgba(0, 255, 210, 0.3);
+            box-shadow: 0 0 14px rgba(0, 255, 210, 0.08);
+        }
+        .asset-drop-zone {
+            width: 100%;
+            height: 96px;
+            border: 2px dashed var(--border-muted);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .asset-drop-zone:hover, .asset-drop-zone.drag-over {
+            border-color: var(--accent-primary);
+            color: var(--text-main);
+            background: rgba(0, 255, 210, 0.04);
+        }
+        .asset-drop-zone:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 2px rgba(0, 255, 210, 0.16);
+        }
+        .asset-drop-zone img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 6px;
+        }
+        .asset-drop-zone .adz-label {
+            padding: 6px;
+            pointer-events: none;
+            line-height: 1.5;
+        }
+        .asset-name-input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-muted);
+            border-radius: 6px;
+            padding: 7px 10px;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: border-color 0.2s;
+        }
+        .asset-name-input:focus { outline: none; border-color: var(--accent-primary); }
+        .asset-desc-input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-muted);
+            border-radius: 6px;
+            padding: 7px 10px;
+            color: var(--text-muted);
+            font-family: inherit;
+            font-size: 0.72rem;
+            resize: none;
+            min-height: 58px;
+            transition: border-color 0.2s;
+        }
+        .asset-desc-input:focus { outline: none; border-color: var(--accent-primary); color: var(--text-main); }
+        .asset-card-actions {
+            display: flex;
+            gap: 6px;
+        }
+        .asset-save-btn {
+            flex: 1;
+            padding: 6px 0;
+            border-radius: 6px;
+            border: none;
+            font-size: 0.72rem;
+            font-weight: 700;
+            cursor: pointer;
+            background: var(--accent-primary);
+            color: #000;
+            transition: opacity 0.2s;
+        }
+        .asset-save-btn:hover { opacity: 0.85; }
+        .asset-save-btn:disabled {
+            cursor: progress;
+            opacity: 0.55;
+        }
+        .asset-delete-btn {
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 80, 80, 0.35);
+            background: transparent;
+            color: #ff5050;
+            font-size: 0.72rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .asset-delete-btn:hover { background: rgba(255, 80, 80, 0.1); }
+        .asset-card-add {
+            border-style: dashed;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0.55;
+            min-height: 100px;
+            flex-direction: row;
+            gap: 8px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            transition: opacity 0.2s, border-color 0.2s, color 0.2s;
+        }
+        .asset-card-add:hover {
+            opacity: 1;
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h1 class="sidebar-title">
+                <span style="font-size: 1.5rem;">⚙️</span> Comic Series Engine
+            </h1>
+            <div class="sidebar-subtitle">Comic Content Engine</div>
+        </div>
+
+        <!-- Series Selector Box -->
+        <div class="generation-box" style="border-bottom: 1px solid var(--border-muted); background: rgba(0, 255, 210, 0.02);">
+            <div class="input-group">
+                <label class="input-label" for="series-select">Chọn Series Đang Chạy</label>
+                <select id="series-select" style="background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border-muted); border-radius: 8px; padding: 10px 12px; color: var(--text-main); font-family: inherit; font-size: 0.9rem; width: 100%; transition: all 0.2s ease;">
+                    <!-- Series options loaded dynamically -->
+                </select>
+            </div>
+        </div>
+
+        <!-- Series Generation Form -->
+        <div class="generation-box" style="border-bottom: 1px solid var(--border-muted);">
+            <div class="input-group">
+                <label class="input-label">Bắt Đầu Series Mới</label>
+                <button class="btn" id="open-drawer-btn" style="background: linear-gradient(135deg, var(--accent-secondary), #ff4500); color: #fff; width: 100%;">
+                    <span>🎬</span> Khởi Tạo Series Mới
+                </button>
+            </div>
+        </div>
+
+        <!-- Topic Generation Form -->
+        <div class="generation-box">
+            <div class="input-group">
+                <label class="input-label" for="topic-input">Chủ đề tập mới</label>
+                <div class="topic-input-wrap">
+                    <input type="text" id="topic-input" autocomplete="off" spellcheck="false" placeholder="Gõ @ để gọi nhân vật, bối cảnh, vật thể...">
+                    <div class="mention-suggest" id="mention-suggest"></div>
+                </div>
+                <button class="btn" id="generate-btn">
+                    <span>⚡</span> Tạo Tập Mới
+                </button>
+            </div>
+        </div>
+
+
+        <!-- List of generated episodes -->
+        <div class="episodes-list-container">
+            <div class="input-label" style="margin-bottom: 12px;">Các tập đã tạo</div>
+            <div id="episodes-list">
+                <!-- Loaded dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="main-content" id="workspace" style="display: none;">
+        <div class="workspace-header">
+            <div>
+                <h2 class="active-title" id="ep-title">Tập đang chọn</h2>
+                <div class="active-meta" id="ep-meta">Preview carousel truyện tranh</div>
+            </div>
+            <button class="btn" id="publish-btn" style="background: linear-gradient(135deg, var(--accent-secondary), #ff4500);">
+                <span>🚀</span> Đăng Lên Facebook
+            </button>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="workspace-tabs">
+            <button class="workspace-tab active" id="tab-episodes" onclick="switchTab('episodes')">📺 Xem Tập Truyện</button>
+            <button class="workspace-tab" id="tab-lore" onclick="switchTab('lore')">🎭 Quản Lý Tài Nguyên</button>
+        </div>
+
+        <!-- TAB 1: Episodes Preview -->
+        <div class="tab-panel active" id="panel-episodes">
+            <div class="workspace-grid">
+                <!-- Left Side: Swipe Carousel Device Mockup -->
+                <div class="preview-pane">
+                    <div class="carousel-container">
+                        <div class="carousel-slides" id="carousel-slides">
+                            <!-- 4 Slides loaded dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Carousel navigation dots & arrows -->
+                    <div class="carousel-nav">
+                        <button class="arrow-btn" id="prev-slide">◀</button>
+                        <div class="carousel-dot-container" id="carousel-dots">
+                            <div class="carousel-dot active" onclick="goToSlide(0)"></div>
+                            <div class="carousel-dot" onclick="goToSlide(1)"></div>
+                            <div class="carousel-dot" onclick="goToSlide(2)"></div>
+                            <div class="carousel-dot" onclick="goToSlide(3)"></div>
+                        </div>
+                        <button class="arrow-btn" id="next-slide">▶</button>
+                    </div>
+                </div>
+
+                <!-- Right Side: Prompt copy & captions -->
+                <div class="info-pane">
+                    <!-- Slide Prompt Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title" id="prompt-card-title">Prompt cho khung 1</span>
+                            <button class="copy-btn" id="copy-prompt-btn">Copy Prompt</button>
+                        </div>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">
+                            Copy prompt này dán vào Midjourney hoặc Imagen 4 để tạo ảnh:
+                        </p>
+                        <div class="prompt-text" id="prompt-content">Loading...</div>
+                    </div>
+
+                    <!-- Facebook Caption Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Caption đăng bài (Facebook)</span>
+                            <button class="copy-btn" id="copy-caption-btn">Copy Caption</button>
+                        </div>
+                        <div class="caption-text" id="caption-content">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: Lore & Assets Management -->
+        <div class="tab-panel" id="panel-lore">
+            <div class="assets-outer" id="assets-outer">
+
+                <!-- Characters Section -->
+                <div id="section-characters">
+                    <div class="assets-section-header">
+                        <div class="assets-section-title">👤 Nhân Vật (Characters)</div>
+                        <span style="font-size:0.72rem; color:var(--text-muted);">Mô tả xuất hiện trong prompt ảnh để đảm bảo nhất quán</span>
+                    </div>
+                    <div class="assets-cards" id="cards-characters"></div>
+                </div>
+
+                <!-- Objects Section -->
+                <div id="section-objects">
+                    <div class="assets-section-header">
+                        <div class="assets-section-title">🔧 Vật Thể Nhất Quán (Objects)</div>
+                        <span style="font-size:0.72rem; color:var(--text-muted);">Các đồ vật / thiết bị đặc trưng cần xuất hiện đồng nhất</span>
+                    </div>
+                    <div class="assets-cards" id="cards-objects"></div>
+                </div>
+
+                <!-- Settings Section -->
+                <div id="section-settings">
+                    <div class="assets-section-header">
+                        <div class="assets-section-title">🌄 Bối Cảnh (Settings)</div>
+                        <span style="font-size:0.72rem; color:var(--text-muted);">Mô tả môi trường, không gian, ánh sáng để giữ nhất quán</span>
+                    </div>
+                    <div class="assets-cards" id="cards-settings"></div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- New Series Drawer Modal -->
+    <div class="drawer-overlay" id="drawer-overlay"></div>
+    <div class="drawer" id="new-series-drawer">
+        <div class="drawer-header">
+            <h2 class="drawer-title">🎬 Khởi Tạo Series Mới</h2>
+            <button class="drawer-close" id="close-drawer-btn">&times;</button>
+        </div>
+        <div class="drawer-body">
+            <!-- Accordion container -->
+            <div class="accordion">
+                <!-- Section 1: Tên truyện -->
+                <div class="accordion-item active">
+                    <div class="accordion-header" onclick="toggleAccordion(this)">
+                        <span>1. Tên Truyện (Series Title)</span>
+                        <span class="chevron">▼</span>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="input-group" style="padding-top: 10px;">
+                            <input type="text" id="series-title" placeholder="Ví dụ: Thành Phố Mưa, Hành Trình Sao Băng..." style="width: 100%;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2: Intro cốt truyện -->
+                <div class="accordion-item">
+                    <div class="accordion-header" onclick="toggleAccordion(this)">
+                        <span>2. Cốt Truyện & Chủ Đề (Intro / Plot)</span>
+                        <span class="chevron">▼</span>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="input-group" style="padding-top: 10px;">
+                            <textarea id="series-plot" placeholder="Mô tả tóm tắt nội dung chính của bộ truyện, mục tiêu của nhân vật..." rows="3" style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--border-muted); border-radius: 8px; padding: 10px 12px; color: var(--text-main); font-family: inherit; font-size: 0.9rem; resize: vertical;"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Mô tả nhân vật -->
+                <div class="accordion-item">
+                    <div class="accordion-header" onclick="toggleAccordion(this)">
+                        <span>3. Nhân Vật Chính (Protagonist)</span>
+                        <span class="chevron">▼</span>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="input-group" style="padding-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+                            <div>
+                                <label class="input-label" style="font-size: 0.7rem;">Tên nhân vật</label>
+                                <input type="text" id="series-char-name" placeholder="Ví dụ: An, Linh, Kael" style="width: 100%;">
+                            </div>
+                            <div>
+                                <label class="input-label" style="font-size: 0.7rem;">Mô tả ngoại hình</label>
+                                <textarea id="series-char-desc" placeholder="Ví dụ: 25 tuổi, tóc thắt bím màu xanh lam, đeo kính bảo hộ, mặc quần yếm jean, có vết dầu loang trên má..." rows="3" style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--border-muted); border-radius: 8px; padding: 10px 12px; color: var(--text-main); font-family: inherit; font-size: 0.9rem; resize: vertical;"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 4: Bối cảnh -->
+                <div class="accordion-item">
+                    <div class="accordion-header" onclick="toggleAccordion(this)">
+                        <span>4. Bối Cảnh & Không Khí (Setting)</span>
+                        <span class="chevron">▼</span>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="input-group" style="padding-top: 10px;">
+                            <textarea id="series-setting" placeholder="Ví dụ: Mái nhà đô thị cyberpunk ngập tràn ánh đèn neon và biển hiệu hologram lúc trời mưa lớn..." rows="3" style="width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--border-muted); border-radius: 8px; padding: 10px 12px; color: var(--text-main); font-family: inherit; font-size: 0.9rem; resize: vertical;"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 5: Ảnh tham chiếu -->
+                <div class="accordion-item">
+                    <div class="accordion-header" onclick="toggleAccordion(this)">
+                        <span>5. Ảnh Tham Chiếu (Reference Images)</span>
+                        <span class="chevron">▼</span>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="input-group" style="padding-top: 10px; display: flex; flex-direction: column; gap: 12px;">
+                            <div>
+                                <label class="input-label" style="font-size: 0.7rem; display: block; margin-bottom: 4px;">Khuôn mặt nhân vật (Face Ref)</label>
+                                <div class="drop-zone" id="char-drop-zone" tabindex="0">
+                                    <span class="drop-zone-prompt">Kéo thả ảnh hoặc dán vào đây (Khuôn mặt)</span>
+                                    <input type="file" id="char-ref-file" accept="image/*" class="drop-zone-input" style="display: none;">
+                                    <div id="char-ref-preview" class="drop-zone-preview"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="input-label" style="font-size: 0.7rem; display: block; margin-bottom: 4px;">Bối cảnh xung quanh (Setting Ref)</label>
+                                <div class="drop-zone" id="setting-drop-zone" tabindex="0">
+                                    <span class="drop-zone-prompt">Kéo thả ảnh hoặc dán vào đây (Bối cảnh)</span>
+                                    <input type="file" id="setting-ref-file" accept="image/*" class="drop-zone-input" style="display: none;">
+                                    <div id="setting-ref-preview" class="drop-zone-preview"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="drawer-footer">
+            <button class="btn btn-secondary" id="cancel-drawer-btn" style="flex: 1;">Hủy bỏ</button>
+            <button class="btn" id="submit-series-btn" style="flex: 1; background: linear-gradient(135deg, var(--accent-secondary), #ff4500); color: #fff;">
+                🎬 Khởi Tạo
+            </button>
+        </div>
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-state" id="empty-state">
+        <span style="font-size: 4rem; margin-bottom: 20px;">💡</span>
+        <h2>Chưa Có Tập Nào Được Chọn</h2>
+        <p style="color: var(--text-muted); margin-top: 8px;">Hãy tạo tập mới hoặc chọn một tập bên danh sách để xem.</p>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loading-text">Đang tạo nội dung với Gemini...</div>
+    </div>
+
+    <!-- Toast notification -->
+    <div class="notification-toast" id="notification-toast">
+        <div class="notification-title" id="toast-title">Thành Công!</div>
+        <div class="notification-body" id="toast-body">Đã đăng thành công lên Facebook.</div>
+        <a href="#" class="notification-link" id="toast-link" target="_blank">Xem bài viết trên Facebook</a>
+    </div>
+
+    <!-- Scripting Frontend Logic -->
+    <script>
+        let episodes = [];
+        let currentEpisode = null;
+        let currentSlideIndex = 0;
+
+        // Dom Elements
+        const epList = document.getElementById("episodes-list");
+        const emptyState = document.getElementById("empty-state");
+        const workspace = document.getElementById("workspace");
+        const epTitle = document.getElementById("ep-title");
+        const epMeta = document.getElementById("ep-meta");
+        const carouselSlides = document.getElementById("carousel-slides");
+        const promptCardTitle = document.getElementById("prompt-card-title");
+        const promptContent = document.getElementById("prompt-content");
+        const captionContent = document.getElementById("caption-content");
+        const loadingOverlay = document.getElementById("loading-overlay");
+        const loadingText = document.getElementById("loading-text");
+        const dots = document.querySelectorAll(".carousel-dot");
+        const toast = document.getElementById("notification-toast");
+        const seriesSelect = document.getElementById("series-select");
+        
+        // Buttons
+        const generateBtn = document.getElementById("generate-btn");
+        const topicInput = document.getElementById("topic-input");
+        const mentionSuggest = document.getElementById("mention-suggest");
+        const openDrawerBtn = document.getElementById("open-drawer-btn");
+        const closeDrawerBtn = document.getElementById("close-drawer-btn");
+        const cancelDrawerBtn = document.getElementById("cancel-drawer-btn");
+        const submitSeriesBtn = document.getElementById("submit-series-btn");
+        const drawer = document.getElementById("new-series-drawer");
+        const overlay = document.getElementById("drawer-overlay");
+        const nextBtn = document.getElementById("next-slide");
+        const prevBtn = document.getElementById("prev-slide");
+        const copyPromptBtn = document.getElementById("copy-prompt-btn");
+        const copyCaptionBtn = document.getElementById("copy-caption-btn");
+        const publishBtn = document.getElementById("publish-btn");
+
+        // Load Episodes on Init
+        async function fetchEpisodes() {
+            try {
+                const res = await fetch("/api/episodes");
+                episodes = await res.json();
+                renderEpisodesList();
+                
+                // Load first episode by default if present
+                if (episodes.length > 0 && !currentEpisode) {
+                    selectEpisode(episodes[0].episode_number);
+                }
+            } catch (err) {
+                console.error("Error fetching episodes:", err);
+            }
+        }
+
+        function renderEpisodesList() {
+            epList.innerHTML = "";
+            if (episodes.length === 0) {
+                epList.innerHTML = `<div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; padding: 20px;">Không tìm thấy tập nào. Hãy tạo mới chủ đề!</div>`;
+                return;
+            }
+
+            episodes.forEach(ep => {
+                const isSelected = currentEpisode && currentEpisode.episode_number === ep.episode_number;
+                
+                // Count how many panel images exist
+                const readyImagesCount = ep.images ? ep.images.filter(img => img.exists).length : 0;
+                const isReady = readyImagesCount === 4;
+
+                const item = document.createElement("div");
+                item.className = `episode-item ${isSelected ? 'active' : ''}`;
+                item.onclick = () => selectEpisode(ep.episode_number);
+
+                item.innerHTML = `
+                    <div class="episode-item-title">#${ep.episode_number} - ${ep.episode_title}</div>
+                    <div class="episode-item-meta">
+                        <span>Chủ đề: ${ep.episode_title.split(":")[0]}</span>
+                        <span class="badge ${isReady ? 'badge-ready' : ''}">${readyImagesCount}/4 ảnh</span>
+                    </div>
+                `;
+                epList.appendChild(item);
+            });
+        }
+        function getStyleForText(text, type) {
+            let hash = 0;
+            for (let i = 0; i < text.length; i++) {
+                hash = text.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            hash = Math.abs(hash);
+
+            let style = "";
+            if (type === "dialogue") {
+                const shapes = [
+                    "255px 15px 225px 15px/15px 225px 15px 255px",
+                    "15px 225px 15px 255px/255px 15px 225px 15px",
+                    "300px 20px 250px 30px/20px 250px 30px 300px",
+                    "170px 15px 180px 15px/15px 180px 15px 170px",
+                    "220px 20px 200px 25px/20px 200px 25px 220px"
+                ];
+                const shapeIdx = hash % shapes.length;
+                const tilt = ((hash % 7) - 3) / 2; // -1.5 to 1.5 degrees
+                style += `border-radius: ${shapes[shapeIdx]}; transform: rotate(${tilt}deg);`;
+            } else if (type === "narration") {
+                const tilt = ((hash % 5) - 2) / 2; // -1 to 1 degree
+                style += `transform: rotate(${tilt}deg);`;
+            } else if (type === "thought") {
+                const tilt = ((hash % 5) - 2) / 2; // -1 to 1 degree
+                style += `transform: rotate(${tilt}deg);`;
+            } else if (type === "shout") {
+                const tilt = ((hash % 5) - 2) - 1; // -3 to 1 degree
+                style += `transform: rotate(${tilt}deg);`;
+            }
+            return style;
+        }
+
+        function buildOverlaysHTML(frame) {
+            if (frame.text_overlays && Array.isArray(frame.text_overlays) && frame.text_overlays.length > 0) {
+                return frame.text_overlays.map(overlay => {
+                    const posClass = `pos-${overlay.position || 'bottom-left'}`;
+                    const customStyle = getStyleForText(overlay.text, overlay.type);
+                    
+                    let content = overlay.text;
+                    if (overlay.type !== "narration" && overlay.character) {
+                        content = `<span style="display:block; font-size: 0.7rem; text-transform: uppercase; color: var(--accent-secondary); margin-bottom: 2px;">${overlay.character}</span>${overlay.text}`;
+                    }
+
+                    if (overlay.type === "narration") {
+                        return `<div class="comic-overlay narration-box ${posClass}" style="${customStyle}">${content}</div>`;
+                    } else if (overlay.type === "thought") {
+                        const dotsHtml = `
+                            <div class="thought-dots ${posClass}">
+                                <div class="thought-dot dot-1"></div>
+                                <div class="thought-dot dot-2"></div>
+                                <div class="thought-dot dot-3"></div>
+                            </div>
+                        `;
+                        return `<div class="comic-overlay thought-bubble ${posClass}" style="${customStyle}">${content}${dotsHtml}</div>`;
+                    } else if (overlay.type === "shout") {
+                        return `
+                            <div class="comic-overlay shout-bubble ${posClass}" style="${customStyle}">
+                                <div class="shout-inner">
+                                    ${content}
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        // Default to standard speech-bubble dialogue
+                        return `<div class="comic-overlay speech-bubble ${posClass} ${posClass}" style="${customStyle}">${content}</div>`;
+                    }
+                }).join("");
+            }
+            
+            // Fallback for legacy text
+            if (frame.text_overlay_vietnamese) {
+                const hasDialogue = frame.text_overlay_vietnamese.includes(":");
+                const typeClass = hasDialogue ? "speech-bubble" : "narration-box";
+                const posClass = "pos-bottom-left";
+                const tailClass = hasDialogue ? "pos-bottom-left" : "";
+                const customStyle = getStyleForText(frame.text_overlay_vietnamese, hasDialogue ? "dialogue" : "narration");
+                
+                return `<div class="comic-overlay ${typeClass} ${posClass} ${tailClass}" style="${customStyle}">${frame.text_overlay_vietnamese.replace(/\n/g, "<br>")}</div>`;
+            }
+            
+            return "";
+        }
+
+        function selectEpisode(number) {
+            currentEpisode = episodes.find(e => e.episode_number === number);
+            if (!currentEpisode) return;
+
+            // Show workspace, hide empty state
+            emptyState.style.display = "none";
+            workspace.style.display = "flex";
+
+            // Render Header
+            let cleanTitle = currentEpisode.episode_title;
+            const prefixRegex = new RegExp(`^(Tập|Episode)\\s*${currentEpisode.episode_number}\\s*:\\s*`, 'i');
+            cleanTitle = cleanTitle.replace(prefixRegex, '');
+            epTitle.innerText = `Tập ${currentEpisode.episode_number}: ${cleanTitle}`;
+            epMeta.innerText = `Tập #${currentEpisode.episode_number} | Preview carousel truyện tranh`;
+
+            // Render Slides
+            carouselSlides.innerHTML = "";
+            currentEpisode.frames.forEach((frame, idx) => {
+                const slideData = currentEpisode.images[idx];
+                const slideDiv = document.createElement("div");
+                slideDiv.className = "slide";
+
+                if (slideData.exists) {
+                    // Show actual panel image
+                    slideDiv.innerHTML = `
+                        <img class="slide-img" src="${slideData.path}?t=${new Date().getTime()}" alt="Panel ${frame.frame_number}">
+                        ${buildOverlaysHTML(frame)}
+                    `;
+                } else {
+                    // Show a styled mock placeholder with prompts
+                    slideDiv.innerHTML = `
+                        <div class="slide-placeholder">
+                            <div class="slide-placeholder-icon">📐</div>
+                            <h3 style="color: var(--accent-primary); margin-bottom: 8px;">Khung ${frame.frame_number}: ${frame.panel_type}</h3>
+                            <div class="slide-placeholder-text">
+                                LƯU Ý: Không tìm thấy ảnh panel_${frame.frame_number}.png.<br>
+                                Hãy tạo ảnh bằng Prompt bên phải và lưu vào:<br>
+                                <code style="color: var(--accent-secondary); background: rgba(0,0,0,0.4); padding: 2px 4px; border-radius: 4px; font-size: 0.75rem;">episode_${currentEpisode.episode_number}_panels/panel_${frame.frame_number}.png</code>
+                             </div>
+                             ${buildOverlaysHTML(frame)}
+                        </div>
+                    `;
+                }
+                carouselSlides.appendChild(slideDiv);
+            });
+
+            // Reset carousel index
+            goToSlide(0);
+
+            // Render Caption
+            captionContent.innerText = currentEpisode.caption_post;
+
+            // Refresh sidebar to set active class
+            renderEpisodesList();
+        }
+
+        function goToSlide(index) {
+            currentSlideIndex = index;
+            carouselSlides.style.transform = `translateX(-${index * 25}%)`;
+
+            // Update dots
+            const activeDot = document.querySelector(".carousel-dot.active");
+            if (activeDot) activeDot.classList.remove("active");
+            dots[index].classList.add("active");
+
+            // Update Prompt Card
+            if (currentEpisode && currentEpisode.frames[index]) {
+                const frame = currentEpisode.frames[index];
+                promptCardTitle.innerText = `Prompt cho khung ${frame.frame_number} (${frame.panel_type})`;
+                promptContent.innerText = frame.image_generation_prompt;
+            }
+        }
+
+        // Navigation actions
+        nextBtn.onclick = () => {
+            let nextIndex = currentSlideIndex + 1;
+            if (nextIndex > 3) nextIndex = 0;
+            goToSlide(nextIndex);
+        };
+
+        prevBtn.onclick = () => {
+            let prevIndex = currentSlideIndex - 1;
+            if (prevIndex < 0) prevIndex = 3;
+            goToSlide(prevIndex);
+        };
+
+        // Collapsible Accordion Drawer Helpers
+        window.toggleAccordion = function(header) {
+            const item = header.parentElement;
+            const isActive = item.classList.contains("active");
+            
+            // Close all
+            document.querySelectorAll(".accordion-item").forEach(el => {
+                el.classList.remove("active");
+            });
+            
+            // Open clicked if it wasn't active
+            if (!isActive) {
+                item.classList.add("active");
+            }
+        };
+
+        function updatePreview(zone, file) {
+            const prompt = zone.querySelector(".drop-zone-prompt");
+            const preview = zone.querySelector(".drop-zone-preview");
+            
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    prompt.style.display = "none";
+                    preview.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
+                    preview.style.display = "flex";
+                }
+                reader.readAsDataURL(file);
+            } else {
+                prompt.style.display = "block";
+                preview.innerHTML = "";
+                preview.style.display = "none";
+            }
+        }
+
+        // Setup drop zones for drag & drop and paste from clipboard
+        document.querySelectorAll(".drop-zone").forEach(zone => {
+            const input = zone.querySelector(".drop-zone-input");
+            
+            // Click to trigger hidden input dialog
+            zone.onclick = (e) => {
+                // If clicked from outside of input itself (to prevent infinite loops)
+                if (e.target !== input) {
+                    input.click();
+                }
+            };
+
+            // Prevent drag behavior, add hover visuals
+            zone.addEventListener("dragover", (e) => {
+                e.preventDefault();
+                zone.classList.add("drag-over");
+            });
+
+            ["dragleave", "dragend"].forEach(type => {
+                zone.addEventListener(type, (e) => {
+                    zone.classList.remove("drag-over");
+                });
+            });
+
+            zone.addEventListener("drop", (e) => {
+                e.preventDefault();
+                zone.classList.remove("drag-over");
+                
+                if (e.dataTransfer.files.length) {
+                    input.files = e.dataTransfer.files;
+                    updatePreview(zone, e.dataTransfer.files[0]);
+                }
+            });
+
+            // Clipboard Paste event handler
+            zone.addEventListener("paste", (e) => {
+                const items = (e.clipboardData || window.clipboardData).items;
+                for (let item of items) {
+                    if (item.kind === "file" && item.type.startsWith("image/")) {
+                        const file = item.getAsFile();
+                        
+                        // Assign file to input using DataTransfer
+                        const dataTransfer = new DataTransfer();
+                        dataTransfer.items.add(file);
+                        input.files = dataTransfer.files;
+                        
+                        updatePreview(zone, file);
+                        e.preventDefault();
+                        e.stopPropagation(); // Avoid bubble triggering parent actions
+                        break;
+                    }
+                }
+            });
+
+            // Normal file picker change selection
+            input.addEventListener("change", () => {
+                if (input.files.length) {
+                    updatePreview(zone, input.files[0]);
+                }
+            });
+        });
+
+        function getBase64(file) {
+            return new Promise((resolve, reject) => {
+                if (!file) {
+                    resolve(null);
+                    return;
+                }
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        // @ mention suggestions for database-backed characters/assets/settings
+        let mentionState = null;
+        let mentionItems = [];
+        let mentionActiveIndex = 0;
+        let mentionRequestSeq = 0;
+
+        function getMentionState() {
+            if (!topicInput) return null;
+            const caret = topicInput.selectionStart || 0;
+            const before = topicInput.value.slice(0, caret);
+            const match = before.match(/(^|[\s([{,])@([^\s@]*)$/);
+            if (!match) return null;
+            return {
+                start: before.length - match[2].length - 1,
+                end: caret,
+                query: match[2] || ''
+            };
+        }
+
+        async function updateMentionSuggest() {
+            mentionState = getMentionState();
+            if (!mentionState) {
+                hideMentionSuggest();
+                return;
+            }
+
+            const seq = ++mentionRequestSeq;
+            try {
+                const res = await fetch(`/api/mentions?q=${encodeURIComponent(mentionState.query)}`);
+                if (seq !== mentionRequestSeq) return;
+                const data = await res.json();
+                mentionItems = data.items || [];
+                mentionActiveIndex = 0;
+                renderMentionSuggest();
+            } catch (err) {
+                console.error('Error fetching mention suggestions:', err);
+                hideMentionSuggest();
+            }
+        }
+
+        function renderMentionSuggest() {
+            if (!mentionSuggest || !mentionItems.length) {
+                hideMentionSuggest();
+                return;
+            }
+
+            mentionSuggest.innerHTML = mentionItems.map((item, index) => {
+                const activeClass = index === mentionActiveIndex ? ' active' : '';
+                const kind = item.category || item.kind || 'asset';
+                return `
+                    <div class="mention-item${activeClass}" data-index="${index}">
+                        <div class="mention-item-name">
+                            <span>@${escHtml(item.name)}</span>
+                            <span class="mention-item-kind">${escHtml(kind)}</span>
+                        </div>
+                        <div class="mention-item-desc">${escHtml(item.description || 'No description yet')}</div>
+                    </div>
+                `;
+            }).join('');
+
+            mentionSuggest.querySelectorAll('.mention-item').forEach(itemEl => {
+                itemEl.addEventListener('mousedown', e => {
+                    e.preventDefault();
+                    const index = Number(itemEl.dataset.index || 0);
+                    insertMention(mentionItems[index]);
+                });
+            });
+            mentionSuggest.classList.add('active');
+        }
+
+        function hideMentionSuggest() {
+            mentionItems = [];
+            if (mentionSuggest) {
+                mentionSuggest.classList.remove('active');
+                mentionSuggest.innerHTML = '';
+            }
+        }
+
+        function moveMentionSelection(delta) {
+            if (!mentionItems.length) return;
+            mentionActiveIndex = (mentionActiveIndex + delta + mentionItems.length) % mentionItems.length;
+            renderMentionSuggest();
+        }
+
+        function insertMention(item) {
+            if (!item || !mentionState) return;
+            const before = topicInput.value.slice(0, mentionState.start);
+            const after = topicInput.value.slice(mentionState.end).replace(/^\s+/, '');
+            const inserted = `@${item.name} `;
+            topicInput.value = before + inserted + after;
+            const caret = before.length + inserted.length;
+            topicInput.focus();
+            topicInput.setSelectionRange(caret, caret);
+            hideMentionSuggest();
+        }
+
+        topicInput.addEventListener('input', updateMentionSuggest);
+        topicInput.addEventListener('click', updateMentionSuggest);
+        topicInput.addEventListener('keydown', e => {
+            const isOpen = mentionSuggest && mentionSuggest.classList.contains('active');
+            if (!isOpen) return;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                moveMentionSelection(1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                moveMentionSelection(-1);
+            } else if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                insertMention(mentionItems[mentionActiveIndex]);
+            } else if (e.key === 'Escape') {
+                hideMentionSuggest();
+            }
+        });
+        topicInput.addEventListener('blur', () => setTimeout(hideMentionSuggest, 120));
+        document.addEventListener('click', e => {
+            if (!e.target.closest('.topic-input-wrap')) hideMentionSuggest();
+        });
+
+        // Drawer Controls
+        openDrawerBtn.onclick = () => {
+            drawer.classList.add("open");
+            overlay.classList.add("open");
+        };
+
+        function closeDrawer() {
+            drawer.classList.remove("open");
+            overlay.classList.remove("open");
+            
+            // Reset text inputs
+            document.getElementById("series-title").value = "";
+            document.getElementById("series-plot").value = "";
+            document.getElementById("series-char-name").value = "";
+            document.getElementById("series-char-desc").value = "";
+            document.getElementById("series-setting").value = "";
+            
+            // Reset drop-zone inputs and previews
+            document.querySelectorAll(".drop-zone").forEach(zone => {
+                const input = zone.querySelector(".drop-zone-input");
+                input.value = "";
+                updatePreview(zone, null);
+            });
+            
+            // Set first accordion item active, close others
+            document.querySelectorAll(".accordion-item").forEach((el, idx) => {
+                if (idx === 0) el.classList.add("active");
+                else el.classList.remove("active");
+            });
+        }
+
+        closeDrawerBtn.onclick = closeDrawer;
+        cancelDrawerBtn.onclick = closeDrawer;
+        overlay.onclick = closeDrawer;
+
+        // Submit Structured New Series
+        submitSeriesBtn.onclick = async () => {
+            const title = document.getElementById("series-title").value.trim();
+            const plot = document.getElementById("series-plot").value.trim();
+            const charName = document.getElementById("series-char-name").value.trim();
+            const charDesc = document.getElementById("series-char-desc").value.trim();
+            const settingDesc = document.getElementById("series-setting").value.trim();
+            
+            const charFile = document.getElementById("char-ref-file").files[0];
+            const settingFile = document.getElementById("setting-ref-file").files[0];
+
+            if (!charName) {
+                alert("Vui lòng nhập ít nhất tên nhân vật chính ở mục 3!");
+                // Open character accordion
+                document.querySelectorAll(".accordion-item").forEach((el, idx) => {
+                    if (idx === 2) el.classList.add("active");
+                    else el.classList.remove("active");
+                });
+                return;
+            }
+
+            if (!confirm("Bắt đầu series mới sẽ tự động lưu trữ series hiện tại. Bạn có muốn tiếp tục?")) {
+                return;
+            }
+
+            loadingText.innerText = "Đang mã hóa ảnh và gửi dữ liệu khởi tạo...";
+            loadingOverlay.classList.add("active");
+
+            try {
+                // Read base64 files
+                const charBase64 = await getBase64(charFile);
+                const settingBase64 = await getBase64(settingFile);
+
+                loadingText.innerText = "Đang khởi tạo series mới và vẽ tập đầu tiên bằng Gemini...";
+                
+                const res = await fetch("/api/new_series", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        title: title,
+                        plot: plot,
+                        character_name: charName,
+                        character_desc: charDesc,
+                        setting_desc: settingDesc,
+                        character_ref: charBase64,
+                        setting_ref: settingBase64
+                    })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    closeDrawer();
+                    await fetchEpisodes();
+                    selectEpisode(data.episode_number);
+                    showToast("Khởi Tạo Series Thành Công! 🎬", `Đã tạo Tập 1 cho series mới.`);
+                } else {
+                    const err = await res.text();
+                    alert("Khởi tạo series thất bại: " + err);
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Lỗi khi tải ảnh hoặc kết nối server");
+            } finally {
+                loadingOverlay.classList.remove("active");
+            }
+        };
+
+        // Generation
+        generateBtn.onclick = async () => {
+            const topic = topicInput.value.trim();
+
+            // Show loading overlay
+            loadingText.innerText = "Đang tạo kịch bản với Gemini API (gemini-2.5-flash)...";
+            loadingOverlay.classList.add("active");
+
+            try {
+                const res = await fetch("/api/generate", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ topic: topic })
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    topicInput.value = "";
+                    await fetchEpisodes();
+                    selectEpisode(data.episode_number);
+                    showToast("Tạo kịch bản thành công!", `Đã lưu kịch bản Tập ${data.episode_number}. Hãy chuẩn bị ảnh!`);
+                } else {
+                    const err = await res.text();
+                    alert("Tạo kịch bản thất bại: " + err);
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Lỗi kết nối server");
+            } finally {
+                loadingOverlay.classList.remove("active");
+            }
+        };
+
+        // Publish to Facebook
+        publishBtn.onclick = async () => {
+            if (!currentEpisode) return;
+
+            // Check if all 4 images are uploaded
+            const readyImagesCount = currentEpisode.images.filter(img => img.exists).length;
+            if (readyImagesCount < 4) {
+                alert(`Bạn cần tạo đủ 4 ảnh panels và lưu vào thư mục trước khi đăng! (Hiện tại: ${readyImagesCount}/4)`);
+                return;
+            }
+
+            if (!confirm(`Bạn có chắc chắn muốn đăng Tập ${currentEpisode.episode_number} lên Facebook?`)) {
+                return;
+            }
+
+            loadingText.innerText = "Đang tải ảnh lên Facebook & Xuất bản Carousel...";
+            loadingOverlay.classList.add("active");
+
+            try {
+                const res = await fetch("/api/publish", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ episode_number: currentEpisode.episode_number })
+                });
+
+                const result = await res.json();
+                if (res.ok && result.success) {
+                    // Extract link if success
+                    const outputText = result.stdout;
+                    const match = outputText.match(/https:\/\/facebook\.com\/[0-9_]+/);
+                    const link = match ? match[0] : "#";
+
+                    showToast(
+                        "Đăng Facebook Thành Công! 🎉", 
+                        `Tập ${currentEpisode.episode_number} đã được xuất bản dưới dạng Carousel.`,
+                        link
+                    );
+                } else {
+                    alert("Thất bại khi đăng:\n" + (result.error || result.stdout || "Unknown error"));
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Lỗi kết nối khi gửi yêu cầu đăng bài.");
+            } finally {
+                loadingOverlay.classList.remove("active");
+            }
+        };
+
+        // Clipboard Copy
+        copyPromptBtn.onclick = () => {
+            navigator.clipboard.writeText(promptContent.innerText);
+            showToast("Đã Copy Prompt!", "Đã sao chép prompt vẽ ảnh vào clipboard.");
+        };
+
+        copyCaptionBtn.onclick = () => {
+            navigator.clipboard.writeText(captionContent.innerText);
+            showToast("Đã Copy Caption!", "Đã sao chép nội dung bài đăng vào clipboard.");
+        };
+
+        // Fetch and load series list
+        async function fetchSeries() {
+            try {
+                const res = await fetch("/api/series");
+                const seriesList = await res.json();
+                
+                seriesSelect.innerHTML = "";
+                seriesList.forEach(s => {
+                    const option = document.createElement("option");
+                    option.value = s.id;
+                    option.innerText = `${s.protagonist_name} Series (${s.episodes_count} tập) - ${s.timestamp}`;
+                    if (s.is_active) {
+                        option.selected = true;
+                    }
+                    seriesSelect.appendChild(option);
+                });
+            } catch (err) {
+                console.error("Error fetching series list:", err);
+            }
+        }
+
+        // Switch series handler
+        seriesSelect.onchange = async () => {
+            const selectedId = seriesSelect.value;
+            
+            // Find target info
+            const selectedOptionText = seriesSelect.options[seriesSelect.selectedIndex].text;
+            if (!confirm(`Bạn có chắc muốn chuyển sang series: "${selectedOptionText}"?\n(Series hiện tại sẽ tự động được lưu trữ)`)) {
+                // Reset select
+                fetchSeries();
+                return;
+            }
+            
+            loadingText.innerText = "Đang chuyển đổi series...";
+            loadingOverlay.classList.add("active");
+            
+            try {
+                const res = await fetch("/api/switch_series", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ series_id: selectedId })
+                });
+                
+                if (res.ok) {
+                    showToast("Chuyển Series Thành Công!", "Workspace đã được tải lại với series mới.");
+                    // Reload page to refresh everything
+                    window.location.reload();
+                } else {
+                    const err = await res.text();
+                    alert("Chuyển series thất bại: " + err);
+                    fetchSeries();
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Lỗi kết nối server");
+                fetchSeries();
+            } finally {
+                loadingOverlay.classList.remove("active");
+            }
+        };
+
+        // Toasts
+        function showToast(title, body, link = null) {
+            const toastTitle = document.getElementById("toast-title");
+            const toastBody = document.getElementById("toast-body");
+            const toastLink = document.getElementById("toast-link");
+
+            toastTitle.innerText = title;
+            toastBody.innerText = body;
+
+            if (link) {
+                toastLink.href = link;
+                toastLink.style.display = "inline-block";
+            } else {
+                toastLink.style.display = "none";
+            }
+
+            toast.classList.add("active");
+            setTimeout(() => {
+                toast.classList.remove("active");
+            }, 6000);
+        }
+
+        // ── TAB SWITCHING ──
+        window.switchTab = function(tab) {
+            document.querySelectorAll('.workspace-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+            document.getElementById('panel-' + tab).classList.add('active');
+            if (tab === 'lore') fetchAssets();
+        };
+
+        // ── ASSETS / LORE MANAGEMENT ──
+        let assetsData = { characters: [], objects: [], settings: [] };
+
+        async function fetchAssets() {
+            try {
+                const res = await fetch('/api/assets');
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                assetsData = await res.json();
+                renderAssets();
+            } catch (err) {
+                console.error('Error fetching assets:', err);
+                showToast('Không tải được tài nguyên', String(err));
+            }
+        }
+
+        function renderAssets() {
+            renderAssetSection('characters', assetsData.characters || []);
+            renderAssetSection('objects', assetsData.objects || []);
+            renderAssetSection('settings', assetsData.settings || []);
+        }
+
+        function renderAssetSection(type, items) {
+            const container = document.getElementById('cards-' + type);
+            container.innerHTML = '';
+
+            items.forEach((asset, idx) => {
+                const card = createAssetCard(type, asset);
+                container.appendChild(card);
+            });
+
+            // Add-new card
+            const addCard = document.createElement('div');
+            addCard.className = 'asset-card asset-card-add';
+            addCard.innerHTML = `<span style="font-size:1.6rem;">＋</span><span>Thêm Mới</span>`;
+            addCard.onclick = () => {
+                const newCard = createAssetCard(type, { name: '', description: '', image_ref_path: '' }, true);
+                container.insertBefore(newCard, addCard);
+                newCard.querySelector('.asset-name-input').focus();
+            };
+            container.appendChild(addCard);
+        }
+
+        function createAssetCard(type, asset, isNew = false) {
+            const card = document.createElement('div');
+            card.className = 'asset-card';
+
+            const hasImage = asset.has_image && asset.image_ref_path;
+            const imgSrc = hasImage ? asset.image_ref_path + '?t=' + Date.now() : null;
+
+            card.innerHTML = `
+                <div class="asset-drop-zone" tabindex="0">
+                    ${ imgSrc ? `<img src="${escAttr(imgSrc)}" alt="ref">` : '<div class="adz-label">📎 Kéo thả, dán<br>(Ctrl+V) hoặc click</div>' }
+                    <input type="file" accept="image/*" style="display:none;">
+                </div>
+                <input class="asset-name-input" type="text" placeholder="Tên..." value="${escHtml(asset.name)}">
+                <textarea class="asset-desc-input" placeholder="Mô tả ngoại hình / đặc điểm để đưa vào prompt ảnh..." rows="3">${escHtml(asset.description)}</textarea>
+                <div class="asset-card-actions">
+                    <button class="asset-save-btn">💾 Lưu</button>
+                    ${ !isNew ? `<button class="asset-delete-btn">🗑</button>` : '' }
+                </div>
+            `;
+
+            // ── Save button
+            const saveBtn = card.querySelector('.asset-save-btn');
+            saveBtn.onclick = () => saveAsset(card, type, isNew ? null : asset.name);
+
+            // ── Delete button
+            const delBtn = card.querySelector('.asset-delete-btn');
+            if (delBtn) {
+                delBtn.onclick = () => {
+                    if (confirm(`Xóa "${asset.name}" khỏi danh sách?`)) deleteAsset(type, asset.name);
+                };
+            }
+
+            // ── Drop zone interactions
+            setupAssetDropZone(card);
+
+            return card;
+        }
+
+        function escHtml(s) {
+            if (!s) return '';
+            return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        function escAttr(s) {
+            return escHtml(String(s || '')).replace(/'/g, '&#39;');
+        }
+
+        function setupAssetDropZone(card) {
+            const zone = card.querySelector('.asset-drop-zone');
+            const input = zone.querySelector('input[type=file]');
+
+            // Click opens file picker and also makes Ctrl+V paste target explicit.
+            zone.onclick = (e) => {
+                zone.focus();
+                if (e.target !== input) input.click();
+            };
+
+            zone.addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    input.click();
+                }
+            });
+
+            // Drag over
+            zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+            ['dragleave','dragend'].forEach(ev => zone.addEventListener(ev, () => zone.classList.remove('drag-over')));
+
+            // Drop
+            zone.addEventListener('drop', e => {
+                e.preventDefault();
+                zone.classList.remove('drag-over');
+                if (e.dataTransfer.files.length) setAssetZoneFile(zone, e.dataTransfer.files[0]);
+            });
+
+            // Paste (Ctrl+V)
+            zone.addEventListener('paste', e => {
+                const items = (e.clipboardData || window.clipboardData).items;
+                for (let item of items) {
+                    if (item.kind === 'file' && item.type.startsWith('image/')) {
+                        setAssetZoneFile(zone, item.getAsFile());
+                        e.preventDefault();
+                        break;
+                    }
+                }
+            });
+
+            // File input change
+            input.addEventListener('change', () => {
+                if (input.files.length) setAssetZoneFile(zone, input.files[0]);
+                input.value = '';
+            });
+        }
+
+        function setAssetZoneFile(zone, file) {
+            if (!file || !file.type.startsWith('image/')) {
+                showToast('Ảnh không hợp lệ', 'Hãy chọn, kéo thả, hoặc dán một file ảnh.');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = e => {
+                const label = zone.querySelector('.adz-label');
+                if (label) label.remove();
+
+                let img = zone.querySelector('img');
+                if (!img) {
+                    img = document.createElement('img');
+                    img.alt = 'preview';
+                    zone.insertBefore(img, zone.firstChild);
+                }
+                img.src = e.target.result;
+                zone.dataset.imageBase64 = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function saveAsset(card, type, oldName) {
+            const nameInput = card.querySelector('.asset-name-input');
+            const descInput = card.querySelector('.asset-desc-input');
+            const zone = card.querySelector('.asset-drop-zone');
+
+            const name = nameInput.value.trim();
+            const description = descInput.value.trim();
+            const imageBase64 = zone.dataset.imageBase64 || null;
+
+            if (!name) { nameInput.style.borderColor = '#ff5050'; nameInput.focus(); return; }
+            nameInput.style.borderColor = '';
+
+            const saveBtn = card.querySelector('.asset-save-btn');
+            saveBtn.disabled = true;
+            saveBtn.textContent = '⏳...';
+
+            try {
+                const res = await fetch('/api/assets/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type, name, description, old_name: oldName, image_base64: imageBase64 })
+                });
+                const result = await res.json();
+                if (res.ok && result.success) {
+                    showToast('Đã Lưu!', `${name} đã được cập nhật.`);
+                    fetchAssets();
+                } else {
+                    alert('Lưu thất bại: ' + (result.error || 'Unknown error'));
+                }
+            } catch (e) {
+                alert('Lỗi kết nối: ' + e);
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = '💾 Lưu';
+            }
+        }
+
+        async function deleteAsset(type, name) {
+            try {
+                const res = await fetch('/api/assets/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type, name })
+                });
+                const result = await res.json();
+                if (res.ok && result.success) {
+                    showToast('Đã Xóa!', `${name} đã được xóa khỏi danh sách.`);
+                    fetchAssets();
+                } else {
+                    alert('Xóa thất bại: ' + (result.error || ''));
+                }
+            } catch (e) {
+                alert('Lỗi kết nối: ' + e);
+            }
+        }
+
+        // Global Ctrl+V paste handler for focused asset drop zones
+        document.addEventListener('paste', (e) => {
+            const focused = document.activeElement;
+            if (focused && focused.classList.contains('asset-drop-zone')) {
+                const items = (e.clipboardData || window.clipboardData).items;
+                for (let item of items) {
+                    if (item.kind === 'file' && item.type.startsWith('image/')) {
+                        setAssetZoneFile(focused, item.getAsFile());
+                        e.preventDefault();
+                        break;
+                    }
+                }
+            }
+        });
+
+        // Init
+        fetchSeries();
+        fetchEpisodes();
+        // Check local image state periodically (every 5 seconds) to auto-update view when they save files
+        setInterval(async () => {
+            if (currentEpisode) {
+                const activeEpNum = currentEpisode.episode_number;
+                const activeSlideIdx = currentSlideIndex;
+                
+                const res = await fetch("/api/episodes");
+                episodes = await res.json();
+                renderEpisodesList();
+                
+                // Reload active episode to see if image files were created
+                currentEpisode = episodes.find(e => e.episode_number === activeEpNum);
+                selectEpisode(activeEpNum);
+                goToSlide(activeSlideIdx);
+            }
+        }, 5000);
+    </script>
+    
+    <!-- SVG Displacement filter for hand-drawn look -->
+    <svg style="position: absolute; width: 0; height: 0;" width="0" height="0">
+        <defs>
+            <filter id="hand-drawn-bubble">
+                <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" result="noise" />
+                <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G" />
+            </filter>
+        </defs>
+    </svg>
+</body>
+</html>
