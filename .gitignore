@@ -6,3 +6,20 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Local/user data
+snapshot.json
+snapshot.json.bak
+corrupt-snapshots/
+__pycache__/
+*.pyc
+
+# Local verification / scratch
+tmp-*.mjs
+restart-*.cmd
+vite.log
+vite.err.log
+humanboard-ui.out.log
+humanboard-ui.err.log
+humanboard-mcp.out.log
+humanboard-mcp.err.log

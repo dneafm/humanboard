@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAppStore, IdeaType, Idea } from '../store';
+import { useAppStore, IdeaType, Idea, getReadinessScore, getReadinessState } from '../store';
 import { Link } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { LayoutGrid, List, Plus, Folder, Lightbulb, Scale, BookOpen, Search, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
@@ -26,8 +26,11 @@ export default function IdeasPage() {
     <div className="max-w-5xl mx-auto w-full p-8 flex flex-col h-full transition-colors duration-300">
       <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-[10px] font-bold uppercase tracking-[0.25em] px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-900/30 text-emerald-700 dark:text-emerald-400">Compiled knowledge</span>
+          </div>
           <h1 className="text-4xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">Ideas & Principles</h1>
-          <p className="text-stone-500 dark:text-stone-400 mt-2 text-lg">Your living garden of concepts and values.</p>
+          <p className="text-stone-500 dark:text-stone-400 mt-2 text-lg">Your maintained knowledge garden, compiled from raw capture into reusable understanding.</p>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center bg-stone-100 dark:bg-stone-900 rounded-lg p-1 border border-stone-200 dark:border-stone-800">
@@ -63,7 +66,7 @@ export default function IdeasPage() {
           />
         </div>
         <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
-          {(['All', 'Concept', 'Principle', 'Reference'] as const).map(type => (
+          {(['All', 'Concept', 'Principle', 'Reference', 'Project', 'Question', 'Action', 'Base Skill', 'Umbrella Goal'] as const).map(type => (
             <button
               key={type}
               onClick={() => setActiveType(type)}
@@ -114,6 +117,24 @@ export default function IdeasPage() {
 function IdeaCard({ idea, section, compact }: { idea: Idea, section?: any, compact?: boolean }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const isPrinciple = idea.type === 'Principle';
+  const isProjectIdea = idea.type === 'Project';
+  const readinessScore = idea.activationReadiness ? getReadinessScore(idea.activationReadiness) : null;
+  const readinessState = readinessScore !== null ? getReadinessState(readinessScore) : null;
+  const readinessLabel = isProjectIdea
+    ? readinessState
+      ? readinessState === 'Ready'
+        ? 'Ready to activate'
+        : readinessState === 'Close'
+          ? 'Close to activation'
+          : readinessState === 'Warming'
+            ? 'Incubating'
+            : 'Early incubation'
+      : idea.maturity >= 80
+        ? 'Ready to activate'
+        : idea.maturity >= 50
+          ? 'Incubating'
+          : 'Early incubation'
+    : null;
   
   return (
     <motion.div 
@@ -135,8 +156,11 @@ function IdeaCard({ idea, section, compact }: { idea: Idea, section?: any, compa
               {isPrinciple ? <Scale className="w-4 h-4" /> : <Lightbulb className="w-4 h-4" />}
             </div>
             <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[9px] font-bold uppercase tracking-[0.22em] px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/30">Knowledge</span>
+              </div>
               <h3 className={cn("text-xl font-semibold text-stone-900 dark:text-stone-100 leading-tight", compact && "text-base")}>{idea.title}</h3>
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
                 {section && (
                   <span className={cn("text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1.5", section.color)}>
                     <Folder className="w-2.5 h-2.5" />
@@ -146,6 +170,23 @@ function IdeaCard({ idea, section, compact }: { idea: Idea, section?: any, compa
                 <span className="text-[9px] font-black uppercase tracking-widest text-stone-400 dark:text-stone-600">
                   {idea.type}
                 </span>
+                {idea.strategicRole && (
+                  <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-900/30">
+                    {idea.strategicRole}
+                  </span>
+                )}
+                {readinessLabel && (
+                  <span className={cn(
+                    'text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border',
+                    (readinessScore ?? idea.maturity) >= 80
+                      ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/30'
+                      : (readinessScore ?? idea.maturity) >= 50
+                        ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/30'
+                        : 'bg-stone-50 dark:bg-stone-900 text-stone-500 dark:text-stone-400 border-stone-200 dark:border-stone-800'
+                  )}>
+                    {readinessLabel}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -187,17 +228,38 @@ function IdeaCard({ idea, section, compact }: { idea: Idea, section?: any, compa
         </AnimatePresence>
 
         {!isPrinciple ? (
-          <div className="mt-6">
-            <div className="flex items-center justify-between text-[10px] font-bold text-stone-400 dark:text-stone-600 uppercase tracking-widest mb-2">
-              <span>Maturity</span>
-              <span>{idea.maturity}%</span>
+          <div className="mt-6 space-y-4">
+            <div>
+              <div className="flex items-center justify-between text-[10px] font-bold text-stone-400 dark:text-stone-600 uppercase tracking-widest mb-2">
+                <span>Maturity</span>
+                <span>{idea.maturity}%</span>
+              </div>
+              <div className="w-full h-1.5 bg-stone-100 dark:bg-stone-800 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-stone-900 dark:bg-stone-100 transition-all duration-700" 
+                  style={{ width: `${idea.maturity}%` }}
+                />
+              </div>
             </div>
-            <div className="w-full h-1.5 bg-stone-100 dark:bg-stone-800 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-stone-900 dark:bg-stone-100 transition-all duration-700" 
-                style={{ width: `${idea.maturity}%` }}
-              />
-            </div>
+            {idea.activationReadiness && (
+              <div>
+                <div className="flex items-center justify-between text-[10px] font-bold text-stone-400 dark:text-stone-600 uppercase tracking-widest mb-2">
+                  <span>Activation readiness</span>
+                  <span>{readinessScore}%</span>
+                </div>
+                <div className="w-full h-1.5 bg-emerald-100 dark:bg-emerald-950/30 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-emerald-500 transition-all duration-700" 
+                    style={{ width: `${readinessScore}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {idea.strategicNote && !compact && (
+              <p className="text-sm leading-relaxed text-stone-500 dark:text-stone-400 line-clamp-2">
+                {idea.strategicNote}
+              </p>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-2 mt-6 text-amber-600/60 dark:text-amber-400/60">

@@ -1,8 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
-import { Bot, X, Send, Maximize2, Minimize2 } from 'lucide-react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { Bot, X, Send, Maximize2, Minimize2, BookmarkPlus, Check } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
-import { GoogleGenAI } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
+import { askGemma, buildMemoryShapedSystemInstruction, getGemmaRuntimeStatus } from '../lib/ai';
+import { useAppStore } from '../store';
 
 type Message = {
   id: string;
@@ -12,21 +14,299 @@ type Message = {
 
 export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
+  const runtime = getGemmaRuntimeStatus();
+  const location = useLocation();
+  const notes = useAppStore((state) => state.notes);
+  const ideas = useAppStore((state) => state.ideas);
+  const projects = useAppStore((state) => state.projects);
+  const goals = useAppStore((state) => state.goals);
+  const reflections = useAppStore((state) => state.reflections);
+  const sections = useAppStore((state) => state.sections);
+  const addIdea = useAppStore((state) => state.addIdea);
+  const addNote = useAppStore((state) => state.addNote);
+  const updateIdea = useAppStore((state) => state.updateIdea);
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', role: 'model', content: "Hi. I'm your HumanBoard assistant. I can help you refine ideas, suggest experiments, or summarize your notes. What are we working on?" }
+    { id: '1', role: 'model', content: "Hi. I'm Gemma Librarian, your HumanBoard assistant. I can help refine ideas, suggest experiments, summarize notes, and connect thoughts across the app. What are we working on?" }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [savedMessageIds, setSavedMessageIds] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const inferSectionId = () => {
+    if (location.pathname.startsWith('/goals')) return 'sec2';
+    if (location.pathname.startsWith('/projects')) return 'sec2';
+    if (location.pathname.startsWith('/map')) return 'sec1';
+    if (location.pathname.startsWith('/review')) return 'sec1';
+    return 'sec1';
+  };
+
+  const normalizeText = (value?: string | null) => (value || '').trim().toLowerCase();
+
+  const findSectionId = (value?: string) => {
+    const normalized = normalizeText(value);
+    if (!normalized) return inferSectionId();
+    const direct = sections.find((section) => normalizeText(section.id) === normalized || normalizeText(section.name) === normalized);
+    return direct?.id || inferSectionId();
+  };
+
+  const findIdeaByReference = (value?: string) => {
+    const normalized = normalizeText(value);
+    if (!normalized) return undefined;
+    return ideas.find((idea) => normalizeText(idea.id) === normalized || normalizeText(idea.title) === normalized);
+  };
+
+  const findRelatedIdeaIds = (values?: string[]) => {
+    if (!Array.isArray(values)) return [];
+    return values
+      .map((value) => findIdeaByReference(value)?.id)
+      .filter((id): id is string => Boolean(id));
+  };
+
+  const buildIdeaTitle = (content: string) => {
+    const cleaned = content
+      .replace(/[#*_`>\-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const firstSentence = cleaned.split(/[.!?\n]/)[0]?.trim() || cleaned;
+    return (firstSentence || 'Saved chat insight').slice(0, 72);
+  };
+
+  const shouldCaptureAsInboxContent = (raw: string) => {
+    const text = raw.trim().toLowerCase();
+    if (!text) return false;
+
+    const operationalPatterns = [
+      /\bfix\b.*\b(ui|app|bug|build|route|button|page|component|review|inbox)\b/,
+      /\bpatch\b.*\b(app|ui|code|component|page|route)\b/,
+      /\b(refactor|rename|debug|deploy|restart|build|compile)\b/,
+      /\b(humanboard|app|ui)\b.*\b(down|broken|bug|issue)\b/,
+    ];
+
+    const strategicPatterns = [
+      /\bidea\b/,
+      /\bthesis\b/,
+      /\bopportunity\b/,
+      /\bproject\b/,
+      /\bgoal\b/,
+      /\bprinciple\b/,
+      /\bsignal\b/,
+      /\bnote\b/,
+      /\bremember\b/,
+      /\binsight\b/,
+      /\bquestion\b/,
+      /\bmarket\b/,
+      /\bskill\b/,
+    ];
+
+    if (operationalPatterns.some((pattern) => pattern.test(text)) && !strategicPatterns.some((pattern) => pattern.test(text))) {
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSaveMessage = (message: Message) => {
+    if (savedMessageIds.includes(message.id)) return;
+    const content = message.content.trim();
+    if (!content) return;
+
+    addIdea({
+      title: buildIdeaTitle(content),
+      summary: content.replace(/\s+/g, ' ').slice(0, 220),
+      content,
+      type: 'Reference',
+      stage: 'Sprouting',
+      sectionId: inferSectionId(),
+      confidence: 7,
+      maturity: 55,
+      nextAction: 'Review, refine, or compile this saved chat insight into a stronger knowledge page.',
+      linkedNoteIds: [],
+      relatedIdeaIds: [],
+    });
+
+    setSavedMessageIds((prev) => [...prev, message.id]);
+  };
+
   useEffect(() => {
     scrollToBottom();
   }, [messages, isOpen]);
+
+  const relatedContext = useMemo(() => {
+    const routeHints: Record<string, string[]> = {
+      '/': ['inbox', 'note', 'capture'],
+      '/ideas': ['idea', 'concept', 'principle', 'reference'],
+      '/goals': ['goal', 'roadmap', 'todo', 'knowledge'],
+      '/projects': ['project', 'experiment'],
+      '/map': ['map', 'relationship', 'related'],
+      '/review': ['review', 'summary'],
+      '/search': ['search', 'find'],
+    };
+
+    const hints = routeHints[location.pathname] ?? [];
+    const recentUserText = messages
+      .filter((m) => m.role === 'user')
+      .slice(-3)
+      .map((m) => m.content.toLowerCase())
+      .join(' ');
+
+    const scoreText = (text: string) => {
+      const hay = text.toLowerCase();
+      let score = 0;
+      for (const hint of hints) {
+        if (hay.includes(hint)) score += 3;
+      }
+      for (const token of recentUserText.split(/\W+/).filter(Boolean)) {
+        if (token.length >= 3 && hay.includes(token)) score += 1;
+      }
+      return score;
+    };
+
+    const sectionName = (sectionId?: string) => sections.find((section) => section.id === sectionId)?.name;
+    const collapseText = (value?: string, max = 280) => (value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+    const isTensionIdea = (idea: typeof ideas[number]) => {
+      const hay = `${idea.title} ${idea.summary} ${idea.content}`.toLowerCase();
+      return idea.type === 'Question' && (hay.includes('unresolved tension') || hay.includes('tension'));
+    };
+    const ideaTypePriority = (idea: typeof ideas[number]) => {
+      if (idea.type === 'Principle') return 40;
+      if (isTensionIdea(idea)) return 24;
+      if (idea.type === 'Question') return 18;
+      if (idea.type === 'Project') return 12;
+      if (idea.type === 'Concept') return 10;
+      if (idea.type === 'Action') return 8;
+      return 4;
+    };
+
+    const scoredIdeas = ideas
+      .map((idea) => {
+        const relevance = scoreText(`${idea.title} ${idea.summary} ${idea.content} ${idea.nextAction ?? ''} ${sectionName(idea.sectionId) ?? ''}`);
+        const memoryWeight = ideaTypePriority(idea);
+        const recencyBoost = idea.lastReviewed ? 2 : 0;
+        return {
+          idea,
+          relevance,
+          score: relevance > 0 ? relevance + memoryWeight + recencyBoost : 0,
+        };
+      })
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score);
+
+    const topPrinciples = scoredIdeas
+      .filter(({ idea }) => idea.type === 'Principle')
+      .slice(0, 4);
+
+    const topTensions = scoredIdeas
+      .filter(({ idea }) => isTensionIdea(idea))
+      .slice(0, 3);
+
+    const topIdeas = scoredIdeas
+      .filter(({ idea }) => idea.type !== 'Principle' && !isTensionIdea(idea))
+      .slice(0, 4);
+
+    const principleContext = topPrinciples.map(({ idea }) =>
+      `Principle memory: ${idea.title} | summary=${idea.summary} | content=${collapseText(idea.content)} | next=${idea.nextAction ?? 'none'}`
+    );
+
+    const tensionContext = topTensions.map(({ idea }) =>
+      `Unresolved tension: ${idea.title} | summary=${idea.summary} | question=${collapseText(idea.content)} | next=${idea.nextAction ?? 'none'}`
+    );
+
+    const relatedIdeasFormatting = topIdeas.map(({ idea }) => 
+      `Knowledge memory: ${idea.title} | type=${idea.type} | stage=${idea.stage} | section=${sectionName(idea.sectionId) ?? 'Unsorted'} | summary=${idea.summary} | next=${idea.nextAction ?? 'none'}`
+    );
+
+    // Graph Walk: Automatically pull in 1st-degree connected nodes of the top memory artifacts
+    const multihopIdeaIds = new Set<string>();
+    [...topPrinciples, ...topTensions, ...topIdeas].forEach(({ idea }) => {
+      idea.relatedIdeaIds.forEach(id => multihopIdeaIds.add(id));
+    });
+
+    const graphWalkIdeas = ideas
+      .filter(i => multihopIdeaIds.has(i.id) && ![...topPrinciples, ...topTensions, ...topIdeas].find(t => t.idea.id === i.id))
+      .slice(0, 4)
+      .map(idea => `[Linked Context via Graph]: ${idea.type === 'Principle' ? 'Principle' : isTensionIdea(idea) ? 'Tension' : 'Idea'}: ${idea.title} | summary=${idea.summary}`);
+
+    const activeReflections = reflections
+      .filter((reflection) => !reflection.dismissedAt)
+      .map((reflection) => ({
+        reflection,
+        score: scoreText(`${reflection.pattern} ${reflection.question} ${reflection.suggestion}`),
+      }))
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 2)
+      .map(({ reflection }) => `Ongoing digestion: pattern=${reflection.pattern} | question=${reflection.question} | suggestion=${reflection.suggestion}`);
+
+    const relatedGoals = goals
+      .map((goal) => ({
+        score: scoreText(`${goal.title} ${goal.description} ${(goal.roadmap?.knowledge ?? []).join(' ')} ${(goal.roadmap?.ideas ?? []).join(' ')} ${(goal.roadmap?.todos ?? []).join(' ')}`),
+        text: `Goal memory: ${goal.title} | status=${goal.status} | description=${goal.description} | roadmap knowledge=${(goal.roadmap?.knowledge ?? []).slice(0, 3).join('; ') || 'none'} | ideas=${(goal.roadmap?.ideas ?? []).slice(0, 3).join('; ') || 'none'} | todos=${(goal.roadmap?.todos ?? []).slice(0, 3).join('; ') || 'none'}`,
+      }))
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
+      .map((item) => item.text);
+
+    const relatedProjects = projects
+      .map((project) => ({
+        score: scoreText(`${project.title} ${project.description} ${project.status} ${project.experiments.map((exp) => `${exp.title} ${exp.status} ${exp.result ?? ''}`).join(' ')}`),
+        text: `Project memory: ${project.title} | status=${project.status} | description=${project.description} | experiments=${project.experiments.slice(0, 3).map((exp) => `${exp.title}(${exp.status})`).join('; ') || 'none'}`,
+      }))
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
+      .map((item) => item.text);
+
+    const relatedNotes = notes
+      .map((note) => ({
+        score: scoreText(note.content),
+        text: `Raw memory: ${note.content.replace(/\s+/g, ' ').slice(0, 180)}`,
+      }))
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
+      .map((item) => item.text);
+
+    const fallbackIdeas = topIdeas.length === 0 && topPrinciples.length === 0 && topTensions.length === 0
+      ? ideas
+          .slice()
+          .sort((a, b) => ideaTypePriority(b) - ideaTypePriority(a))
+          .slice(0, 4)
+          .map((idea) => `${idea.type === 'Principle' ? 'Principle memory' : isTensionIdea(idea) ? 'Unresolved tension' : 'Knowledge memory'}: ${idea.title} | summary=${idea.summary}`)
+      : [];
+
+    const personaIdea = ideas.find(i => i.title === 'System OS: Agent Persona');
+    const personaText = personaIdea 
+      ? `AGENT SYSTEM PERSONA (Operating instructions and user preferences - follow strictly):\n${personaIdea.content}\n---` 
+      : '';
+
+    return [
+      personaText,
+      `Current route: ${location.pathname}`,
+      `Knowledge base snapshot: notes=${notes.length}, ideas=${ideas.length}, goals=${goals.length}, projects=${projects.length}, reflections=${reflections.length}`,
+      'Memory hierarchy:',
+      '- distilled principles first',
+      '- then active reflections and unresolved tensions',
+      '- then connected knowledge and active goals/projects',
+      '- then raw notes only as supporting evidence',
+      'Relevant context:',
+      ...principleContext,
+      ...activeReflections,
+      ...tensionContext,
+      ...relatedIdeasFormatting,
+      ...graphWalkIdeas,
+      ...relatedGoals,
+      ...relatedProjects,
+      ...relatedNotes,
+      ...fallbackIdeas,
+    ].filter(Boolean).join('\n');
+  }, [goals, ideas, location.pathname, messages, notes, projects, reflections, sections]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,33 +318,198 @@ export default function Chatbot() {
     setIsLoading(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const chat = ai.chats.create({
-        model: 'gemini-3.1-flash-lite-preview',
-        config: {
-          systemInstruction: "You are the AI assistant for HumanBoard, a personal second-brain app focused on ideas. Be concise, calm, and highly actionable. Help the user refine ideas, suggest next steps, and connect concepts. Do not use markdown tables.",
-        }
-      });
-
-      // Replay history (simplified for demo, ideally we pass history to chat creation or send sequentially)
-      // For this simple implementation, we'll just send the latest message with some context.
       const historyContext = messages.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n');
-      
-      const response = await chat.sendMessage({ 
-        message: `Previous context:\n${historyContext}\n\nUser: ${userMsg}` 
-      });
+      const systemInstruction = buildMemoryShapedSystemInstruction(`Use the provided HumanBoard knowledge context when relevant. Prefer connecting the user to existing notes, ideas, goals, projects, principles, and reflections before giving generic advice.
+
+AUTONOMOUS WRITE CAPABILITY:
+You can now autonomously write to the user's board, but you are an inbox gate, not a vacuum cleaner. Only save content that belongs in the HumanBoard database: ideas, strategic observations, principles, goals, projects, unresolved questions, signals, durable user preferences, or raw notes that may matter later. Do NOT save operational chatter about patching/debugging the app, UI bug reports, build/restart requests, or implementation instructions unless the user explicitly says to store them as knowledge. If your response implies creating a note or compiling an idea, you MUST use one of the tools by placing a toolcall block in your response.
+
+Tool 1: Create an inbox note. Use this to save an episodic memory, raw thought, or quick fact.
+<toolcall_create_note>The text of the note goes here</toolcall_create_note>
+
+Tool 2: Create a knowledge Idea node. Use this when the user wants a new idea node on the board or map.
+<toolcall_create_idea>
+{
+  "title": "Short title",
+  "summary": "1 sentence string",
+  "content": "detailed body",
+  "type": "Concept|Principle|Reference|Project|Question|Action",
+  "stage": "Seed|Sprouting|Evergreen",
+  "nextAction": "optional string",
+  "section": "optional section name or id",
+  "confidence": 7,
+  "maturity": 50,
+  "relatedIdeas": ["optional existing idea title or id"]
+}
+</toolcall_create_idea>
+
+Tool 3: Update an existing Idea node. Use this to manage an existing map node by changing its title, summary, content, type, stage, next action, section, confidence, maturity, or related ideas.
+<toolcall_update_idea>
+{
+  "target": "existing idea title or id",
+  "title": "optional new title",
+  "summary": "optional summary",
+  "content": "optional body",
+  "type": "Concept|Principle|Reference|Project|Question|Action",
+  "stage": "Seed|Sprouting|Evergreen|Archived",
+  "nextAction": "optional string",
+  "section": "optional section name or id",
+  "confidence": 8,
+  "maturity": 65,
+  "relatedIdeas": ["optional existing idea title or id"]
+}
+</toolcall_update_idea>
+
+Tool 4: Update your Persona. If you learn something new about the user's preferences, goals, or your operating constraints, dynamically update your memory persona card.
+<toolcall_update_persona>
+{
+  "content": "Fully rewritten persona content containing all known user preferences, facts, and communication styles..."
+}
+</toolcall_update_persona>
+
+When the user asks to create or manage a map idea node, prefer toolcall_create_idea or toolcall_update_idea instead of only describing what to do.
+Include the toolcall anywhere in your response. You can use multiple toolcalls if needed.`);
+
+      const responseText = await askGemma(
+        `HumanBoard knowledge context:\n${relatedContext}\n\nPrevious conversation:\n${historyContext}\n\nUser: ${userMsg}`,
+        systemInstruction
+      );
+
+      let cleanText = responseText;
+      let matchedNote = false;
+      let matchedIdea = false;
+      let matchedIdeaUpdate = false;
+
+      // Extract Create Note tool calls
+      const noteRegex = /<toolcall_create_note>([\s\S]*?)<\/toolcall_create_note>/gi;
+      let noteMatch;
+      while ((noteMatch = noteRegex.exec(responseText)) !== null) {
+        const noteContent = noteMatch[1].trim();
+        if (noteContent && shouldCaptureAsInboxContent(noteContent)) {
+          matchedNote = true;
+          addNote(noteContent);
+        }
+      }
+      cleanText = cleanText.replace(noteRegex, '').trim();
+
+      // Extract Create Idea tool calls
+      const ideaRegex = /<toolcall_create_idea>([\s\S]*?)<\/toolcall_create_idea>/gi;
+      let ideaMatch;
+      while ((ideaMatch = ideaRegex.exec(responseText)) !== null) {
+        try {
+          const jsonStr = ideaMatch[1].trim();
+          const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+          const ideaData = JSON.parse(cleanJsonStr);
+          matchedIdea = true;
+          addIdea({
+            title: ideaData.title || 'Untitled Idea from Gemma',
+            summary: ideaData.summary || ideaData.content?.slice(0, 100) || '',
+            content: ideaData.content || '',
+            type: ideaData.type || 'Concept',
+            stage: ideaData.stage || 'Seed',
+            sectionId: findSectionId(ideaData.section),
+            confidence: Number.isFinite(ideaData.confidence) ? Math.max(1, Math.min(10, Number(ideaData.confidence))) : 7,
+            maturity: Number.isFinite(ideaData.maturity) ? Math.max(0, Math.min(100, Number(ideaData.maturity))) : 50,
+            nextAction: ideaData.nextAction || '',
+            linkedNoteIds: [],
+            relatedIdeaIds: findRelatedIdeaIds(ideaData.relatedIdeas),
+          });
+        } catch (err) {
+          console.error("Failed to parse create_idea toolcall JSON:", err);
+        }
+      }
+      cleanText = cleanText.replace(ideaRegex, '').trim();
+
+      // Extract Update Idea tool calls
+      const updateIdeaRegex = /<toolcall_update_idea>([\s\S]*?)<\/toolcall_update_idea>/gi;
+      let updateIdeaMatch;
+      while ((updateIdeaMatch = updateIdeaRegex.exec(responseText)) !== null) {
+        try {
+          const jsonStr = updateIdeaMatch[1].trim();
+          const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+          const ideaData = JSON.parse(cleanJsonStr);
+          const targetIdea = findIdeaByReference(ideaData.target);
+          if (!targetIdea) continue;
+          matchedIdeaUpdate = true;
+          updateIdea(targetIdea.id, {
+            title: ideaData.title || targetIdea.title,
+            summary: ideaData.summary || targetIdea.summary,
+            content: ideaData.content || targetIdea.content,
+            type: ideaData.type || targetIdea.type,
+            stage: ideaData.stage || targetIdea.stage,
+            sectionId: ideaData.section ? findSectionId(ideaData.section) : targetIdea.sectionId,
+            confidence: Number.isFinite(ideaData.confidence) ? Math.max(1, Math.min(10, Number(ideaData.confidence))) : targetIdea.confidence,
+            maturity: Number.isFinite(ideaData.maturity) ? Math.max(0, Math.min(100, Number(ideaData.maturity))) : targetIdea.maturity,
+            nextAction: ideaData.nextAction ?? targetIdea.nextAction,
+            relatedIdeaIds: Array.isArray(ideaData.relatedIdeas) ? findRelatedIdeaIds(ideaData.relatedIdeas) : targetIdea.relatedIdeaIds,
+          });
+        } catch (err) {
+          console.error("Failed to parse update_idea toolcall JSON:", err);
+        }
+      }
+      cleanText = cleanText.replace(updateIdeaRegex, '').trim();
+
+      // Extract Update Persona tool calls
+      const personaRegex = /<toolcall_update_persona>([\s\S]*?)<\/toolcall_update_persona>/gi;
+      let personaMatch;
+      let matchedPersona = false;
+      while ((personaMatch = personaRegex.exec(responseText)) !== null) {
+        try {
+          const jsonStr = personaMatch[1].trim();
+          const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+          const data = JSON.parse(cleanJsonStr);
+          matchedPersona = true;
+          
+          const existingPersona = ideas.find(i => i.title === 'System OS: Agent Persona');
+          if (existingPersona && data.content) {
+             updateIdea(existingPersona.id, { 
+               content: data.content, 
+               summary: data.content.slice(0, 200) + '...'
+             });
+          } else if (data.content) {
+             addIdea({
+               title: 'System OS: Agent Persona',
+               summary: data.content.slice(0, 200) + '...',
+               content: data.content,
+               type: 'Principle',
+               stage: 'Evergreen',
+               sectionId: inferSectionId(),
+               confidence: 10,
+               maturity: 100,
+               nextAction: 'Strict system guidelines',
+               linkedNoteIds: [],
+               relatedIdeaIds: [],
+             });
+          }
+        } catch (err) {
+          console.error("Failed to parse update_persona toolcall JSON:", err);
+        }
+      }
+      cleanText = cleanText.replace(personaRegex, '').trim();
+
+      let actionMessage = '';
+      if (matchedNote || matchedIdea || matchedIdeaUpdate || matchedPersona) {
+        actionMessage = "\n\n*(Gemma: ";
+        const acts = [];
+        if (matchedNote) acts.push("added to Inbox");
+        if (matchedIdea) acts.push("created Idea node");
+        if (matchedIdeaUpdate) acts.push("updated Idea node");
+        if (matchedPersona) acts.push("updated System Persona");
+        actionMessage += acts.join(", ") + ")*";
+      }
 
       setMessages(prev => [...prev, { 
         id: (Date.now() + 1).toString(), 
         role: 'model', 
-        content: response.text || "I couldn't generate a response." 
+        content: (cleanText || "I have saved that to your board.") + actionMessage 
       }]);
     } catch (error) {
       console.error("Chat error:", error);
+      const detail = error instanceof Error ? error.message : 'Unknown Gemma error.';
       setMessages(prev => [...prev, { 
         id: (Date.now() + 1).toString(), 
         role: 'model', 
-        content: "Sorry, I encountered an error connecting to the AI." 
+        content: `Gemma runtime error: ${detail}` 
       }]);
     } finally {
       setIsLoading(false);
@@ -75,7 +520,7 @@ export default function Chatbot() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 w-12 h-12 bg-stone-900 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-stone-800 transition-transform hover:scale-105 z-50"
+        className="fixed bottom-4 right-4 md:bottom-6 md:right-6 w-12 h-12 bg-stone-900 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-stone-800 transition-transform hover:scale-105 z-50"
       >
         <Bot className="w-5 h-5" />
       </button>
@@ -85,14 +530,21 @@ export default function Chatbot() {
   return (
     <div 
       className={cn(
-        "fixed bottom-6 right-6 bg-white border border-stone-200 shadow-2xl flex flex-col z-50 transition-all duration-300 ease-in-out overflow-hidden",
-        isExpanded ? "w-[600px] h-[800px] rounded-xl" : "w-[380px] h-[600px] rounded-2xl"
+        "fixed z-50 bg-white border border-stone-200 shadow-2xl flex flex-col transition-all duration-300 ease-in-out overflow-hidden bottom-3 right-3 left-3 max-w-[calc(100vw-1.5rem)] md:left-auto md:bottom-6 md:right-6",
+        isExpanded
+          ? "h-[85vh] md:w-[600px] md:h-[800px] rounded-xl"
+          : "w-full h-[70vh] md:w-[380px] md:h-[600px] rounded-2xl"
       )}
     >
       <div className="flex items-center justify-between p-4 border-b border-stone-100 bg-stone-50/50">
-        <div className="flex items-center gap-2 text-stone-800 font-medium text-sm">
-          <Bot className="w-4 h-4 text-blue-600" />
-          HumanBoard Assistant
+        <div className="flex flex-col gap-1 text-stone-800 font-medium text-sm">
+          <div className="flex items-center gap-2">
+            <Bot className="w-4 h-4 text-blue-600" />
+            HumanBoard Assistant
+          </div>
+          <div className="text-[11px] text-stone-500">
+            Gemma: {runtime.model} · {runtime.local ? 'local runtime' : runtime.baseUrl}
+          </div>
         </div>
         <div className="flex items-center gap-1 text-stone-400">
           <button onClick={() => setIsExpanded(!isExpanded)} className="p-1.5 hover:bg-stone-200 rounded-md transition-colors">
@@ -116,7 +568,29 @@ export default function Chatbot() {
               {msg.role === 'user' ? (
                 msg.content
               ) : (
-                <ReactMarkdown>{msg.content}</ReactMarkdown>
+                <>
+                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  <div className="mt-3 flex items-center justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveMessage(msg)}
+                      disabled={savedMessageIds.includes(msg.id)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-500 transition-colors hover:border-stone-400 hover:text-stone-800 disabled:cursor-default disabled:opacity-70"
+                    >
+                      {savedMessageIds.includes(msg.id) ? (
+                        <>
+                          <Check className="w-3 h-3" />
+                          Saved
+                        </>
+                      ) : (
+                        <>
+                          <BookmarkPlus className="w-3 h-3" />
+                          Save to board
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -140,7 +614,11 @@ export default function Chatbot() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask anything..."
-            className="w-full bg-stone-50 border border-stone-200 rounded-full py-3 pl-4 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-stone-900/10 focus:border-stone-400"
+            autoCapitalize="sentences"
+            autoCorrect="on"
+            spellCheck
+            className="w-full bg-stone-50 border border-stone-200 rounded-full py-3 pl-4 pr-12 text-sm text-stone-900 caret-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900/10 focus:border-stone-400"
+            style={{ WebkitTextFillColor: '#1c1917' }}
           />
           <button 
             type="submit"

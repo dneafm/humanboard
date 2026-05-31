@@ -4,9 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
+    "dev": "vite --port=3001 --host=0.0.0.0",
     "build": "vite build",
+    "build:prod": "vite build",
     "preview": "vite preview",
+    "start:prod": "node ./server.mjs",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
   },

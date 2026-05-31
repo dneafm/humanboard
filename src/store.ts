@@ -1,14 +1,112 @@
 import { create } from 'zustand';
+import { defaultSections } from './lib/storage/defaultSnapshot';
+import { localSnapshotRepository } from './lib/storage/localSnapshotRepository';
+import type { AppSnapshot } from './lib/storage/types';
+
+export type SignalDirection = 'Supports' | 'Weakens' | 'Mixed' | 'Unclear';
+export type PredictionHorizon = 'Near' | 'Mid' | 'Long';
+export type StrategicRole = 'Base' | 'Vehicle' | 'Signal' | 'Question';
+export type ReadinessState = 'Incubating' | 'Warming' | 'Close' | 'Ready';
+
+export type SignalAssessment = {
+  detected: boolean;
+  strength: number; // 1-10
+  confidence: number; // 1-10
+  direction: SignalDirection;
+  horizon: PredictionHorizon;
+  thesis?: string;
+  whyItMatters?: string;
+  relatedBaseSkillIds?: string[];
+  relatedUmbrellaGoalIds?: string[];
+  relatedIdeaIds?: string[];
+};
+
+export type ActivationReadiness = {
+  baseStrength: number; // 0-100
+  marketSignal: number; // 0-100
+  personalPull: number; // 0-100
+  monetizationClarity: number; // 0-100
+  timing: number; // 0-100
+};
 
 export type Note = {
   id: string;
   content: string;
   createdAt: string;
+  layer: 'raw';
+  signalAssessment?: SignalAssessment;
+  capabilityBetIds?: string[];
+  capabilityEvidencePolarity?: EvidencePolarity;
+  capabilityEvidenceSummary?: string;
+  extractionReview?: NoteExtractionReview;
 };
 
 export type IdeaStage = 'Seed' | 'Sprouting' | 'Evergreen' | 'Archived';
 
-export type IdeaType = 'Concept' | 'Principle' | 'Reference';
+export type IdeaType = 'Concept' | 'Principle' | 'Reference' | 'Project' | 'Question' | 'Action' | 'Base Skill' | 'Umbrella Goal';
+
+export function getReadinessScore(readiness: ActivationReadiness): number {
+  return Math.round(
+    (readiness.baseStrength +
+      readiness.marketSignal +
+      readiness.personalPull +
+      readiness.monetizationClarity +
+      readiness.timing) / 5,
+  );
+}
+
+export function getReadinessState(score: number): ReadinessState {
+  if (score >= 80) return 'Ready';
+  if (score >= 65) return 'Close';
+  if (score >= 40) return 'Warming';
+  return 'Incubating';
+}
+
+export function deriveStrategicIdeaFields(ideas: Idea[], notes: Note[]): Idea[] {
+  const signalNotes = notes.filter((note) => note.signalAssessment?.detected);
+
+  return ideas.map((idea) => {
+    const isBaseIdea = idea.type === 'Base Skill' || idea.strategicRole === 'Base';
+    if (!isBaseIdea) return idea;
+
+    const supportingNotes = signalNotes.filter((note) => {
+      const assessment = note.signalAssessment;
+      return assessment && assessment.direction === 'Supports' && (
+        assessment.relatedBaseSkillIds?.includes(idea.id) ||
+        assessment.relatedIdeaIds?.includes(idea.id)
+      );
+    });
+
+    const weakeningNotes = signalNotes.filter((note) => {
+      const assessment = note.signalAssessment;
+      return assessment && assessment.direction === 'Weakens' && (
+        assessment.relatedBaseSkillIds?.includes(idea.id) ||
+        assessment.relatedIdeaIds?.includes(idea.id)
+      );
+    });
+
+    const weightedSupport = supportingNotes.reduce((sum, note) => sum + ((note.signalAssessment?.strength ?? 0) * (note.signalAssessment?.confidence ?? 0)), 0);
+    const weightedWeakening = weakeningNotes.reduce((sum, note) => sum + ((note.signalAssessment?.strength ?? 0) * (note.signalAssessment?.confidence ?? 0)), 0);
+    const rawAlignment = 50 + (weightedSupport * 0.8) - (weightedWeakening * 0.8);
+    const alignmentScore = Math.max(0, Math.min(100, Math.round(rawAlignment)));
+    const supportingNoteIds = supportingNotes.map((note) => note.id);
+    const weakeningNoteIds = weakeningNotes.map((note) => note.id);
+
+    const unchanged =
+      idea.alignmentScore === alignmentScore &&
+      JSON.stringify(idea.supportingNoteIds ?? []) === JSON.stringify(supportingNoteIds) &&
+      JSON.stringify(idea.weakeningNoteIds ?? []) === JSON.stringify(weakeningNoteIds);
+
+    if (unchanged) return idea;
+
+    return {
+      ...idea,
+      alignmentScore,
+      supportingNoteIds,
+      weakeningNoteIds,
+    };
+  });
+}
 
 export interface Comment {
   id: string;
@@ -29,6 +127,7 @@ export type Idea = {
   title: string;
   summary: string;
   content: string;
+  layer: 'knowledge';
   type: IdeaType;
   stage: IdeaStage;
   sectionId?: string;
@@ -38,8 +137,20 @@ export type Idea = {
   lastReviewed: string;
   linkedNoteIds: string[];
   relatedIdeaIds: string[];
+  tags?: string[];
+  sourceNoteExcerpt?: string;
+  compileReason?: string;
+  openQuestions?: string[];
   coverImage?: string;
   comments?: Comment[];
+  strategicRole?: StrategicRole;
+  baseSkillIds?: string[];
+  umbrellaGoalIds?: string[];
+  activationReadiness?: ActivationReadiness;
+  strategicNote?: string;
+  alignmentScore?: number; // 0-100
+  supportingNoteIds?: string[];
+  weakeningNoteIds?: string[];
 };
 
 export type Project = {
@@ -71,39 +182,157 @@ export type Goal = {
   };
 };
 
+export type ReflectionFeedback = 'useful' | 'not-useful';
+
+export type Reflection = {
+  id: string;
+  pattern: string;
+  question: string;
+  suggestion: string;
+  sourceNoteIds: string[];
+  sourceIdeaIds: string[];
+  createdAt: string;
+  dismissedAt?: string;
+  feedback?: ReflectionFeedback;
+};
+
+export type EvidencePolarity = 'supports' | 'contradicts' | 'complicates';
+export type CapabilityBetStatus = 'watching' | 'exploring' | 'preparing' | 'committed';
+export type ExtractionCandidateStatus = 'pending' | 'accepted' | 'rejected';
+export type ExtractionReviewSource = 'ai' | 'heuristic' | 'hybrid';
+
+export type CapabilityEvidenceCandidate = {
+  id: string;
+  capabilityBetId: string;
+  title: string;
+  polarity: EvidencePolarity;
+  summary: string;
+  rationale: string;
+  suggestedWeight: number;
+  status: ExtractionCandidateStatus;
+};
+
+export type IdeaLinkCandidateRelation = 'base-skill' | 'umbrella-goal' | 'idea';
+
+export type IdeaLinkCandidate = {
+  id: string;
+  ideaId: string;
+  title: string;
+  relation: IdeaLinkCandidateRelation;
+  rationale: string;
+  status: ExtractionCandidateStatus;
+};
+
+export type NoteExtractionReview = {
+  source: ExtractionReviewSource;
+  generatedAt: string;
+  themes: string[];
+  entities: string[];
+  capabilityCandidates: CapabilityEvidenceCandidate[];
+  ideaCandidates: IdeaLinkCandidate[];
+};
+
+export type SignalEvent = {
+  id: string;
+  noteId: string;
+  capabilityBetId: string;
+  polarity: EvidencePolarity;
+  weight: number;
+  summary: string;
+  createdAt: string;
+};
+
+export type CapabilityBet = {
+  id: string;
+  title: string;
+  thesis: string;
+  baselineConviction: number;
+  status: CapabilityBetStatus;
+  conviction: number;
+  thresholdToCommit: number;
+  salience: number;
+  keywords: string[];
+  supportingSignalIds: string[];
+  contradictingSignalIds: string[];
+  complicatingSignalIds: string[];
+  lastReviewed: string;
+  unlockPaths: string[];
+  firstUseCases: string[];
+  costOfNotKnowing?: string;
+  reviewCadence?: string;
+  strategicNote?: string;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt?: string;
+};
+
+export type CapabilityTimelineEventReason = 'baseline' | 'signal-change' | 'manual-edit';
+
+export type CapabilityTimelineEvent = {
+  id: string;
+  capabilityBetId: string;
+  createdAt: string;
+  reason: CapabilityTimelineEventReason;
+  previousConviction: number;
+  conviction: number;
+  delta: number;
+  previousStatus: CapabilityBetStatus;
+  status: CapabilityBetStatus;
+  salience: number;
+  evidenceIds: string[];
+  summary: string;
+};
+
 interface AppState {
   notes: Note[];
   ideas: Idea[];
   projects: Project[];
   sections: Section[];
   goals: Goal[];
+  reflections: Reflection[];
+  capabilityBets: CapabilityBet[];
+  signalEvents: SignalEvent[];
+  capabilityTimelineEvents: CapabilityTimelineEvent[];
   isDarkMode: boolean;
   addNote: (content: string) => void;
+  updateNote: (id: string, updates: Partial<Note>) => void;
   deleteNote: (id: string) => void;
-  addIdea: (idea: Omit<Idea, 'id' | 'lastReviewed'>) => void;
+  addIdea: (idea: Omit<Idea, 'id' | 'lastReviewed' | 'layer'>) => void;
   updateIdea: (id: string, updates: Partial<Idea>) => void;
   addProject: (project: Omit<Project, 'id'>) => void;
   addSection: (section: Omit<Section, 'id'>) => void;
   addGoal: (goal: Omit<Goal, 'id' | 'createdAt'>) => void;
   updateGoal: (id: string, updates: Partial<Goal>) => void;
   deleteGoal: (id: string) => void;
+  addReflection: (reflection: Omit<Reflection, 'id' | 'createdAt'>) => Reflection;
+  updateReflection: (id: string, updates: Partial<Reflection>) => void;
+  dismissReflection: (id: string) => void;
+  setReflectionFeedback: (id: string, feedback: ReflectionFeedback) => void;
+  setIdeas: (ideas: Idea[]) => void;
+  addCapabilityBet: (bet: {
+    title: string;
+    thesis: string;
+    baselineConviction?: number;
+    thresholdToCommit?: number;
+    keywords?: string[];
+    unlockPaths?: string[];
+    firstUseCases?: string[];
+    costOfNotKnowing?: string;
+    reviewCadence?: string;
+    strategicNote?: string;
+  }) => void;
+  updateCapabilityBet: (id: string, updates: Partial<CapabilityBet>) => void;
+  archiveCapabilityBet: (id: string) => void;
+  recomputeStrategicAlignment: () => void;
+  recomputeCapabilityBetSignals: () => void;
   toggleDarkMode: () => void;
 }
 
-const initialNotes: Note[] = [
-  { id: 'n1', content: 'What if we used LLMs to automatically categorize personal expenses based on receipt photos?', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString() },
-  { id: 'n2', content: 'Read that article about local-first software. Need to think about how it applies to my note-taking habits.', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString() },
-  { id: 'n3', content: 'Idea: A smart mirror that only shows positive affirmations when you look stressed.', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString() },
-];
+const initialNotes: Note[] = [];
 
-const initialSections: Section[] = [
-  { id: 'sec1', name: 'Technology & Tools', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
-  { id: 'sec2', name: 'Finance', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' },
-  { id: 'sec3', name: 'Health & Wellness', color: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300' },
-  { id: 'sec4', name: 'Lifestyle & Home', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
-];
+const initialSections: Section[] = defaultSections;
 
-const initialIdeas: Idea[] = [
+const initialIdeas = [
   {
     id: 'i1',
     title: 'Local-First Personal CRM',
@@ -116,7 +345,7 @@ const initialIdeas: Idea[] = [
     maturity: 45,
     nextAction: 'Research CRDT libraries for React Native',
     lastReviewed: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
-    linkedNoteIds: ['n2'],
+    linkedNoteIds: [],
     relatedIdeaIds: ['i5'],
   },
   {
@@ -131,7 +360,7 @@ const initialIdeas: Idea[] = [
     maturity: 15,
     nextAction: 'Test Gemini Vision API with 5 sample receipts',
     lastReviewed: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
-    linkedNoteIds: ['n1'],
+    linkedNoteIds: [],
     relatedIdeaIds: ['i4', 'i8'],
   },
   {
@@ -249,57 +478,712 @@ const initialIdeas: Idea[] = [
     maturity: 35,
     nextAction: 'Find a reliable CO2 estimation API',
     lastReviewed: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
-    linkedNoteIds: ['n1'],
+    linkedNoteIds: [],
     relatedIdeaIds: ['i2'],
   }
-];
+] satisfies Omit<Idea, 'layer'>[];
 
-const initialProjects: Project[] = [
+const hydratedInitialIdeas: Idea[] = initialIdeas.map((idea) => ({ ...idea, layer: 'knowledge' as const }));
+
+const initialProjects: Project[] = [];
+
+const capabilitySeededAt = new Date().toISOString();
+
+const initialCapabilityBets: CapabilityBet[] = [
   {
-    id: 'p1',
-    title: 'Local CRM Prototype',
-    description: 'Build a basic React Native app with WatermelonDB for local storage.',
-    sourceIdeaId: 'i1',
-    status: 'Active',
-    experiments: [
-      { id: 'e1', title: 'Test WatermelonDB sync performance', status: 'Running' }
-    ]
-  }
+    id: 'cb-learn-chinese',
+    title: 'Learn Chinese',
+    thesis: 'Chinese may become a high-leverage long-horizon capability if China-linked opportunity, information flow, and network effects keep rising enough to justify serious study.',
+    baselineConviction: 58,
+    status: 'watching',
+    conviction: 58,
+    thresholdToCommit: 80,
+    salience: 61,
+    keywords: ['chinese', 'mandarin', 'china', 'sinophone', 'taobao', 'wechat', 'xiaohongshu', 'douyin'],
+    supportingSignalIds: [],
+    contradictingSignalIds: [],
+    complicatingSignalIds: [],
+    lastReviewed: capabilitySeededAt,
+    unlockPaths: ['direct market reading', 'relationship access', 'faster supplier and operator research', 'distribution edge into China-linked ecosystems'],
+    firstUseCases: ['read primary-source market chatter', 'navigate Chinese products and docs', 'source opportunities earlier'],
+    costOfNotKnowing: 'Stay dependent on translations and second-hand interpretation as China-linked opportunity grows.',
+    reviewCadence: 'monthly or when new strong signals land',
+    strategicNote: 'Do not commit just because it feels intellectually impressive. Commit when repeated signals make it economically or strategically real.',
+    createdAt: capabilitySeededAt,
+    updatedAt: capabilitySeededAt,
+  },
 ];
 
-export const useAppStore = create<AppState>((set) => ({
+const initialSignalEvents: SignalEvent[] = [];
+
+const initialCapabilityTimelineEvents: CapabilityTimelineEvent[] = initialCapabilityBets.map((bet) => ({
+  id: `${bet.id}:baseline`,
+  capabilityBetId: bet.id,
+  createdAt: bet.createdAt,
+  reason: 'baseline',
+  previousConviction: bet.baselineConviction,
+  conviction: bet.conviction,
+  delta: 0,
+  previousStatus: bet.status,
+  status: bet.status,
+  salience: bet.salience,
+  evidenceIds: [],
+  summary: 'Baseline conviction snapshot before evidence starts moving this bet.',
+}));
+
+function randomId() {
+  return Math.random().toString(36).substring(2, 10);
+}
+
+function persistSnapshot(snapshot: AppSnapshot) {
+  void localSnapshotRepository.save(snapshot);
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function normalizeText(value: string) {
+  return value.toLowerCase();
+}
+
+function arraysMatch(a: string[] | undefined, b: string[] | undefined) {
+  const left = [...(a ?? [])].sort();
+  const right = [...(b ?? [])].sort();
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function trimList(items: string[] | undefined, maxItems = 6) {
+  return (items ?? []).map((item) => item.trim()).filter(Boolean).slice(0, maxItems);
+}
+
+function inferEvidencePolarity(note: Note): EvidencePolarity {
+  if (note.capabilityEvidencePolarity) return note.capabilityEvidencePolarity;
+
+  const explicit = note.signalAssessment?.direction;
+  if (explicit === 'Supports') return 'supports';
+  if (explicit === 'Weakens') return 'contradicts';
+  if (explicit === 'Mixed') return 'complicates';
+
+  const content = normalizeText(note.content);
+  if (/(not now|too early|overrated|unlikely|no edge|won't matter|waste)/.test(content)) return 'contradicts';
+  if (/(hard|costly|difficult|tradeoff|but|however|unclear)/.test(content)) return 'complicates';
+  return 'supports';
+}
+
+function buildCapabilitySignalEvents(capabilityBets: CapabilityBet[], notes: Note[]): SignalEvent[] {
+  const events: SignalEvent[] = [];
+
+  for (const note of notes) {
+    const content = normalizeText(note.content);
+    const strength = note.signalAssessment?.strength ?? 5;
+    const confidence = note.signalAssessment?.confidence ?? 5;
+    const direction = inferEvidencePolarity(note);
+    const explicitBetIds = note.capabilityBetIds ?? [];
+
+    const extractionGateActive = (note.extractionReview?.capabilityCandidates.length ?? 0) > 0;
+
+    for (const bet of capabilityBets) {
+      if (bet.archivedAt) continue;
+
+      const keywordHits = extractionGateActive
+        ? 0
+        : bet.keywords.filter((keyword) => content.includes(keyword.toLowerCase())).length;
+      const explicitlyLinked = explicitBetIds.includes(bet.id);
+      if (!keywordHits && !explicitlyLinked) continue;
+
+      const baseWeight = strength * 1.8 + confidence * 1.6 + keywordHits * 8 + (explicitlyLinked ? 12 : 0);
+      const polarityMultiplier = direction === 'contradicts' ? 1.15 : direction === 'complicates' ? 0.85 : 1;
+      const weight = clamp(Math.round(baseWeight * polarityMultiplier), 8, 100);
+
+      events.push({
+        id: `${bet.id}:${note.id}`,
+        noteId: note.id,
+        capabilityBetId: bet.id,
+        polarity: direction,
+        weight,
+        summary: (note.capabilityEvidenceSummary || note.content).replace(/\s+/g, ' ').trim().slice(0, 160),
+        createdAt: note.createdAt,
+      });
+    }
+  }
+
+  return events;
+}
+
+function getCapabilityBetStatus(conviction: number, thresholdToCommit: number): CapabilityBetStatus {
+  if (conviction >= thresholdToCommit) return 'committed';
+  if (conviction >= 70) return 'preparing';
+  if (conviction >= 50) return 'exploring';
+  return 'watching';
+}
+
+function buildCapabilityTimelineSummary(related: SignalEvent[]) {
+  const supporting = related.filter((event) => event.polarity === 'supports');
+  const contradicting = related.filter((event) => event.polarity === 'contradicts');
+  const complicating = related.filter((event) => event.polarity === 'complicates');
+  const latestEvidence = [...related]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 2)
+    .map((event) => event.summary)
+    .filter(Boolean);
+
+  const counts = `${supporting.length} support, ${contradicting.length} contradict, ${complicating.length} complicate`;
+  return latestEvidence.length
+    ? `${counts}. Latest evidence: ${latestEvidence.join(' | ')}`
+    : `${counts}. No linked evidence yet.`;
+}
+
+function buildCapabilityTimelineEvent(params: {
+  previousBet: CapabilityBet;
+  nextBet: CapabilityBet;
+  relatedEvents: SignalEvent[];
+  reason: CapabilityTimelineEventReason;
+}) {
+  const { previousBet, nextBet, relatedEvents, reason } = params;
+  return {
+    id: `${nextBet.id}:${randomId()}`,
+    capabilityBetId: nextBet.id,
+    createdAt: new Date().toISOString(),
+    reason,
+    previousConviction: previousBet.conviction,
+    conviction: nextBet.conviction,
+    delta: nextBet.conviction - previousBet.conviction,
+    previousStatus: previousBet.status,
+    status: nextBet.status,
+    salience: nextBet.salience,
+    evidenceIds: relatedEvents
+      .map((event) => event.id)
+      .sort(),
+    summary: buildCapabilityTimelineSummary(relatedEvents),
+  } satisfies CapabilityTimelineEvent;
+}
+
+function deriveCapabilityBetFields(
+  capabilityBets: CapabilityBet[],
+  notes: Note[],
+  existingTimelineEvents: CapabilityTimelineEvent[] = [],
+  options: {
+    recordTimeline?: boolean;
+    reason?: CapabilityTimelineEventReason;
+  } = {},
+) {
+  const signalEvents = buildCapabilitySignalEvents(capabilityBets, notes);
+  const nextTimelineEvents = [...existingTimelineEvents];
+
+  const nextBets = capabilityBets.map((bet) => {
+    if (bet.archivedAt) {
+      return {
+        ...bet,
+        supportingSignalIds: [],
+        contradictingSignalIds: [],
+        complicatingSignalIds: [],
+      };
+    }
+
+    const related = signalEvents.filter((event) => event.capabilityBetId === bet.id);
+    const supporting = related.filter((event) => event.polarity === 'supports');
+    const contradicting = related.filter((event) => event.polarity === 'contradicts');
+    const complicating = related.filter((event) => event.polarity === 'complicates');
+
+    const positiveDelta = supporting.reduce((sum, event) => sum + event.weight, 0) * 0.08;
+    const negativeDelta = contradicting.reduce((sum, event) => sum + event.weight, 0) * 0.1;
+    const complicationDelta = complicating.reduce((sum, event) => sum + event.weight, 0) * 0.04;
+    const recurrenceModifier = related.length >= 4 ? 4 : related.length >= 2 ? 2 : 0;
+    const baselineConviction = clamp(bet.baselineConviction ?? bet.conviction, 0, 100);
+    const conviction = clamp(Math.round(baselineConviction + positiveDelta - negativeDelta - complicationDelta + recurrenceModifier), 0, 100);
+    const salience = clamp(Math.round(35 + related.length * 6 + positiveDelta * 0.9 - negativeDelta * 0.7), 0, 100);
+
+    const status = getCapabilityBetStatus(conviction, bet.thresholdToCommit);
+
+    const nextBet = {
+      ...bet,
+      baselineConviction,
+      status,
+      conviction,
+      salience,
+      supportingSignalIds: supporting.map((event) => event.id),
+      contradictingSignalIds: contradicting.map((event) => event.id),
+      complicatingSignalIds: complicating.map((event) => event.id),
+      lastReviewed: related.length ? related.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0].createdAt : bet.lastReviewed,
+      updatedAt: bet.updatedAt || bet.createdAt || new Date().toISOString(),
+    };
+
+    if (!nextTimelineEvents.some((event) => event.capabilityBetId === bet.id)) {
+      nextTimelineEvents.push({
+        id: `${bet.id}:baseline`,
+        capabilityBetId: bet.id,
+        createdAt: bet.createdAt || new Date().toISOString(),
+        reason: 'baseline',
+        previousConviction: baselineConviction,
+        conviction: baselineConviction,
+        delta: 0,
+        previousStatus: getCapabilityBetStatus(baselineConviction, bet.thresholdToCommit),
+        status: getCapabilityBetStatus(baselineConviction, bet.thresholdToCommit),
+        salience: nextBet.salience,
+        evidenceIds: [],
+        summary: 'Baseline conviction snapshot before evidence starts moving this bet.',
+      });
+    }
+
+    const changed =
+      bet.conviction !== nextBet.conviction ||
+      bet.status !== nextBet.status ||
+      bet.salience !== nextBet.salience ||
+      !arraysMatch(bet.supportingSignalIds, nextBet.supportingSignalIds) ||
+      !arraysMatch(bet.contradictingSignalIds, nextBet.contradictingSignalIds) ||
+      !arraysMatch(bet.complicatingSignalIds, nextBet.complicatingSignalIds);
+
+    if (options.recordTimeline && changed) {
+      const candidateEvent = buildCapabilityTimelineEvent({
+        previousBet: { ...bet, baselineConviction },
+        nextBet,
+        relatedEvents: related,
+        reason: options.reason ?? 'signal-change',
+      });
+      const previousEvent = nextTimelineEvents
+        .filter((event) => event.capabilityBetId === bet.id)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+
+      const isDuplicate =
+        previousEvent &&
+        previousEvent.conviction === candidateEvent.conviction &&
+        previousEvent.status === candidateEvent.status &&
+        previousEvent.salience === candidateEvent.salience &&
+        arraysMatch(previousEvent.evidenceIds, candidateEvent.evidenceIds);
+
+      if (!isDuplicate) {
+        nextTimelineEvents.push(candidateEvent);
+      }
+    }
+
+    return nextBet;
+  });
+
+  return { capabilityBets: nextBets, signalEvents, capabilityTimelineEvents: nextTimelineEvents };
+}
+
+function normalizeOptionalText(value: string | undefined, fallback?: string) {
+  if (value === undefined) return fallback;
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
+function normalizeCapabilityBet(input: {
+  title: string;
+  thesis: string;
+  baselineConviction?: number;
+  thresholdToCommit?: number;
+  keywords?: string[];
+  unlockPaths?: string[];
+  firstUseCases?: string[];
+  costOfNotKnowing?: string;
+  reviewCadence?: string;
+  strategicNote?: string;
+  archivedAt?: string;
+}, existing?: CapabilityBet): CapabilityBet {
+  const now = new Date().toISOString();
+  const thresholdToCommit = clamp(Math.round(Number(input.thresholdToCommit ?? existing?.thresholdToCommit ?? 80)), 0, 100);
+  const baselineConviction = clamp(
+    Math.round(Number(input.baselineConviction ?? existing?.baselineConviction ?? existing?.conviction ?? 50)),
+    0,
+    100,
+  );
+  const status = getCapabilityBetStatus(existing?.conviction ?? baselineConviction, thresholdToCommit);
+
+  return {
+    id: existing?.id ?? randomId(),
+    title: input.title.trim() || existing?.title || 'Untitled capability bet',
+    thesis: input.thesis.trim() || existing?.thesis || 'Write the thesis that makes this capability worth watching.',
+    baselineConviction,
+    status,
+    conviction: existing?.conviction ?? baselineConviction,
+    thresholdToCommit,
+    salience: existing?.salience ?? 35,
+    keywords: trimList(input.keywords ?? existing?.keywords, 12),
+    supportingSignalIds: existing?.supportingSignalIds ?? [],
+    contradictingSignalIds: existing?.contradictingSignalIds ?? [],
+    complicatingSignalIds: existing?.complicatingSignalIds ?? [],
+    lastReviewed: existing?.lastReviewed ?? now,
+    unlockPaths: trimList(input.unlockPaths ?? existing?.unlockPaths, 8),
+    firstUseCases: trimList(input.firstUseCases ?? existing?.firstUseCases, 8),
+    costOfNotKnowing: normalizeOptionalText(input.costOfNotKnowing, existing?.costOfNotKnowing),
+    reviewCadence: normalizeOptionalText(input.reviewCadence, existing?.reviewCadence),
+    strategicNote: normalizeOptionalText(input.strategicNote, existing?.strategicNote),
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+    archivedAt: input.archivedAt ?? existing?.archivedAt,
+  };
+}
+
+export const useAppStore = create<AppState>((set, get) => ({
   notes: initialNotes,
-  ideas: initialIdeas,
+  ideas: hydratedInitialIdeas,
   projects: initialProjects,
   sections: initialSections,
   goals: [],
+  reflections: [],
+  capabilityBets: initialCapabilityBets,
+  signalEvents: initialSignalEvents,
+  capabilityTimelineEvents: initialCapabilityTimelineEvents,
   isDarkMode: false,
-  addNote: (content) => set((state) => ({
-    notes: [{ id: Math.random().toString(36).substring(7), content, createdAt: new Date().toISOString() }, ...state.notes]
-  })),
-  deleteNote: (id) => set((state) => ({
-    notes: state.notes.filter(n => n.id !== id)
-  })),
-  addIdea: (idea) => set((state) => ({
-    ideas: [{ ...idea, id: Math.random().toString(36).substring(7), lastReviewed: new Date().toISOString() }, ...state.ideas]
-  })),
-  updateIdea: (id, updates) => set((state) => ({
-    ideas: state.ideas.map(i => i.id === id ? { ...i, ...updates } : i)
-  })),
-  addProject: (project) => set((state) => ({
-    projects: [{ ...project, id: Math.random().toString(36).substring(7) }, ...state.projects]
-  })),
-  addSection: (section) => set((state) => ({
-    sections: [...state.sections, { ...section, id: Math.random().toString(36).substring(7) }]
-  })),
-  addGoal: (goal) => set((state) => ({
-    goals: [{ ...goal, id: Math.random().toString(36).substring(7), createdAt: new Date().toISOString() }, ...state.goals]
-  })),
-  updateGoal: (id, updates) => set((state) => ({
-    goals: state.goals.map(g => g.id === id ? { ...g, ...updates } : g)
-  })),
-  deleteGoal: (id) => set((state) => ({
-    goals: state.goals.filter(g => g.id !== id)
-  })),
-  toggleDarkMode: () => set((state) => ({ isDarkMode: !state.isDarkMode })),
+  addNote: (content) => set((state) => {
+    const nextNotes = [{ id: randomId(), content, createdAt: new Date().toISOString(), layer: 'raw' as const }, ...state.notes];
+    const derived = deriveCapabilityBetFields(state.capabilityBets, nextNotes, state.capabilityTimelineEvents, {
+      recordTimeline: true,
+      reason: 'signal-change',
+    });
+    const next = {
+      ...state,
+      notes: nextNotes,
+      capabilityBets: derived.capabilityBets,
+      signalEvents: derived.signalEvents,
+      capabilityTimelineEvents: derived.capabilityTimelineEvents,
+    };
+    persistSnapshot(next);
+    return {
+      notes: next.notes,
+      capabilityBets: next.capabilityBets,
+      signalEvents: next.signalEvents,
+      capabilityTimelineEvents: next.capabilityTimelineEvents,
+    };
+  }),
+  updateNote: (id, updates) => set((state) => {
+    const nextNotes = state.notes.map((note) => note.id === id ? { ...note, ...updates } : note);
+    const derived = deriveCapabilityBetFields(state.capabilityBets, nextNotes, state.capabilityTimelineEvents, {
+      recordTimeline: true,
+      reason: 'signal-change',
+    });
+    const next = {
+      ...state,
+      notes: nextNotes,
+      capabilityBets: derived.capabilityBets,
+      signalEvents: derived.signalEvents,
+      capabilityTimelineEvents: derived.capabilityTimelineEvents,
+    };
+    persistSnapshot(next);
+    return {
+      notes: next.notes,
+      capabilityBets: next.capabilityBets,
+      signalEvents: next.signalEvents,
+      capabilityTimelineEvents: next.capabilityTimelineEvents,
+    };
+  }),
+  deleteNote: (id) => set((state) => {
+    const nextNotes = state.notes.filter(n => n.id !== id);
+    const derived = deriveCapabilityBetFields(state.capabilityBets, nextNotes, state.capabilityTimelineEvents, {
+      recordTimeline: true,
+      reason: 'signal-change',
+    });
+    const next = {
+      ...state,
+      notes: nextNotes,
+      capabilityBets: derived.capabilityBets,
+      signalEvents: derived.signalEvents,
+      capabilityTimelineEvents: derived.capabilityTimelineEvents,
+    };
+    persistSnapshot(next);
+    return {
+      notes: next.notes,
+      capabilityBets: next.capabilityBets,
+      signalEvents: next.signalEvents,
+      capabilityTimelineEvents: next.capabilityTimelineEvents,
+    };
+  }),
+  addIdea: (idea) => set((state) => {
+    const next = {
+      ...state,
+      ideas: [{ ...idea, id: randomId(), layer: 'knowledge' as const, lastReviewed: new Date().toISOString() }, ...state.ideas],
+    };
+    persistSnapshot(next);
+    return { ideas: next.ideas };
+  }),
+  updateIdea: (id, updates) => set((state) => {
+    const next = {
+      ...state,
+      ideas: state.ideas.map(i => i.id === id ? { ...i, ...updates } : i),
+    };
+    persistSnapshot(next);
+    return { ideas: next.ideas };
+  }),
+  addProject: (project) => set((state) => {
+    const next = {
+      ...state,
+      projects: [{ ...project, id: randomId() }, ...state.projects],
+    };
+    persistSnapshot(next);
+    return { projects: next.projects };
+  }),
+  addSection: (section) => set((state) => {
+    const next = {
+      ...state,
+      sections: [...state.sections, { ...section, id: randomId() }],
+    };
+    persistSnapshot(next);
+    return { sections: next.sections };
+  }),
+  addGoal: (goal) => set((state) => {
+    const next = {
+      ...state,
+      goals: [{ ...goal, id: randomId(), createdAt: new Date().toISOString() }, ...state.goals],
+    };
+    persistSnapshot(next);
+    return { goals: next.goals };
+  }),
+  updateGoal: (id, updates) => set((state) => {
+    const next = {
+      ...state,
+      goals: state.goals.map(g => g.id === id ? { ...g, ...updates } : g),
+    };
+    persistSnapshot(next);
+    return { goals: next.goals };
+  }),
+  deleteGoal: (id) => set((state) => {
+    const next = {
+      ...state,
+      goals: state.goals.filter(g => g.id !== id),
+    };
+    persistSnapshot(next);
+    return { goals: next.goals };
+  }),
+  addReflection: (reflection) => {
+    const createdReflection: Reflection = {
+      ...reflection,
+      id: randomId(),
+      createdAt: new Date().toISOString(),
+    };
+
+    set((state) => {
+      const next = {
+        ...state,
+        reflections: [createdReflection, ...state.reflections],
+      };
+      persistSnapshot(next);
+      return { reflections: next.reflections };
+    });
+
+    return createdReflection;
+  },
+  updateReflection: (id, updates) => set((state) => {
+    const next = {
+      ...state,
+      reflections: state.reflections.map((reflection) => reflection.id === id ? { ...reflection, ...updates } : reflection),
+    };
+    persistSnapshot(next);
+    return { reflections: next.reflections };
+  }),
+  dismissReflection: (id) => set((state) => {
+    const next = {
+      ...state,
+      reflections: state.reflections.map((reflection) => reflection.id === id ? { ...reflection, dismissedAt: new Date().toISOString() } : reflection),
+    };
+    persistSnapshot(next);
+    return { reflections: next.reflections };
+  }),
+  setReflectionFeedback: (id, feedback) => set((state) => {
+    const next = {
+      ...state,
+      reflections: state.reflections.map((reflection) => reflection.id === id ? { ...reflection, feedback } : reflection),
+    };
+    persistSnapshot(next);
+    return { reflections: next.reflections };
+  }),
+  setIdeas: (ideas) => set((state) => {
+    const next = {
+      ...state,
+      ideas,
+    };
+    persistSnapshot(next);
+    return { ideas: next.ideas };
+  }),
+  addCapabilityBet: (bet) => set((state) => {
+    const nextCapabilityBets = [normalizeCapabilityBet({
+      title: bet.title,
+      thesis: bet.thesis,
+      baselineConviction: bet.baselineConviction,
+      thresholdToCommit: bet.thresholdToCommit,
+      keywords: bet.keywords,
+      unlockPaths: bet.unlockPaths,
+      firstUseCases: bet.firstUseCases,
+      costOfNotKnowing: bet.costOfNotKnowing,
+      reviewCadence: bet.reviewCadence,
+      strategicNote: bet.strategicNote,
+    }), ...state.capabilityBets];
+    const derived = deriveCapabilityBetFields(nextCapabilityBets, state.notes, state.capabilityTimelineEvents, {
+      recordTimeline: true,
+      reason: 'manual-edit',
+    });
+    const next = {
+      ...state,
+      capabilityBets: derived.capabilityBets,
+      signalEvents: derived.signalEvents,
+      capabilityTimelineEvents: derived.capabilityTimelineEvents,
+    };
+    persistSnapshot(next);
+    return {
+      capabilityBets: next.capabilityBets,
+      signalEvents: next.signalEvents,
+      capabilityTimelineEvents: next.capabilityTimelineEvents,
+    };
+  }),
+  updateCapabilityBet: (id, updates) => set((state) => {
+    const nextCapabilityBets = state.capabilityBets.map((bet) => {
+      if (bet.id !== id) return bet;
+      return normalizeCapabilityBet({
+        title: updates.title ?? bet.title,
+        thesis: updates.thesis ?? bet.thesis,
+        baselineConviction: updates.baselineConviction,
+        thresholdToCommit: updates.thresholdToCommit,
+        keywords: updates.keywords,
+        unlockPaths: updates.unlockPaths,
+        firstUseCases: updates.firstUseCases,
+        costOfNotKnowing: updates.costOfNotKnowing,
+        reviewCadence: updates.reviewCadence,
+        strategicNote: updates.strategicNote,
+        archivedAt: updates.archivedAt,
+      }, bet);
+    });
+    const derived = deriveCapabilityBetFields(nextCapabilityBets, state.notes, state.capabilityTimelineEvents, {
+      recordTimeline: true,
+      reason: 'manual-edit',
+    });
+    const next = {
+      ...state,
+      capabilityBets: derived.capabilityBets,
+      signalEvents: derived.signalEvents,
+      capabilityTimelineEvents: derived.capabilityTimelineEvents,
+    };
+    persistSnapshot(next);
+    return {
+      capabilityBets: next.capabilityBets,
+      signalEvents: next.signalEvents,
+      capabilityTimelineEvents: next.capabilityTimelineEvents,
+    };
+  }),
+  archiveCapabilityBet: (id) => set((state) => {
+    const nextCapabilityBets = state.capabilityBets.map((bet) => (
+      bet.id === id ? normalizeCapabilityBet({
+        title: bet.title,
+        thesis: bet.thesis,
+        baselineConviction: bet.baselineConviction,
+        thresholdToCommit: bet.thresholdToCommit,
+        keywords: bet.keywords,
+        unlockPaths: bet.unlockPaths,
+        firstUseCases: bet.firstUseCases,
+        costOfNotKnowing: bet.costOfNotKnowing,
+        reviewCadence: bet.reviewCadence,
+        strategicNote: bet.strategicNote,
+        archivedAt: new Date().toISOString(),
+      }, bet) : bet
+    ));
+    const derived = deriveCapabilityBetFields(nextCapabilityBets, state.notes, state.capabilityTimelineEvents, {
+      recordTimeline: true,
+      reason: 'manual-edit',
+    });
+    const next = {
+      ...state,
+      capabilityBets: derived.capabilityBets,
+      signalEvents: derived.signalEvents,
+      capabilityTimelineEvents: derived.capabilityTimelineEvents,
+    };
+    persistSnapshot(next);
+    return {
+      capabilityBets: next.capabilityBets,
+      signalEvents: next.signalEvents,
+      capabilityTimelineEvents: next.capabilityTimelineEvents,
+    };
+  }),
+  recomputeStrategicAlignment: () => set((state) => {
+    const ideas = deriveStrategicIdeaFields(state.ideas, state.notes);
+    const unchanged = JSON.stringify(ideas) === JSON.stringify(state.ideas);
+    if (unchanged) return {};
+
+    const next = {
+      ...state,
+      ideas,
+    };
+    persistSnapshot(next);
+    return { ideas: next.ideas };
+  }),
+  recomputeCapabilityBetSignals: () => set((state) => {
+    const derived = deriveCapabilityBetFields(state.capabilityBets, state.notes, state.capabilityTimelineEvents, {
+      recordTimeline: true,
+      reason: 'signal-change',
+    });
+    const next = {
+      ...state,
+      capabilityBets: derived.capabilityBets,
+      signalEvents: derived.signalEvents,
+      capabilityTimelineEvents: derived.capabilityTimelineEvents,
+    };
+    persistSnapshot(next);
+    return {
+      capabilityBets: next.capabilityBets,
+      signalEvents: next.signalEvents,
+      capabilityTimelineEvents: next.capabilityTimelineEvents,
+    };
+  }),
+  toggleDarkMode: () => set((state) => {
+    const next = { ...state, isDarkMode: !state.isDarkMode };
+    persistSnapshot(next);
+    return { isDarkMode: next.isDarkMode };
+  }),
 }));
+
+void localSnapshotRepository.load().then((snapshot) => {
+  const hydratedSnapshot: AppSnapshot = {
+    ...snapshot,
+    notes: snapshot.notes.map((note) => ({ ...note, layer: 'raw' as const })),
+    ideas: deriveStrategicIdeaFields(
+      snapshot.ideas
+        .map((idea) => ({ ...idea, layer: 'knowledge' as const })),
+      snapshot.notes.map((note) => ({ ...note, layer: 'raw' as const })),
+    ),
+    sections: snapshot.sections.length ? snapshot.sections : defaultSections,
+    capabilityBets: snapshot.capabilityBets?.length
+      ? snapshot.capabilityBets.map((bet) => normalizeCapabilityBet({
+        title: bet.title,
+        thesis: bet.thesis,
+        baselineConviction: bet.baselineConviction,
+        thresholdToCommit: bet.thresholdToCommit,
+        keywords: bet.keywords,
+        unlockPaths: bet.unlockPaths,
+        firstUseCases: bet.firstUseCases,
+        costOfNotKnowing: bet.costOfNotKnowing,
+        reviewCadence: bet.reviewCadence,
+        strategicNote: bet.strategicNote,
+        archivedAt: bet.archivedAt,
+      }, bet))
+      : initialCapabilityBets,
+    signalEvents: snapshot.signalEvents ?? [],
+    capabilityTimelineEvents: snapshot.capabilityTimelineEvents ?? initialCapabilityTimelineEvents,
+  };
+
+  const derived = deriveCapabilityBetFields(
+    hydratedSnapshot.capabilityBets,
+    hydratedSnapshot.notes,
+    hydratedSnapshot.capabilityTimelineEvents,
+  );
+
+  const finalSnapshot = {
+    ...hydratedSnapshot,
+    capabilityBets: derived.capabilityBets,
+    signalEvents: derived.signalEvents,
+    capabilityTimelineEvents: derived.capabilityTimelineEvents,
+  };
+
+  useAppStore.setState({
+    notes: finalSnapshot.notes,
+    ideas: finalSnapshot.ideas,
+    projects: finalSnapshot.projects,
+    sections: finalSnapshot.sections,
+    goals: finalSnapshot.goals,
+    reflections: finalSnapshot.reflections ?? [],
+    capabilityBets: finalSnapshot.capabilityBets,
+    signalEvents: finalSnapshot.signalEvents,
+    capabilityTimelineEvents: finalSnapshot.capabilityTimelineEvents,
+    isDarkMode: finalSnapshot.isDarkMode,
+  });
+
+  persistSnapshot(finalSnapshot);
+});

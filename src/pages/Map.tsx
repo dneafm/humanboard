@@ -10,6 +10,8 @@ type Node = d3.SimulationNodeDatum & {
   group: 'section' | 'idea';
   radius: number;
   color?: string;
+  sectionId?: string;
+  type?: string;
 };
 
 type Link = d3.SimulationLinkDatum<Node> & {
@@ -50,13 +52,17 @@ export default function MapPage() {
     const links: Link[] = [];
 
     // Add section nodes
-    sections.forEach(section => {
+    sections.forEach((section, index) => {
+      const angle = (index / Math.max(sections.length, 1)) * Math.PI * 2;
+      const orbit = Math.min(width, height) * 0.28;
       nodes.push({
         id: section.id,
         name: section.name,
         group: 'section',
-        radius: 45,
-        color: colors.sectionNode
+        radius: 50,
+        color: colors.sectionNode,
+        fx: Math.cos(angle) * orbit,
+        fy: Math.sin(angle) * orbit,
       });
     });
 
@@ -72,7 +78,8 @@ export default function MapPage() {
         group: 'idea',
         radius: scaledRadius,
         color: isPrinciple ? (isDarkMode ? '#451a03' : '#fffbeb') : colors.ideaNode,
-        type: idea.type
+        type: idea.type,
+        sectionId: idea.sectionId,
       } as any);
 
       // Link to section
@@ -108,6 +115,25 @@ export default function MapPage() {
       .attr('height', height)
       .attr('viewBox', [0, 0, width, height]);
 
+    const defs = svg.append('defs');
+
+    sections.forEach((section, index) => {
+      const gradient = defs
+        .append('radialGradient')
+        .attr('id', `section-halo-${section.id}`)
+        .attr('cx', '50%')
+        .attr('cy', '50%')
+        .attr('r', '50%');
+
+      const hue = (index * 67) % 360;
+      const center = isDarkMode ? `hsla(${hue}, 80%, 60%, 0.18)` : `hsla(${hue}, 85%, 70%, 0.22)`;
+      const edge = isDarkMode ? `hsla(${hue}, 80%, 40%, 0)` : `hsla(${hue}, 85%, 60%, 0)`;
+
+      gradient.append('stop').attr('offset', '0%').attr('stop-color', center);
+      gradient.append('stop').attr('offset', '65%').attr('stop-color', isDarkMode ? `hsla(${hue}, 75%, 55%, 0.08)` : `hsla(${hue}, 80%, 68%, 0.1)`);
+      gradient.append('stop').attr('offset', '100%').attr('stop-color', edge);
+    });
+
     // Add zoom capabilities
     const g = svg.append('g');
     
@@ -123,11 +149,24 @@ export default function MapPage() {
     svg.call(zoom.transform, d3.zoomIdentity.translate(width / 2, height / 2));
 
     const simulation = d3.forceSimulation<Node>(nodes)
-      .force('link', d3.forceLink<Node, Link>(links).id(d => d.id).distance(150))
-      .force('charge', d3.forceManyBody().strength(-600))
-      .force('x', d3.forceX())
-      .force('y', d3.forceY())
-      .force('collide', d3.forceCollide().radius(d => (d as Node).radius + 15));
+      .force('link', d3.forceLink<Node, Link>(links).id(d => d.id).distance((link) => link.type === 'section' ? 170 : 230).strength((link) => link.type === 'section' ? 0.45 : 0.12))
+      .force('charge', d3.forceManyBody<Node>().strength((d) => d.group === 'section' ? -2200 : -900))
+      .force('x', d3.forceX<Node>(d => d.group === 'section' ? (d.fx ?? 0) : 0).strength(d => d.group === 'section' ? 0.45 : 0.02))
+      .force('y', d3.forceY<Node>(d => d.group === 'section' ? (d.fy ?? 0) : 0).strength(d => d.group === 'section' ? 0.45 : 0.02))
+      .force('collide', d3.forceCollide().radius(d => (d as Node).radius + ((d as Node).group === 'section' ? 80 : 24)));
+
+    const sectionNodes = nodes.filter((node) => node.group === 'section');
+
+    const halos = g.append('g')
+      .attr('class', 'section-halos')
+      .selectAll('path')
+      .data(sectionNodes)
+      .join('path')
+      .attr('fill', (d) => `url(#section-halo-${d.id})`)
+      .attr('stroke', isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(28,25,23,0.05)')
+      .attr('stroke-width', 1.25)
+      .attr('pointer-events', 'none')
+      .attr('opacity', 0.95);
 
     // Draw links
     const link = g.append('g')
@@ -136,9 +175,10 @@ export default function MapPage() {
       .join('path')
       .attr('fill', 'none')
       .attr('stroke', d => d.type === 'section' ? colors.linkSection : colors.linkRelated)
-      .attr('stroke-opacity', d => d.type === 'section' ? 0.6 : 0.3)
-      .attr('stroke-width', d => d.type === 'section' ? 2 : 1.5)
-      .attr('stroke-dasharray', d => d.type === 'related' ? '6,4' : 'none')
+      .attr('stroke-opacity', d => d.type === 'section' ? 0.28 : 0.16)
+      .attr('stroke-width', d => d.type === 'section' ? 2.2 : 1.2)
+      .attr('stroke-dasharray', d => d.type === 'related' ? '7,6' : 'none')
+      .attr('stroke-linecap', 'round')
       .attr('class', 'transition-opacity duration-300');
 
     // Draw nodes
@@ -169,26 +209,44 @@ export default function MapPage() {
         });
 
         node.transition().duration(200)
-          .style('opacity', n => connectedNodeIds.has(n.id) ? 1 : 0.15);
+          .style('opacity', n => connectedNodeIds.has(n.id) ? 1 : 0.12);
+
+        halos.transition().duration(200)
+          .style('opacity', haloNode => {
+            const sameField = haloNode.id === d.id || haloNode.id === d.sectionId || (d.group === 'section' && haloNode.id === d.id);
+            return sameField ? 1 : 0.18;
+          });
         
         link.transition().duration(200)
           .style('opacity', l => {
             const sourceId = typeof l.source === 'string' ? l.source : (l.source as Node).id;
             const targetId = typeof l.target === 'string' ? l.target : (l.target as Node).id;
-            return (sourceId === d.id || targetId === d.id) ? 1 : 0.05;
+            return (sourceId === d.id || targetId === d.id) ? 0.95 : 0.04;
           })
           .attr('stroke-width', l => {
             const sourceId = typeof l.source === 'string' ? l.source : (l.source as Node).id;
             const targetId = typeof l.target === 'string' ? l.target : (l.target as Node).id;
-            return (sourceId === d.id || targetId === d.id) ? 3 : 1.5;
+            return (sourceId === d.id || targetId === d.id) ? 2.8 : 1;
           });
       })
       .on('mouseleave', () => {
         node.transition().duration(200).style('opacity', 1);
+        halos.transition().duration(200).style('opacity', 0.95);
         link.transition().duration(200)
-          .style('opacity', d => d.type === 'section' ? 0.6 : 0.3)
-          .attr('stroke-width', d => d.type === 'section' ? 2 : 1.5);
+          .style('opacity', d => d.type === 'section' ? 0.28 : 0.16)
+          .attr('stroke-width', d => d.type === 'section' ? 2.2 : 1.2);
       });
+
+    node.append('circle')
+      .attr('r', d => d.group === 'section' ? d.radius + 10 : d.radius + 5)
+      .attr('fill', d => d.group === 'section'
+        ? (isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.65)')
+        : ((d as any).type === 'Principle'
+          ? (isDarkMode ? 'rgba(245,158,11,0.14)' : 'rgba(251,191,36,0.16)')
+          : (isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.55)')))
+      .attr('stroke', 'none')
+      .attr('pointer-events', 'none')
+      .style('filter', d => d.group === 'section' ? 'blur(1px)' : 'blur(3px)');
 
     // Node circles
     node.append('circle')
@@ -197,11 +255,11 @@ export default function MapPage() {
       .attr('stroke', d => {
         if (d.group === 'section') return 'none';
         const isPrinciple = (d as any).type === 'Principle';
-        return isPrinciple ? (isDarkMode ? '#d97706' : '#f59e0b') : colors.ideaStroke;
+        return isPrinciple ? (isDarkMode ? '#f59e0b' : '#d97706') : colors.ideaStroke;
       })
-      .attr('stroke-width', d => d.group === 'idea' ? ((d as any).type === 'Principle' ? 3 : 2) : 0)
+      .attr('stroke-width', d => d.group === 'idea' ? ((d as any).type === 'Principle' ? 2.5 : 1.5) : 0)
       .attr('class', d => d.group === 'idea' ? 'cursor-pointer hover:stroke-blue-500 transition-all duration-300' : 'cursor-grab active:cursor-grabbing')
-      .style('filter', d => d.group === 'section' ? 'drop-shadow(0 4px 12px rgba(0,0,0,0.1))' : 'none');
+      .style('filter', d => d.group === 'section' ? 'drop-shadow(0 8px 24px rgba(0,0,0,0.16))' : 'drop-shadow(0 8px 18px rgba(0,0,0,0.08))');
 
     // Node labels
     node.append('text')
@@ -219,20 +277,48 @@ export default function MapPage() {
       .call(wrapText, 80);
 
     simulation.on('tick', () => {
+      halos.attr('d', (sectionNode) => {
+        const memberNodes = nodes.filter((node) => node.group === 'idea' && node.sectionId === sectionNode.id);
+        const points = [sectionNode, ...memberNodes].filter((node) => Number.isFinite(node.x) && Number.isFinite(node.y));
+
+        if (points.length < 2) {
+          const x = sectionNode.x ?? 0;
+          const y = sectionNode.y ?? 0;
+          const r = sectionNode.radius + 110;
+          return `M ${x - r},${y} a ${r},${r} 0 1,0 ${r * 2},0 a ${r},${r} 0 1,0 -${r * 2},0`;
+        }
+
+        const hullPoints = points.map((node) => [node.x ?? 0, node.y ?? 0] as [number, number]);
+        const hull = d3.polygonHull(hullPoints);
+        if (!hull) {
+          const x = sectionNode.x ?? 0;
+          const y = sectionNode.y ?? 0;
+          const r = sectionNode.radius + 120;
+          return `M ${x - r},${y} a ${r},${r} 0 1,0 ${r * 2},0 a ${r},${r} 0 1,0 -${r * 2},0`;
+        }
+
+        const centroid = d3.polygonCentroid(hull);
+        const expanded = hull.map(([x, y]) => {
+          const dx = x - centroid[0];
+          const dy = y - centroid[1];
+          const length = Math.sqrt(dx * dx + dy * dy) || 1;
+          const padding = 105;
+          return [x + (dx / length) * padding, y + (dy / length) * padding] as [number, number];
+        });
+
+        return d3.line<[number, number]>()
+          .curve(d3.curveCatmullRomClosed.alpha(0.9))(expanded) || '';
+      });
+
       link.attr('d', d => {
         const source = d.source as Node;
         const target = d.target as Node;
-        
-        if (d.type === 'section') {
-          // Straight line for section hierarchy
-          return `M${source.x},${source.y}L${target.x},${target.y}`;
-        } else {
-          // Curved path for cross-interconnections
-          const dx = target.x! - source.x!;
-          const dy = target.y! - source.y!;
-          const dr = Math.sqrt(dx * dx + dy * dy) * 1.5; // Curvature factor
-          return `M${source.x},${source.y}A${dr},${dr} 0 0,1 ${target.x},${target.y}`;
-        }
+
+        const dx = (target.x ?? 0) - (source.x ?? 0);
+        const dy = (target.y ?? 0) - (source.y ?? 0);
+        const dr = Math.sqrt(dx * dx + dy * dy) * (d.type === 'section' ? 1.05 : 1.7);
+
+        return `M${source.x},${source.y}A${dr},${dr} 0 0,1 ${target.x},${target.y}`;
       });
 
       node

@@ -1,26 +1,37 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAppStore } from '../store';
-import { ArrowLeft, Sparkles, Volume2, Image as ImageIcon, GitBranch, FlaskConical, CheckCircle2, Folder, Scale, Wand2, Type, AlignLeft, Zap, RefreshCw, Check, X, MessageSquare, ChevronDown } from 'lucide-react';
+import { useAppStore, getReadinessScore, getReadinessState, type StrategicRole } from '../store';
+import { ArrowLeft, Sparkles, Volume2, Image as ImageIcon, GitBranch, FlaskConical, CheckCircle2, Folder, Scale, Wand2, Type, AlignLeft, Zap, RefreshCw, Check, X, MessageSquare, ChevronDown, Sprout } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
-import { GoogleGenAI, Modality } from '@google/genai';
 import { performAIAction, AIAction } from '../lib/ai';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function IdeaDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { ideas, sections, updateIdea } = useAppStore();
+  const { ideas, sections, notes, updateIdea } = useAppStore();
   const idea = ideas.find(i => i.id === id);
   const section = sections.find(s => s.id === idea?.sectionId);
+  const relatedIdeas = ideas.filter(i => idea?.relatedIdeaIds?.includes(i.id));
+  const linkedNotes = notes.filter(n => idea?.linkedNoteIds?.includes(n.id));
 
   const [isEditing, setIsEditing] = useState(false);
   const [content, setContent] = useState(idea?.content || '');
+  const [strategicNote, setStrategicNote] = useState(idea?.strategicNote || '');
+  const [strategicRole, setStrategicRole] = useState<StrategicRole | ''>(idea?.strategicRole || '');
+  const [activationReadiness, setActivationReadiness] = useState(idea?.activationReadiness || {
+    baseStrength: 0,
+    marketSignal: 0,
+    personalPull: 0,
+    monetizationClarity: 0,
+    timing: 0,
+  });
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [isPerformingAI, setIsPerformingAI] = useState(false);
   const [aiResult, setAiResult] = useState<string | null>(null);
+  const [uiError, setUiError] = useState<string | null>(null);
   const [imageSize, setImageSize] = useState<'1K' | '2K' | '4K'>('1K');
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   
@@ -81,50 +92,35 @@ export default function IdeaDetailPage() {
   }
 
   const handleSave = () => {
-    updateIdea(idea.id, { content });
+    updateIdea(idea.id, {
+      content,
+      strategicNote: strategicNote.trim() || undefined,
+      strategicRole: strategicRole || undefined,
+      activationReadiness,
+    });
     setIsEditing(false);
   };
 
   const handleTTS = async () => {
-    if (audioUrl) {
-      const audio = new Audio(audioUrl);
-      audio.play();
-      return;
-    }
-
+    const text = `Idea Title: ${idea.title}. Summary: ${idea.summary}. Content: ${idea.content}`;
+    setUiError(null);
     setIsGeneratingAudio(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text: `Idea Title: ${idea.title}. Summary: ${idea.summary}. Content: ${idea.content}` }] }],
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: 'Kore' },
-            },
-          },
-        },
-      });
-
-      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (base64Audio) {
-        const binary = atob(base64Audio);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) {
-          bytes[i] = binary.charCodeAt(i);
-        }
-        const blob = new Blob([bytes], { type: 'audio/pcm;rate=24000' });
-        const url = URL.createObjectURL(blob);
-        setAudioUrl(url);
-        const audio = new Audio(url);
-        audio.play();
+      if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+        throw new Error('Browser speech synthesis is not available.');
       }
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      utterance.onend = () => setIsGeneratingAudio(false);
+      utterance.onerror = () => setIsGeneratingAudio(false);
+      window.speechSynthesis.speak(utterance);
+      setAudioUrl('browser-speech');
     } catch (error) {
-      console.error("TTS Error:", error);
-      alert("Failed to generate audio.");
-    } finally {
+      console.error('Speech Error:', error);
+      const detail = error instanceof Error ? error.message : 'Failed to play speech for this idea.';
+      setUiError(`Speech failed. ${detail}`);
       setIsGeneratingAudio(false);
     }
   };
@@ -134,6 +130,7 @@ export default function IdeaDetailPage() {
   };
 
   const handleAIAction = async (action: AIAction) => {
+    setUiError(null);
     setIsPerformingAI(true);
     setAiResult(null);
     try {
@@ -144,7 +141,8 @@ export default function IdeaDetailPage() {
       }
     } catch (error) {
       console.error("AI Action Error:", error);
-      alert("AI action failed. Please try again.");
+      const detail = error instanceof Error ? error.message : "Gemma action failed. Please try again.";
+      setUiError(`Idea AI action failed. ${detail}`);
     } finally {
       setIsPerformingAI(false);
     }
@@ -162,6 +160,7 @@ export default function IdeaDetailPage() {
   };
 
   const handleBlockAIAction = async (action: AIAction, text: string) => {
+    setUiError(null);
     setActiveBlockMenu(null);
     setIsPerformingAI(true);
     setAiResult(null);
@@ -173,13 +172,43 @@ export default function IdeaDetailPage() {
       }
     } catch (error) {
       console.error("AI Action Error:", error);
-      alert("AI action failed. Please try again.");
+      const detail = error instanceof Error ? error.message : "Gemma action failed. Please try again.";
+      setUiError(`Block AI action failed. ${detail}`);
     } finally {
       setIsPerformingAI(false);
     }
   };
 
   const isPrinciple = idea.type === 'Principle';
+  const isProjectIdea = idea.type === 'Project';
+  const activationThreshold = 80;
+  const readinessScore = idea.activationReadiness ? getReadinessScore(idea.activationReadiness) : getReadinessScore(activationReadiness);
+  const derivedReadinessState = getReadinessState(readinessScore);
+  const readinessState = isProjectIdea
+    ? derivedReadinessState === 'Ready'
+      ? {
+          label: 'Ready to activate',
+          tone: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/30',
+          hint: 'This no longer needs to stay only a dream. Start with one small, reversible move.',
+        }
+      : derivedReadinessState === 'Close'
+        ? {
+            label: 'Close to activation',
+            tone: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/30',
+            hint: 'This is getting real. Keep reducing uncertainty without prematurely forcing execution.',
+          }
+        : derivedReadinessState === 'Warming'
+          ? {
+              label: 'Incubating with momentum',
+              tone: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/30',
+              hint: 'Signals are gathering. Keep watching and collecting proof without turning it into pressure.',
+            }
+          : {
+              label: 'Early incubation',
+              tone: 'bg-stone-50 dark:bg-stone-900 text-stone-500 dark:text-stone-400 border-stone-200 dark:border-stone-800',
+              hint: 'Keep this visible as a live seed. You do not need to force learning or execution yet.',
+            }
+    : null;
 
   return (
     <div className="flex h-full transition-colors duration-300">
@@ -200,7 +229,28 @@ export default function IdeaDetailPage() {
             </div>
           )}
 
+          {uiError && (
+            <div className="mb-8 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700 shadow-sm dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-red-500 dark:text-red-400 mb-2">Idea workflow error</div>
+                  <p className="leading-relaxed">{uiError}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setUiError(null)}
+                  className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-red-700 dark:hover:text-red-200"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
+
           <header className="mb-12">
+            <div className="flex items-center gap-3 mb-5">
+              <span className="text-[10px] font-bold uppercase tracking-[0.25em] px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-900/30 text-emerald-700 dark:text-emerald-400">Compiled knowledge page</span>
+            </div>
             <div className="flex items-center gap-4 mb-6">
               {!isPrinciple && (
                 <span className={cn(
@@ -231,6 +281,106 @@ export default function IdeaDetailPage() {
                 </div>
               )}
             </div>
+            {readinessState && (
+              <div className="mb-6 rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/30 p-5">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className={cn('inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1.5 rounded-full border', readinessState.tone)}>
+                    <Sprout className="w-3.5 h-3.5" />
+                    {readinessState.label}
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600">Readiness {readinessScore}%</span>
+                </div>
+                <p className="text-sm text-stone-600 dark:text-stone-400 leading-relaxed">{readinessState.hint}</p>
+              </div>
+            )}
+            {(idea.strategicRole || idea.strategicNote || isEditing || idea.activationReadiness) && (
+              <div className="mb-8 rounded-3xl border border-violet-200 bg-violet-50/60 p-6 dark:border-violet-900/40 dark:bg-violet-950/20">
+                <div className="flex items-center justify-between gap-4 mb-5">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-violet-600 dark:text-violet-300 mb-2">Strategic layer</div>
+                    <p className="text-sm text-stone-600 dark:text-stone-400">This is where an idea stops being just knowledge and becomes part of the incubation map.</p>
+                  </div>
+                  {(idea.strategicRole || strategicRole) && (
+                    <span className="rounded-full border border-violet-200 bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-violet-700 dark:border-violet-800 dark:bg-stone-900 dark:text-violet-300">
+                      {isEditing ? strategicRole || 'Unassigned' : idea.strategicRole}
+                    </span>
+                  )}
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 mb-5">
+                  <label className="block">
+                    <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 dark:text-stone-400">Strategic role</span>
+                    {isEditing ? (
+                      <select
+                        value={strategicRole}
+                        onChange={(e) => setStrategicRole(e.target.value as StrategicRole | '')}
+                        className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 focus:outline-none dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
+                      >
+                        <option value="">None</option>
+                        <option value="Base">Base</option>
+                        <option value="Vehicle">Vehicle</option>
+                        <option value="Signal">Signal</option>
+                        <option value="Question">Question</option>
+                      </select>
+                    ) : (
+                      <div className="rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200">
+                        {idea.strategicRole || 'Not set'}
+                      </div>
+                    )}
+                  </label>
+                  <div className="rounded-2xl border border-stone-200 bg-white px-4 py-4 dark:border-stone-700 dark:bg-stone-900">
+                    <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-500 mb-2">
+                      <span>Activation readiness</span>
+                      <span>{readinessScore}%</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-emerald-100 dark:bg-emerald-950/30 overflow-hidden mb-4">
+                      <div className="h-full bg-emerald-500 transition-all duration-700" style={{ width: `${readinessScore}%` }} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      {([
+                        ['baseStrength', 'Base'],
+                        ['marketSignal', 'Market'],
+                        ['personalPull', 'Pull'],
+                        ['monetizationClarity', 'Money'],
+                        ['timing', 'Timing'],
+                      ] as const).map(([key, label]) => (
+                        <label key={key} className="block">
+                          <span className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-500">{label}</span>
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              value={activationReadiness[key]}
+                              onChange={(e) => setActivationReadiness((current) => ({ ...current, [key]: Math.max(0, Math.min(100, Number(e.target.value) || 0)) }))}
+                              className="w-full rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-900 focus:outline-none dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100"
+                            />
+                          ) : (
+                            <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-200">
+                              {(idea.activationReadiness?.[key] ?? activationReadiness[key])}%
+                            </div>
+                          )}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <label className="block">
+                  <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 dark:text-stone-400">Strategic note</span>
+                  {isEditing ? (
+                    <textarea
+                      value={strategicNote}
+                      onChange={(e) => setStrategicNote(e.target.value)}
+                      className="w-full min-h-[110px] rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm leading-relaxed text-stone-900 focus:outline-none dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
+                      placeholder="Why this matters strategically, what it could become, what it supports, what should stay in incubation..."
+                    />
+                  ) : (
+                    <div className="rounded-2xl border border-stone-200 bg-white px-4 py-4 text-sm leading-relaxed text-stone-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200">
+                      {idea.strategicNote || 'No strategic note yet.'}
+                    </div>
+                  )}
+                </label>
+              </div>
+            )}
             <h1 className="text-5xl font-bold tracking-tight text-stone-900 dark:text-stone-100 mb-6 leading-tight">{idea.title}</h1>
             <p className="text-xl text-stone-500 dark:text-stone-400 leading-relaxed mb-10 font-medium">{idea.summary}</p>
             
@@ -260,6 +410,20 @@ export default function IdeaDetailPage() {
                   <span>Sprout</span>
                   <span>Evergreen</span>
                 </div>
+                {readinessState && (
+                  <div className="mt-5 rounded-2xl border border-emerald-100 dark:border-emerald-900/30 bg-white/70 dark:bg-stone-950/30 p-4">
+                    <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600 mb-2">
+                      <span>Readiness track</span>
+                      <span>{idea.maturity >= activationThreshold ? 'activate now' : `${Math.max(0, activationThreshold - idea.maturity)}% to go`}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
+                      <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${Math.min(100, (idea.maturity / activationThreshold) * 100)}%` }} />
+                    </div>
+                    <div className="mt-3 text-sm text-stone-600 dark:text-stone-400">
+                      <span className="font-medium text-stone-800 dark:text-stone-200">Suggested posture:</span> {idea.maturity >= activationThreshold ? 'Create a small active project and test it in the real world.' : 'Stay in incubation mode and let useful pieces accumulate naturally.'}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </header>
@@ -303,7 +467,7 @@ export default function IdeaDetailPage() {
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 font-bold text-[10px] uppercase tracking-widest">
                         <Sparkles className="w-3.5 h-3.5" />
-                        AI Suggestion
+                        Gemma Suggestion
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
@@ -335,7 +499,7 @@ export default function IdeaDetailPage() {
                     <div className="absolute inset-0 bg-white/50 dark:bg-stone-950/50 backdrop-blur-[1px] flex items-center justify-center rounded-2xl z-10">
                       <div className="flex flex-col items-center gap-4">
                         <RefreshCw className="w-8 h-8 text-stone-400 animate-spin" />
-                        <span className="text-[10px] font-bold text-stone-500 uppercase tracking-widest">AI is thinking...</span>
+                        <span className="text-[10px] font-bold text-stone-500 uppercase tracking-widest">Gemma is thinking...</span>
                       </div>
                     </div>
                   )}
@@ -497,7 +661,7 @@ export default function IdeaDetailPage() {
                 </div>
                 <div className="mt-12 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 dark:text-stone-600">
                   <Sparkles className="w-3 h-3" />
-                  Double-click to expand or edit. Highlight text to comment. Hover blocks for AI.
+                  Double-click to expand or edit. Highlight text to comment. Hover blocks for Gemma.
                 </div>
               </div>
             )}
@@ -745,6 +909,44 @@ export default function IdeaDetailPage() {
                 <CheckCircle2 className="w-6 h-6" />
               </button>
               <p className="text-sm font-medium text-stone-700 dark:text-stone-300 leading-relaxed">{idea.nextAction}</p>
+            </div>
+          </>
+        )}
+
+        {(relatedIdeas.length > 0 || linkedNotes.length > 0) && (
+          <>
+            <h3 className="text-[10px] font-bold text-stone-400 dark:text-stone-600 uppercase tracking-[0.3em] mb-8 flex items-center gap-3">
+              <GitBranch className="w-3.5 h-3.5" />
+              Relations & Backlinks
+            </h3>
+            <div className="space-y-4 mb-12">
+              {relatedIdeas.map((related) => (
+                <button
+                  key={related.id}
+                  onClick={() => navigate(`/idea/${related.id}`)}
+                  className="w-full text-left bg-white dark:bg-stone-900/40 border border-stone-200 dark:border-stone-800 rounded-2xl p-4 hover:border-emerald-400 dark:hover:border-emerald-500 hover:shadow-xl hover:shadow-emerald-500/[0.05] transition-all group"
+                >
+                  <div className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                    <Sparkles className="w-3 h-3 text-emerald-500" />
+                    Related Idea
+                  </div>
+                  <h4 className="text-sm font-semibold text-stone-800 dark:text-stone-200 truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                    {related.title}
+                  </h4>
+                </button>
+              ))}
+              
+              {linkedNotes.map((note) => (
+                <div key={note.id} className="bg-white dark:bg-stone-900/40 border border-stone-200 dark:border-stone-800 rounded-2xl p-4">
+                  <div className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <AlignLeft className="w-3 h-3 text-stone-400" />
+                    Source Note
+                  </div>
+                  <p className="text-xs text-stone-600 dark:text-stone-400 line-clamp-3 leading-relaxed italic border-l-2 border-stone-200 dark:border-stone-700 pl-3">
+                    "{note.content}"
+                  </p>
+                </div>
+              ))}
             </div>
           </>
         )}

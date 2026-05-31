@@ -3,8 +3,7 @@ import { useAppStore, Goal } from '../store';
 import { Plus, Target, CheckCircle2, Circle, Clock, Sparkles, Trash2, ChevronRight, BookOpen, Lightbulb, ListTodo, RefreshCw, Wand2, AlignLeft, GitBranch, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import { generateGoalRoadmap } from '../lib/ai';
-import { GoogleGenAI } from '@google/genai';
+import { askGemma, generateGoalRoadmap } from '../lib/ai';
 import ReactMarkdown from 'react-markdown';
 
 export default function GoalsPage() {
@@ -17,6 +16,7 @@ export default function GoalsPage() {
   const [activeAiMenu, setActiveAiMenu] = useState<{ type: string, index: number } | null>(null);
   const [aiResult, setAiResult] = useState<{ title: string, content: string } | null>(null);
   const [isPerformingAction, setIsPerformingAction] = useState(false);
+  const [uiError, setUiError] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,23 +43,25 @@ export default function GoalsPage() {
   };
 
   const handleGenerateRoadmap = async (goal: Goal) => {
+    setUiError(null);
     setIsGenerating(goal.id);
     try {
       const roadmap = await generateGoalRoadmap(goal.title, goal.description);
       updateGoal(goal.id, { roadmap });
     } catch (error) {
       console.error("Roadmap generation failed:", error);
-      alert("Failed to generate roadmap. Please try again.");
+      const detail = error instanceof Error ? error.message : "Failed to generate roadmap. Please try again.";
+      setUiError(`Roadmap generation failed. ${detail}`);
     } finally {
       setIsGenerating(null);
     }
   };
 
   const handleRoadmapAiAction = async (action: string, itemText: string, context: string) => {
+    setUiError(null);
     setActiveAiMenu(null);
     setIsPerformingAction(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       let prompt = '';
       
       switch (action) {
@@ -83,18 +85,19 @@ export default function GoalsPage() {
           break;
       }
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-      });
+      const responseText = await askGemma(
+        prompt,
+        'You are Gemma, the live local goal-planning assistant for HumanBoard. Be concrete, practical, and avoid filler.'
+      );
 
       setAiResult({
         title: `${action.charAt(0).toUpperCase() + action.slice(1)}: ${itemText}`,
-        content: response.text || 'No response generated.',
+        content: responseText || 'No response generated.',
       });
     } catch (error) {
       console.error("AI Action failed:", error);
-      alert("AI action failed.");
+      const detail = error instanceof Error ? error.message : "AI action failed.";
+      setUiError(`Goal AI action failed. ${detail}`);
     } finally {
       setIsPerformingAction(false);
     }
@@ -107,7 +110,7 @@ export default function GoalsPage() {
       <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">Goals</h1>
-          <p className="text-stone-500 dark:text-stone-400 mt-2 text-lg">Define your vision and let AI map the path.</p>
+          <p className="text-stone-500 dark:text-stone-400 mt-2 text-lg">Define your vision and let Gemma map the path.</p>
         </div>
         <button 
           onClick={() => setIsAdding(true)}
@@ -117,6 +120,24 @@ export default function GoalsPage() {
           New Goal
         </button>
       </header>
+
+      {uiError && (
+        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700 shadow-sm dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-red-500 dark:text-red-400 mb-2">Goal workflow error</div>
+              <p className="leading-relaxed">{uiError}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setUiError(null)}
+              className="shrink-0 text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-red-700 dark:hover:text-red-200"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 flex-1 overflow-hidden">
         {/* Goals List */}
