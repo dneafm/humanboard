@@ -1,7 +1,3 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
-
 # HumanBoard
 
 HumanBoard is a local-first workspace for capturing notes, shaping ideas, planning goals, mapping relationships, and running lightweight AI-assisted reflection workflows.
@@ -10,14 +6,14 @@ It is designed to work with any OpenAI-compatible local model server or hosted A
 
 ## Screenshots
 
-Repository screenshots live under `docs/screenshots/`.
-If the image files are present, GitHub will render them below.
-
-```md
+### Inbox
 ![Inbox](docs/screenshots/inbox.png)
+
+### Ideas & Principles
 ![Ideas](docs/screenshots/ideas.png)
+
+### Goals
 ![Goals](docs/screenshots/goals.png)
-```
 
 ## Features
 
