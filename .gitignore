@@ -23,3 +23,5 @@ humanboard-ui.out.log
 humanboard-ui.err.log
 humanboard-mcp.out.log
 humanboard-mcp.err.log
+.tmp-chrome-humanboard/
+tools/

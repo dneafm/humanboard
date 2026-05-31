@@ -16,8 +16,8 @@ const SNAPSHOT_PATH = path.resolve(process.env.HUMANBOARD_SNAPSHOT_PATH || path.
 const SNAPSHOT_BACKUP_PATH = `${SNAPSHOT_PATH}.bak`;
 const CORRUPT_SNAPSHOT_DIR = path.join(path.dirname(SNAPSHOT_PATH), 'corrupt-snapshots');
 const AI_ERA_DB_PATH = process.env.AI_ERA_KB_PATH || 'F:/backtest/ai-era-kb/ai_era_kb.sqlite3';
-const GEMMA_BASE_URL = String(process.env.GEMMA_BASE_URL || 'http://127.0.0.1:11434/v1').replace(/\/+$/, '');
-const GEMMA_API_KEY = String(process.env.GEMMA_API_KEY || '').trim();
+const AI_BASE_URL = String(process.env.AI_BASE_URL || process.env.GEMMA_BASE_URL || 'http://127.0.0.1:11434/v1').replace(/\/+$/, '');
+const AI_API_KEY = String(process.env.AI_API_KEY || process.env.GEMMA_API_KEY || '').trim();
 
 const DEFAULT_SECTIONS = [
   {
@@ -265,7 +265,7 @@ app.get('/api/health', async (_req, res) => {
     snapshotExists,
     snapshotBackupPath: SNAPSHOT_BACKUP_PATH,
     snapshotBackupExists: backupExists,
-    gemmaBaseUrl: GEMMA_BASE_URL,
+    aiBaseUrl: AI_BASE_URL,
   });
 });
 
@@ -298,10 +298,10 @@ app.get('/api/ai-era-kb', (_req, res) => {
   }
 });
 
-app.all('/api/gemma/*', express.raw({ type: '*/*', limit: '25mb' }), async (req, res) => {
+app.all(['/api/ai/*', '/api/gemma/*'], express.raw({ type: '*/*', limit: '25mb' }), async (req, res) => {
   try {
-    const suffix = req.originalUrl.replace(/^\/api\/gemma/, '');
-    const targetUrl = `${GEMMA_BASE_URL}${suffix}`;
+    const suffix = req.originalUrl.replace(/^\/api\/(ai|gemma)/, '');
+    const targetUrl = `${AI_BASE_URL}${suffix}`;
     const headers = new Headers();
 
     for (const [key, value] of Object.entries(req.headers)) {
@@ -315,8 +315,8 @@ app.all('/api/gemma/*', express.raw({ type: '*/*', limit: '25mb' }), async (req,
       }
     }
 
-    if (GEMMA_API_KEY && !headers.has('authorization')) {
-      headers.set('authorization', `Bearer ${GEMMA_API_KEY}`);
+    if (AI_API_KEY && !headers.has('authorization')) {
+      headers.set('authorization', `Bearer ${AI_API_KEY}`);
     }
 
     const upstream = await fetch(targetUrl, {

@@ -261,7 +261,7 @@ export default function InboxPage() {
           : [],
       });
     } catch (error) {
-      const detail = error instanceof Error ? error.message : 'Unknown Gemma error.';
+      const detail = error instanceof Error ? error.message : 'Unknown AI runtime error.';
       setCompileError(`Compile failed. HumanBoard could not turn that note into structured knowledge. ${detail}`);
     } finally {
       setCompilingNoteId(null);

@@ -141,7 +141,7 @@ export default function IdeaDetailPage() {
       }
     } catch (error) {
       console.error("AI Action Error:", error);
-      const detail = error instanceof Error ? error.message : "Gemma action failed. Please try again.";
+      const detail = error instanceof Error ? error.message : "AI action failed. Please try again.";
       setUiError(`Idea AI action failed. ${detail}`);
     } finally {
       setIsPerformingAI(false);
@@ -172,7 +172,7 @@ export default function IdeaDetailPage() {
       }
     } catch (error) {
       console.error("AI Action Error:", error);
-      const detail = error instanceof Error ? error.message : "Gemma action failed. Please try again.";
+      const detail = error instanceof Error ? error.message : "AI action failed. Please try again.";
       setUiError(`Block AI action failed. ${detail}`);
     } finally {
       setIsPerformingAI(false);
@@ -467,7 +467,7 @@ export default function IdeaDetailPage() {
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 font-bold text-[10px] uppercase tracking-widest">
                         <Sparkles className="w-3.5 h-3.5" />
-                        Gemma Suggestion
+                        AI Suggestion
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
@@ -499,7 +499,7 @@ export default function IdeaDetailPage() {
                     <div className="absolute inset-0 bg-white/50 dark:bg-stone-950/50 backdrop-blur-[1px] flex items-center justify-center rounded-2xl z-10">
                       <div className="flex flex-col items-center gap-4">
                         <RefreshCw className="w-8 h-8 text-stone-400 animate-spin" />
-                        <span className="text-[10px] font-bold text-stone-500 uppercase tracking-widest">Gemma is thinking...</span>
+                        <span className="text-[10px] font-bold text-stone-500 uppercase tracking-widest">AI is thinking...</span>
                       </div>
                     </div>
                   )}
@@ -661,7 +661,7 @@ export default function IdeaDetailPage() {
                 </div>
                 <div className="mt-12 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 dark:text-stone-600">
                   <Sparkles className="w-3 h-3" />
-                  Double-click to expand or edit. Highlight text to comment. Hover blocks for Gemma.
+                  Double-click to expand or edit. Highlight text to comment. Hover blocks for AI actions.
                 </div>
               </div>
             )}

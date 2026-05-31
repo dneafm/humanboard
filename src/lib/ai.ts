@@ -14,8 +14,8 @@ function readEnv(key: string, fallback = '') {
 }
 
 function getRuntimeConfig(): RuntimeConfig {
-  const baseUrl = readEnv('GEMMA_BASE_URL', '/api/gemma/v1').replace(/\/+$/, '');
-  const model = readEnv('GEMMA_MODEL', 'gemma4:latest');
+  const baseUrl = readEnv('AI_BASE_URL', readEnv('GEMMA_BASE_URL', '/api/ai/v1')).replace(/\/+$/, '');
+  const model = readEnv('AI_MODEL', readEnv('GEMMA_MODEL', 'gemma4:latest'));
   const apiKey = readEnv('GEMMA_API_KEY', 'not-required');
   return { baseUrl, model, apiKey };
 }
@@ -33,7 +33,7 @@ export function getGemmaRuntimeStatus() {
 
 function buildRuntimeError(prefix: string, detail?: string) {
   const status = getGemmaRuntimeStatus();
-  const hint = `Gemma config -> baseUrl=${status.baseUrl}, model=${status.model}. Set VITE_GEMMA_BASE_URL / VITE_GEMMA_MODEL in .env.local if needed.`;
+  const hint = `AI config -> baseUrl=${status.baseUrl}, model=${status.model}. Set VITE_AI_BASE_URL / VITE_AI_MODEL in .env.local if needed.`;
   return new Error(`${prefix}${detail ? ` ${detail}` : ''} ${hint}`.trim());
 }
 
@@ -172,7 +172,7 @@ function buildHeuristicExtractionReview(input: {
 }
 
 export function buildMemoryShapedSystemInstruction(extraGuidance?: string) {
-  const base = `You are Gemma Librarian for HumanBoard.
+  const base = `You are the HumanBoard Librarian assistant.
 
 Answer as if you have memory, distilled principles, and ongoing intellectual digestion, not like a search engine dumping retrieved snippets.
 
@@ -194,7 +194,7 @@ Behavior rules:
 async function callGemma(prompt: string, systemInstruction: string) {
   const runtime = getGemmaRuntimeStatus();
   if (!runtime.configured) {
-    throw buildRuntimeError('Gemma is not configured.');
+    throw buildRuntimeError('AI runtime is not configured.');
   }
 
   let response: Response;
@@ -215,12 +215,12 @@ async function callGemma(prompt: string, systemInstruction: string) {
       }),
     });
   } catch (error) {
-    throw buildRuntimeError('Could not reach the Gemma runtime.', error instanceof Error ? error.message : String(error));
+    throw buildRuntimeError('Could not reach the AI runtime.', error instanceof Error ? error.message : String(error));
   }
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw buildRuntimeError(`Gemma request failed with HTTP ${response.status}.`, errorText);
+    throw buildRuntimeError(`AI request failed with HTTP ${response.status}.`, errorText);
   }
 
   const payload = (await response.json()) as {
@@ -229,12 +229,12 @@ async function callGemma(prompt: string, systemInstruction: string) {
   };
 
   if (payload.error?.message) {
-    throw buildRuntimeError('Gemma returned an API error.', payload.error.message);
+    throw buildRuntimeError('AI runtime returned an API error.', payload.error.message);
   }
 
   const content = payload.choices?.[0]?.message?.content?.trim() || '';
   if (!content) {
-    throw buildRuntimeError('Gemma returned an empty response.');
+    throw buildRuntimeError('AI runtime returned an empty response.');
   }
   return content;
 }
@@ -544,7 +544,7 @@ Rules:
 
   const raw = await callGemma(
     prompt,
-    'You are Gemma Librarian for HumanBoard. Convert raw notes into clean typed knowledge artifacts. Classify carefully, preserve useful nuance, and return only valid JSON with the requested keys.'
+    'You are the HumanBoard Librarian assistant. Convert raw notes into clean typed knowledge artifacts. Classify carefully, preserve useful nuance, and return only valid JSON with the requested keys.'
   );
 
   try {

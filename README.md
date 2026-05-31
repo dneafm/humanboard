@@ -2,63 +2,92 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run HumanBoard with Gemma live
+# HumanBoard
 
-This app targets a live local OpenAI-compatible Gemma runtime for its main idea/chat/goal workflows.
+HumanBoard is a local-first workspace for capturing notes, shaping ideas, planning goals, mapping relationships, and running lightweight AI-assisted reflection workflows.
 
-## Chosen runtime for HumanBoard
+It is designed to work with any OpenAI-compatible local model server or hosted API the user prefers.
 
-- Runtime: Ollama OpenAI-compatible API
-- Base URL: `http://127.0.0.1:11434/v1`
-- Model: `gemma4:26b`
-- HumanBoard invocation: `POST /chat/completions` with `model`, `temperature`, and standard OpenAI-style `messages`
+## Screenshots
 
-## Current install status on this workstation
+Repository screenshots live under `docs/screenshots/`.
+If the image files are present, GitHub will render them below.
 
-- HumanBoard is already wired for an OpenAI-compatible local runtime in `src/lib/ai.ts`.
-- The checked-in env example already points to `gemma4:26b`.
-- `ollama` is installed locally and running enough to answer `ollama list`.
-- `ollama show gemma4:26b` failed because the model is not installed yet.
-- `ollama pull gemma4:26b` failed with:
-  - `The model you are attempting to pull requires a newer version of Ollama.`
+```md
+![Inbox](docs/screenshots/inbox.png)
+![Ideas](docs/screenshots/ideas.png)
+![Goals](docs/screenshots/goals.png)
+```
 
-That means the chosen HumanBoard runtime path is clear, but the local serving environment is currently blocked by an outdated Ollama build.
+## Features
 
-## Install and run locally after upgrading Ollama
+- Local-first snapshot-backed workspace
+- Notes, ideas, goals, and knowledge review flows
+- Relationship mapping and cross-linking
+- AI-assisted refinement, roadmap generation, and reflection
+- Tailscale-friendly self-hosting via the included production server
+- MCP/server integration paths for automation
 
-**Prerequisites:** Node.js and a recent Ollama build that supports Gemma 4
+## AI runtime support
 
-1. Upgrade Ollama from:
-   `https://ollama.com/download`
-2. Install dependencies:
+HumanBoard talks to an OpenAI-compatible chat completions API.
+That can be:
+
+- Ollama (with OpenAI compatibility)
+- LM Studio local server
+- vLLM or llama.cpp server
+- OpenRouter
+- Together
+- your own OpenAI-compatible gateway
+
+You choose the model and endpoint.
+
+## Configure the model/API
+
+Create `.env.local` and set:
+
+```env
+VITE_AI_BASE_URL=http://127.0.0.1:11434/v1
+VITE_AI_MODEL=gemma4:26b
+VITE_AI_API_KEY=***
+```
+
+Examples:
+
+- Ollama: `http://127.0.0.1:11434/v1`
+- OpenRouter: `https://openrouter.ai/api/v1`
+- LM Studio: whatever local `/v1` endpoint you expose
+
+## Local development
+
+1. Install dependencies:
+
    `npm install`
-3. Pull the HumanBoard model in Ollama:
-   `ollama pull gemma4:26b`
-4. Verify the local serving path works:
-   - `ollama run gemma4:26b`
-   - or PowerShell:
-     `Invoke-RestMethod -Method Post -Uri http://127.0.0.1:11434/api/chat -ContentType 'application/json' -Body '{"model":"gemma4:26b","messages":[{"role":"user","content":"Hello from HumanBoard"}],"stream":false}'`
-5. Set Gemma runtime values in `.env.local`:
-   - `VITE_GEMMA_BASE_URL=http://127.0.0.1:11434/v1`
-   - `VITE_GEMMA_MODEL=gemma4:26b`
-   - `VITE_GEMMA_API_KEY=not-required`
-6. Run the app:
+
+2. Set your runtime in `.env.local`
+
+3. Run the app:
+
    `npm run dev`
 
-## HumanBoard invocation contract
+## Production server
 
-HumanBoard uses the OpenAI-style chat completions path:
+Start the production build/server with:
 
-- URL: `${VITE_GEMMA_BASE_URL}/chat/completions`
-- Method: `POST`
-- Headers:
-  - `Content-Type: application/json`
-  - optional `Authorization: Bearer ${VITE_GEMMA_API_KEY}`
-- Body shape:
+`npm run build && npm run start:prod`
+
+Or use the included helper scripts:
+
+- `start-prod.ps1`
+- `start-prod.cmd`
+
+## API contract
+
+HumanBoard uses an OpenAI-style chat completions request:
 
 ```json
 {
-  "model": "gemma4:26b",
+  "model": "your-model-name",
   "temperature": 0.4,
   "messages": [
     { "role": "system", "content": "..." },
@@ -67,12 +96,12 @@ HumanBoard uses the OpenAI-style chat completions path:
 }
 ```
 
-Main live AI surfaces wired through this runtime:
-- idea refinement
-- block-level writing actions
-- goals roadmap generation
-- cross-app chatbot
+Target path:
 
-## Note about the staged local Gemma folder
+- `${VITE_AI_BASE_URL}/chat/completions`
 
-A repo folder named `gemma 4/gemma-4-26B-A4B-it` exists in the staged snapshot, but the DeerFlow sandbox could not verify usable local weights from it for direct serving. For this HumanBoard task, the intended and documented runtime path is Ollama because `src/lib/ai.ts` already targets an OpenAI-compatible `/v1/chat/completions` contract.
+## Privacy
+
+- Local snapshot/user data is not intended to be committed
+- Snapshot files and local logs are ignored by `.gitignore`
+- You can self-host entirely on your own machine or tailnet

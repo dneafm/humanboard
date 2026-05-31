@@ -27,7 +27,7 @@ export default function Chatbot() {
   const updateIdea = useAppStore((state) => state.updateIdea);
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', role: 'model', content: "Hi. I'm Gemma Librarian, your HumanBoard assistant. I can help refine ideas, suggest experiments, summarize notes, and connect thoughts across the app. What are we working on?" }
+    { id: '1', role: 'model', content: "Hi. I'm your HumanBoard assistant. I can help refine ideas, suggest experiments, summarize notes, and connect thoughts across the app. What are we working on?" }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -402,7 +402,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
           const ideaData = JSON.parse(cleanJsonStr);
           matchedIdea = true;
           addIdea({
-            title: ideaData.title || 'Untitled Idea from Gemma',
+            title: ideaData.title || 'Untitled AI Draft',
             summary: ideaData.summary || ideaData.content?.slice(0, 100) || '',
             content: ideaData.content || '',
             type: ideaData.type || 'Concept',
@@ -489,7 +489,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
 
       let actionMessage = '';
       if (matchedNote || matchedIdea || matchedIdeaUpdate || matchedPersona) {
-        actionMessage = "\n\n*(Gemma: ";
+        actionMessage = "\n\n*(AI: ";
         const acts = [];
         if (matchedNote) acts.push("added to Inbox");
         if (matchedIdea) acts.push("created Idea node");
@@ -505,11 +505,11 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       }]);
     } catch (error) {
       console.error("Chat error:", error);
-      const detail = error instanceof Error ? error.message : 'Unknown Gemma error.';
+      const detail = error instanceof Error ? error.message : 'Unknown AI runtime error.';
       setMessages(prev => [...prev, { 
         id: (Date.now() + 1).toString(), 
         role: 'model', 
-        content: `Gemma runtime error: ${detail}` 
+        content: `AI runtime error: ${detail}` 
       }]);
     } finally {
       setIsLoading(false);
@@ -543,7 +543,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
             HumanBoard Assistant
           </div>
           <div className="text-[11px] text-stone-500">
-            Gemma: {runtime.model} · {runtime.local ? 'local runtime' : runtime.baseUrl}
+            AI: {runtime.model} · {runtime.local ? 'local runtime' : runtime.baseUrl}
           </div>
         </div>
         <div className="flex items-center gap-1 text-stone-400">

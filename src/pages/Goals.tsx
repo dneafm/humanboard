@@ -87,7 +87,7 @@ export default function GoalsPage() {
 
       const responseText = await askGemma(
         prompt,
-        'You are Gemma, the live local goal-planning assistant for HumanBoard. Be concrete, practical, and avoid filler.'
+        'You are the live goal-planning assistant for HumanBoard. Be concrete, practical, and avoid filler.'
       );
 
       setAiResult({
@@ -110,7 +110,7 @@ export default function GoalsPage() {
       <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">Goals</h1>
-          <p className="text-stone-500 dark:text-stone-400 mt-2 text-lg">Define your vision and let Gemma map the path.</p>
+          <p className="text-stone-500 dark:text-stone-400 mt-2 text-lg">Define your vision and let your configured AI map the path.</p>
         </div>
         <button 
           onClick={() => setIsAdding(true)}

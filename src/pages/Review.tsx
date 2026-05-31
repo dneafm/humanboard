@@ -683,7 +683,7 @@ export default function ReviewPage() {
           : [],
       });
     } catch (error) {
-      const detail = error instanceof Error ? error.message : 'Unknown Gemma error.';
+      const detail = error instanceof Error ? error.message : 'Unknown AI runtime error.';
       setCompileError(`Compile failed. HumanBoard could not turn that note into structured knowledge. ${detail}`);
     } finally {
       setCompilingNoteId(null);
@@ -789,7 +789,7 @@ export default function ReviewPage() {
               : (idea.openQuestions ?? []),
           });
         } catch (error) {
-          const detail = error instanceof Error ? error.message : 'Unknown Gemma error.';
+          const detail = error instanceof Error ? error.message : 'Unknown AI runtime error.';
           setCompileError(`Sharpen failed. HumanBoard could not improve that artifact right now. ${detail}`);
         } finally {
           setCompilingNoteId(null);
