@@ -3,7 +3,7 @@ import os
 
 from google import genai
 
-from comic_engine import ComicEngine, generate_panels_for_episode, save_episode
+from comic_engine import ComicEngine, generate_panels_for_episode, prepare_episode_payload_for_generation, save_episode
 from series_db import active_series, build_generation_context, load_database, record_episode_payload
 
 
@@ -115,6 +115,7 @@ def main():
             payload = engine.generate_episode(topic, episode_num=ep_num, database_context=database_context)
             payload["topic"] = topic
             payload["prompt_text"] = topic
+            payload = prepare_episode_payload_for_generation(payload)
             save_episode(payload)
             record_episode_payload(payload, topic)
 

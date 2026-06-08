@@ -1,0 +1,2101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Local RSI Backtest UI</title>
+  <link rel="stylesheet" href="flowy.min.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    :root {
+      --bg: #071126;
+      --panel: #0b1830;
+      --panel2: #0d1d39;
+      --line: #1f3358;
+      --text: #d8e5ff;
+      --muted: #8da4cf;
+      --cyan: #36d7ff;
+      --green: #44e089;
+      --red: #ff6b7a;
+      --amber: #ffbf4d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: radial-gradient(1200px 600px at 15% -10%, #11356a55, transparent), var(--bg);
+      color: var(--text);
+    }
+    .wrap { max-width: 1400px; margin: 0 auto; padding: 18px; }
+    .head { margin-bottom: 12px; }
+    .title { font-size: 24px; color: var(--cyan); margin: 0 0 4px; }
+    .sub { color: var(--muted); font-size: 13px; }
+    .grid { display: grid; gap: 14px; grid-template-columns: 420px 1fr; align-items: start; }
+    .panel {
+      background: linear-gradient(180deg, var(--panel2), var(--panel));
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: inset 0 1px 0 #ffffff08;
+    }
+    .panel h2 {
+      margin: 0;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      font-size: 14px;
+      color: var(--muted);
+      letter-spacing: 0.03em;
+    }
+    .body { padding: 14px 16px; }
+    .form-grid { display: grid; gap: 10px; }
+    .row { display: grid; gap: 8px; }
+    .row.two { grid-template-columns: 1fr 1fr; }
+    .row.three { grid-template-columns: 1fr 1fr 1fr; }
+    label { font-size: 12px; color: var(--muted); }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid #2a416d;
+      background: #0a1429;
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font: inherit;
+    }
+    textarea { min-height: 72px; resize: vertical; }
+    .checkrow { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
+    .check {
+      display: flex; align-items: center; gap: 8px;
+      border: 1px solid #233a62; border-radius: 8px; padding: 8px 10px;
+      background: #091325;
+      color: var(--text);
+      font-size: 13px;
+    }
+    .check input { width: auto; margin: 0; }
+    .check.dim {
+      opacity: 0.62;
+      border-color: #1a2b49;
+      color: var(--muted);
+    }
+    .check small {
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .groupbox {
+      border: 1px solid #22365a;
+      background: #081223;
+      border-radius: 10px;
+      padding: 10px;
+    }
+    .gtitle {
+      margin: 0 0 8px;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.03em;
+    }
+    .checkgrid {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .checkgrid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    button {
+      border: 1px solid #1f7da0;
+      background: linear-gradient(180deg, #0d3156, #0b233f);
+      color: #bff4ff;
+      border-radius: 9px;
+      padding: 9px 12px;
+      font: inherit;
+      cursor: pointer;
+    }
+    button.primary {
+      border-color: #13a7cf;
+      background: linear-gradient(180deg, #0e4965, #0b3247);
+      color: #d3fbff;
+      font-weight: 700;
+    }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .status { font-size: 12px; color: var(--muted); }
+    .status.ok { color: var(--green); }
+    .status.err { color: var(--red); }
+    .cards { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      border: 1px solid #23395f;
+      border-radius: 10px;
+      background: #091427;
+      padding: 12px;
+    }
+    .card .k { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .card .v { font-size: 22px; color: var(--text); font-weight: 700; }
+    .card .v.pos { color: var(--green); }
+    .card .v.neg { color: var(--red); }
+    .summary-grid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .kv {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 6px 10px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .kv div:nth-child(odd) { color: var(--muted); }
+    pre {
+      margin: 0;
+      border: 1px solid #22365a;
+      background: #07101f;
+      color: #cde0ff;
+      border-radius: 10px;
+      padding: 12px;
+      overflow: auto;
+      font-size: 12px;
+      max-height: 260px;
+    }
+    table {
+      width: 100%; border-collapse: collapse; font-size: 12px;
+      background: #081223; border: 1px solid #22365a; border-radius: 10px; overflow: hidden;
+    }
+    th, td { padding: 7px 8px; border-bottom: 1px solid #172744; text-align: left; }
+    th { color: var(--muted); background: #0a162c; position: sticky; top: 0; }
+    .table-wrap { max-height: 360px; overflow: auto; border-radius: 10px; }
+    .chart-wrap { border: 1px solid #22365a; border-radius: 10px; background: #07101f; overflow: hidden; }
+    .chart-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+    .chart-toolbar .spacer { flex: 1; }
+    .chart-toolbar input[type="range"] { flex: 1; min-width: 180px; }
+    #replayChart { width: 100%; height: 340px; }
+    #rsiChart { width: 100%; height: 150px; }
+    #equityChart { width: 100%; height: 220px; }
+    .tiny { font-size: 11px; color: var(--muted); }
+    .muted { color: var(--muted); }
+    .mono { font-family: inherit; }
+    @media (max-width: 1000px) {
+      .grid { grid-template-columns: 1fr; }
+      .cards { grid-template-columns: 1fr 1fr; }
+      .summary-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .row.two, .row.three, .checkrow, .cards, .checkgrid, .checkgrid.three { grid-template-columns: 1fr; }
+      .kv { grid-template-columns: 1fr; }
+    }
+
+    /* Tabs & Header */
+    .app-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0 20px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 20px;
+    }
+    .header-main { display: flex; flex-direction: column; }
+    .header-nav { display: flex; gap: 10px; }
+    .tab-btn {
+      border: 1px solid var(--line);
+      background: rgba(13, 29, 57, 0.5);
+      color: var(--muted);
+      border-radius: 8px;
+      padding: 8px 16px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.25s ease;
+    }
+    .tab-btn.active {
+      border-color: var(--cyan);
+      background: linear-gradient(180deg, #0e375e, #0b233f);
+      color: #fff;
+      box-shadow: 0 0 10px rgba(54, 215, 255, 0.2);
+    }
+    .profile-widget {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--panel2);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 4px 12px 4px 6px;
+    }
+    .profile-widget img {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1px solid var(--cyan);
+    }
+    .profile-widget .username {
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .logout-btn {
+      background: transparent;
+      border: 1px solid rgba(255, 107, 122, 0.4);
+      color: var(--red);
+      font-size: 11px;
+      border-radius: 6px;
+      padding: 3px 8px;
+      cursor: pointer;
+      margin-left: 8px;
+      transition: all 0.2s;
+    }
+    .logout-btn:hover {
+      background: rgba(255, 107, 122, 0.1);
+      border-color: var(--red);
+    }
+
+    /* Auth Overlay */
+    #auth-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(4, 10, 24, 0.95);
+      backdrop-filter: blur(12px);
+      z-index: 9999;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      opacity: 1;
+      transition: opacity 0.3s ease;
+    }
+    #auth-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .auth-card {
+      background: linear-gradient(135deg, var(--panel2), var(--panel));
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 30px;
+      width: 460px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(54, 215, 255, 0.05);
+      text-align: center;
+    }
+    .auth-card h2 {
+      margin-top: 0;
+      color: var(--cyan);
+      font-size: 20px;
+    }
+    .auth-card p {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+    .g-btn-wrapper {
+      display: flex;
+      justify-content: center;
+      margin: 20px 0;
+    }
+    .auth-config-box {
+      border: 1px solid rgba(54, 215, 255, 0.15);
+      background: rgba(13, 29, 57, 0.3);
+      border-radius: 10px;
+      padding: 14px;
+      margin-top: 20px;
+      text-align: left;
+      font-size: 11px;
+    }
+    .auth-config-box label {
+      font-weight: bold;
+      color: var(--muted);
+    }
+    .auth-config-box input {
+      margin-top: 6px;
+      font-size: 11px;
+    }
+
+    /* Flowy Strategy Designer Layout */
+    .designer-container {
+      display: grid;
+      grid-template-columns: 260px 1fr 280px;
+      gap: 14px;
+      height: calc(100vh - 120px);
+      min-height: 550px;
+    }
+    .designer-sidebar {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      border-right: 1px solid var(--line);
+      background: var(--panel2);
+      border-radius: 12px;
+      border: 1px solid var(--line);
+    }
+    .designer-sidebar-title {
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+      font-weight: bold;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+    .block-list {
+      flex: 1;
+      padding: 14px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    /* Draggable block styles */
+    .flowy-drag-block {
+      background: rgba(7, 17, 38, 0.8);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: grab;
+      user-select: none;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .flowy-drag-block:hover {
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px rgba(54, 215, 255, 0.1);
+      transform: translateY(-2px);
+    }
+    .flowy-drag-block:active { cursor: grabbing; }
+    .flowy-drag-block .block-title {
+      font-size: 12px;
+      font-weight: bold;
+      color: var(--cyan);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .flowy-drag-block .block-desc {
+      font-size: 10px;
+      color: var(--muted);
+      line-height: 1.3;
+    }
+
+    /* Flowy Canvas */
+    .designer-canvas-wrap {
+      background: radial-gradient(#152642 1px, transparent 1px), var(--bg);
+      background-size: 20px 20px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      position: relative;
+      overflow: hidden;
+      height: 100%;
+    }
+    #flowy-canvas {
+      width: 100%;
+      height: 100%;
+      min-height: 480px;
+      position: absolute;
+      top: 0; left: 0;
+    }
+    .canvas-actions {
+      position: absolute;
+      bottom: 14px;
+      right: 14px;
+      display: flex;
+      gap: 8px;
+      z-index: 10;
+    }
+
+    /* Flowy Canvas Nodes (customized styles) */
+    .blockelem {
+      background: linear-gradient(180deg, var(--panel2), var(--panel)) !important;
+      border: 1px solid var(--line) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35) !important;
+      color: var(--text) !important;
+      font-family: inherit !important;
+      width: 250px !important;
+      padding: 0 !important;
+    }
+    .blockelem.selected {
+      border-color: var(--cyan) !important;
+      box-shadow: 0 0 15px rgba(54, 215, 255, 0.25) !important;
+    }
+    .blockelem .blockheader {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      font-size: 11px;
+      font-weight: bold;
+      color: var(--cyan);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(13, 29, 57, 0.3);
+      border-top-left-radius: 11px;
+      border-top-right-radius: 11px;
+    }
+    .blockelem .blockbody {
+      padding: 12px;
+      font-size: 11px;
+    }
+    .blockelem .blockbody label {
+      font-size: 10px;
+      color: var(--muted);
+      display: block;
+      margin-bottom: 4px;
+    }
+    .blockelem .blockbody input,
+    .blockelem .blockbody select {
+      padding: 4px 8px;
+      font-size: 11px;
+      margin-bottom: 8px;
+    }
+    .blockelem .blockbody input:last-child,
+    .blockelem .blockbody select:last-child {
+      margin-bottom: 0;
+    }
+    .blockelem .blockbody .checkrow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .blockelem .blockbody .check {
+      padding: 4px 6px;
+      font-size: 10px;
+      border-radius: 6px;
+      background: rgba(7, 17, 38, 0.5);
+    }
+
+    /* Show inputs only when snapped inside Flowy canvas */
+    .blockelem .block-inputs {
+      display: block !important;
+    }
+    /* Hide details text inside canvas to save space */
+    .blockelem .font-desc {
+      display: none !important;
+    }
+    .blockelem * {
+      pointer-events: auto !important;
+    }
+
+    /* Designer Right Side Compiler */
+    .designer-compiler {
+      background: var(--panel2);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .designer-compiler h3 {
+      margin-top: 0;
+      font-size: 13px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+      letter-spacing: 0.05em;
+    }
+    .compiler-log {
+      flex: 1;
+      border: 1px solid #1a2d52;
+      background: #060e1d;
+      color: #92b5f0;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 11px;
+      overflow-y: auto;
+      margin-bottom: 14px;
+      white-space: pre-wrap;
+      max-height: calc(100% - 100px);
+    }
+    .compiler-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Google Sign-In Authentication Overlay -->
+  <div id="auth-overlay">
+    <div class="auth-card">
+      <h2>Local RSI Backtest UI</h2>
+      <p>Secure visual backtester console. Please sign in with your Google account to proceed.</p>
+      <div class="g-btn-wrapper">
+        <div id="google-signin-btn"></div>
+      </div>
+      <div id="config-client-id-section" class="auth-config-box" style="display: none;">
+        <label for="manual-client-id-input">Google Client ID Required</label>
+        <p style="margin: 6px 0; font-size: 10px;">Enter your OAuth 2.0 Client ID below to connect dynamically:</p>
+        <input type="text" id="manual-client-id-input" placeholder="Enter Google Client ID" />
+        <button onclick="handleManualClientId()" style="margin-top: 10px; width: 100%;" class="primary">Save & Initialize</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <!-- Header with user profile and Tab navigation -->
+    <header class="app-header">
+      <div class="header-main">
+        <h1 class="title">Local RSI Backtest UI</h1>
+        <div class="sub">Standalone interface for <code>local_rsi_backtest.py</code>.</div>
+      </div>
+      <div class="header-nav">
+        <button id="tab-btn-dashboard" class="tab-btn active" onclick="switchTab('dashboard')">Dashboard</button>
+        <button id="tab-btn-designer" class="tab-btn" onclick="switchTab('designer')">Strategy Designer</button>
+      </div>
+      <div id="user-profile-widget" class="profile-widget">
+        <img id="user-avatar" src="" alt="avatar" />
+        <span id="user-name" class="username">Guest User</span>
+        <button id="logoutBtn" class="logout-btn" onclick="handleLogout()">Sign Out</button>
+      </div>
+    </header>
+
+    <!-- Dashboard Tab -->
+    <div id="tab-dashboard-view">
+      <div class="grid">
+      <section class="panel">
+        <h2>Run Setup</h2>
+        <div class="body">
+          <div class="form-grid">
+            <div class="row">
+              <label for="csv">Dataset CSV</label>
+              <select id="csv"></select>
+            </div>
+            <div class="row">
+              <label for="profile">Profile JSON (optional)</label>
+              <select id="profile"></select>
+            </div>
+            <div class="row three">
+              <div>
+                <label for="symbol">Symbol</label>
+                <input id="symbol" value="BTC" />
+              </div>
+              <div>
+                <label for="tf">Timeframe</label>
+                <select id="tf">
+                  <option>1m</option>
+                  <option>3m</option>
+                  <option>5m</option>
+                  <option selected>15m</option>
+                  <option>30m</option>
+                  <option>1h</option>
+                  <option>4h</option>
+                  <option>1d</option>
+                </select>
+              </div>
+              <div>
+                <label for="order_value">Order Value ($)</label>
+                <input id="order_value" type="number" value="33" step="0.01" />
+              </div>
+            </div>
+
+            <div class="row three">
+              <div>
+                <label for="account_start_value">Account Start Value ($, for chart)</label>
+                <input id="account_start_value" type="number" value="1000" step="1" />
+              </div>
+              <div>
+                <label for="equity_max_points">Equity chart points max</label>
+                <input id="equity_max_points" type="number" value="5000" step="100" />
+              </div>
+              <div></div>
+            </div>
+
+            <div class="row three">
+              <div>
+                <label for="chart_bars_limit">Replay Chart Bars</label>
+                <input id="chart_bars_limit" type="number" value="3000" step="100" />
+              </div>
+              <div>
+                <label for="play_step_bars">Play step (bars)</label>
+                <input id="play_step_bars" type="number" value="5" step="1" />
+              </div>
+              <div>
+                <label for="play_speed_ms">Play speed (ms)</label>
+                <input id="play_speed_ms" type="number" value="80" step="10" />
+              </div>
+            </div>
+
+            <div class="row two">
+              <div>
+                <label for="start">Start (ISO or epoch, optional)</label>
+                <input id="start" placeholder="2025-09-01" />
+              </div>
+              <div>
+                <label for="end">End (ISO or epoch, optional)</label>
+                <input id="end" placeholder="2026-02-25" />
+              </div>
+            </div>
+
+            <div class="row three">
+              <div>
+                <label for="rsi_unwind_delta">RSI unwind delta</label>
+                <input id="rsi_unwind_delta" type="number" value="1.0" step="0.1" />
+              </div>
+              <div>
+                <label for="rsi_reentry_cooldown_sec">Reentry cooldown (sec)</label>
+                <input id="rsi_reentry_cooldown_sec" type="number" value="60" step="1" />
+              </div>
+              <div>
+                <label for="warmup_bars">Warmup bars</label>
+                <input id="warmup_bars" type="number" value="250" step="1" />
+              </div>
+            </div>
+
+            <div class="row three">
+              <div>
+                <label for="maker_fee_bps">Maker fee (bps)</label>
+                <input id="maker_fee_bps" type="number" value="1.5" step="0.1" />
+              </div>
+              <div>
+                <label for="margin_cap">Margin cap (%)</label>
+                <input id="margin_cap" type="number" value="40" step="0.1" />
+              </div>
+              <div>
+                <label for="min_order_notional">Min order notional</label>
+                <input id="min_order_notional" type="number" value="10.5" step="0.1" />
+              </div>
+            </div>
+
+            <div class="row">
+              <label for="rsi_threshold_pairs">Threshold pairs (optional override)</label>
+              <input id="rsi_threshold_pairs" placeholder="5:95,10:90,20:80,30:70,40:60" />
+            </div>
+
+            <div class="groupbox">
+              <div class="gtitle">Timeframes (multi-select batch run; dropdown TF stays primary replay)</div>
+              <div class="checkgrid three" id="tfChecklist">
+                <label class="check"><input type="checkbox" class="tf-check" data-tf="1m"> 1m</label>
+                <label class="check"><input type="checkbox" class="tf-check" data-tf="3m"> 3m</label>
+                <label class="check"><input type="checkbox" class="tf-check" data-tf="5m"> 5m</label>
+                <label class="check"><input type="checkbox" class="tf-check" data-tf="15m"> 15m</label>
+                <label class="check"><input type="checkbox" class="tf-check" data-tf="30m"> 30m</label>
+                <label class="check"><input type="checkbox" class="tf-check" data-tf="1h"> 1h</label>
+                <label class="check"><input type="checkbox" class="tf-check" data-tf="4h"> 4h</label>
+                <label class="check"><input type="checkbox" class="tf-check" data-tf="1d"> 1d</label>
+              </div>
+            </div>
+
+            <div class="groupbox">
+              <div class="gtitle">Guards</div>
+              <div class="checkgrid">
+                <label class="check"><input id="no_shock_guard" type="checkbox"> Shock guard <small>toggle</small></label>
+                <label class="check" title="Local simplified single-symbol harvest trim on account-value RSI"><input id="no_harvest_guard" type="checkbox"> Harvest guard <small>toggle</small></label>
+                <label class="check" title="Local ATR compression + margin reduce-only block path"><input id="no_atr_guard" type="checkbox"> ATR guard <small>toggle</small></label>
+                <label class="check dim" title="Settlement guard disabled in local harness (no funding countdown replay)"><input id="no_settlement_guard" type="checkbox" disabled> Settlement guard <small>n/a</small></label>
+                <label class="check dim" title="Cap guard exists in engine path but is not exposed as a separate local toggle"><input id="no_cap_guard" type="checkbox" disabled> Cap guard <small>locked</small></label>
+              </div>
+            </div>
+
+            <div class="groupbox">
+              <div class="gtitle">Biases & Filters</div>
+              <div class="checkgrid">
+                <label class="check"><input id="no_trend_size_bias" type="checkbox"> Trend size bias <small>toggle</small></label>
+                <label class="check" title="Local HTF RSI override uses next higher timeframe from the same dataset"><input id="no_htf_bias" type="checkbox"> HTF bias <small>toggle</small></label>
+                <label class="check dim" title="Funding bias disabled in local harness (no funding replay feed)"><input id="no_funding_bias" type="checkbox" disabled> Funding bias <small>n/a</small></label>
+                <label class="check"><input id="no_trend_filter" type="checkbox"> Trend filter <small>toggle</small></label>
+                <label class="check"><input id="no_divergence" type="checkbox"> Divergence filter <small>toggle</small></label>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button id="refreshBtn">Refresh Files</button>
+              <button id="runBtn" class="primary">Run Backtest</button>
+              <span id="status" class="status">Idle</span>
+            </div>
+
+            <div>
+              <label for="cmdPreview">Command Preview</label>
+              <textarea id="cmdPreview" readonly></textarea>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Results</h2>
+        <div class="body">
+          <div class="cards" id="metricCards">
+            <div class="card"><div class="k">Net PnL</div><div class="v">--</div></div>
+            <div class="card"><div class="k">Realized PnL</div><div class="v">--</div></div>
+            <div class="card"><div class="k">Win Rate</div><div class="v">--</div></div>
+            <div class="card"><div class="k">Fills</div><div class="v">--</div></div>
+            <div class="card"><div class="k">Close Fills</div><div class="v">--</div></div>
+            <div class="card"><div class="k">Max Drawdown</div><div class="v">--</div></div>
+          </div>
+
+          <div class="summary-grid" style="margin-top:12px;">
+            <div class="panel" style="margin:0;">
+              <h2>Summary</h2>
+              <div class="body"><div id="summaryKv" class="kv"></div></div>
+            </div>
+            <div class="panel" style="margin:0;">
+              <h2>Process Output</h2>
+              <div class="body"><pre id="procOut" class="mono">(run a backtest)</pre></div>
+            </div>
+          </div>
+
+          <div class="panel" style="margin-top:12px;">
+            <h2>Replay Chart (MT5-style local playback)</h2>
+            <div class="body">
+              <div class="chart-toolbar">
+                <button id="replayLoadBtn">Load Chart</button>
+                <button id="replayPlayBtn">Play</button>
+                <button id="replayPauseBtn">Pause</button>
+                <button id="replayResetBtn">Reset</button>
+                <label class="tiny">Idx <span id="replayIdxLabel">0/0</span></label>
+                <span class="spacer"></span>
+                <input id="replaySlider" type="range" min="0" max="0" value="0" />
+              </div>
+              <div class="chart-wrap"><div id="replayChart"></div></div>
+              <div class="chart-wrap" style="margin-top:8px;"><div id="rsiChart"></div></div>
+              <div id="rsiMeta" class="tiny" style="margin-top:8px;">No RSI panel loaded.</div>
+              <div id="replayMeta" class="tiny" style="margin-top:8px;">No chart loaded.</div>
+            </div>
+          </div>
+
+          <div class="panel" style="margin-top:12px;">
+            <h2>Account Value Chart (Backtest)</h2>
+            <div class="body">
+              <div class="chart-wrap"><div id="equityChart"></div></div>
+              <div id="equityMeta" class="tiny" style="margin-top:8px;">No account value curve loaded.</div>
+            </div>
+          </div>
+
+          <div class="panel" style="margin-top:12px;">
+            <h2>Trades Preview (first 120 rows)</h2>
+            <div class="body">
+              <div class="table-wrap"><table id="tradesTable"></table></div>
+            </div>
+          </div>
+        </div>
+      </section>
+      </div>
+    </div>
+
+    <!-- Visual Strategy Designer Tab -->
+    <div id="tab-designer-view" style="display: none;">
+      <div class="designer-container">
+        <!-- Left sidebar: Draggable Inventory -->
+        <aside class="designer-sidebar">
+          <div class="designer-sidebar-title">STRATEGY BLOCKS</div>
+          <div class="block-list">
+            
+            <!-- Block 1: Dataset & Core Settings -->
+            <div class="flowy-drag-block create-flowy" data-blocktype="dataset">
+              <div class="block-title">📊 Dataset & Asset</div>
+              <div class="block-desc font-desc">Select Symbol, Timeframe and CSV. Must be the root block.</div>
+              <div class="block-inputs" style="display: none;">
+                <div class="blockbody">
+                  <label>Symbol</label>
+                  <input type="text" class="node-input" data-param="symbol" value="BTC" />
+                  <label>Timeframe</label>
+                  <select class="node-input" data-param="tf">
+                    <option value="1m">1m</option>
+                    <option value="3m">3m</option>
+                    <option value="5m">5m</option>
+                    <option value="15m" selected>15m</option>
+                    <option value="30m">30m</option>
+                    <option value="1h">1h</option>
+                    <option value="4h">4h</option>
+                    <option value="1d">1d</option>
+                  </select>
+                  <label>Dataset CSV</label>
+                  <select class="node-input" data-param="csv" id="node-csv-select">
+                    <!-- Populated dynamically -->
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Block 2: RSI Signals -->
+            <div class="flowy-drag-block create-flowy" data-blocktype="rsi">
+              <div class="block-title">📈 RSI Signals</div>
+              <div class="block-desc font-desc">Set thresholds, delta, & reentry cooldown seconds.</div>
+              <div class="block-inputs" style="display: none;">
+                <div class="blockbody">
+                  <label>Threshold Pairs</label>
+                  <input type="text" class="node-input" data-param="rsi_threshold_pairs" value="30:70" />
+                  <label>RSI Unwind Delta</label>
+                  <input type="number" class="node-input" data-param="rsi_unwind_delta" value="1.0" step="0.1" />
+                  <label>Reentry Cooldown (sec)</label>
+                  <input type="number" class="node-input" data-param="rsi_reentry_cooldown_sec" value="60" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Block 3: Biases & Filters -->
+            <div class="flowy-drag-block create-flowy" data-blocktype="biases">
+              <div class="block-title">⚖️ Biases & Filters</div>
+              <div class="block-desc font-desc">Toggles for Trend, Divergence, and HTF Bias.</div>
+              <div class="block-inputs" style="display: none;">
+                <div class="blockbody">
+                  <div class="checkrow">
+                    <label class="check"><input type="checkbox" class="node-input" data-param="no_trend_filter"> No Trend Filt</label>
+                    <label class="check"><input type="checkbox" class="node-input" data-param="no_divergence"> No Diverg</label>
+                    <label class="check"><input type="checkbox" class="node-input" data-param="no_trend_size_bias"> No Trend Sz</label>
+                    <label class="check"><input type="checkbox" class="node-input" data-param="no_htf_bias"> No HTF Bias</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Block 4: Guards -->
+            <div class="flowy-drag-block create-flowy" data-blocktype="guards">
+              <div class="block-title">🛡️ Strategy Guards</div>
+              <div class="block-desc font-desc">Enable Shock, Harvest, and ATR guards.</div>
+              <div class="block-inputs" style="display: none;">
+                <div class="blockbody">
+                  <div class="checkrow">
+                    <label class="check"><input type="checkbox" class="node-input" data-param="no_shock_guard"> No Shock Gd</label>
+                    <label class="check"><input type="checkbox" class="node-input" data-param="no_harvest_guard"> No Harvest Gd</label>
+                    <label class="check"><input type="checkbox" class="node-input" data-param="no_atr_guard"> No ATR Gd</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Block 5: Risk Size -->
+            <div class="flowy-drag-block create-flowy" data-blocktype="risk">
+              <div class="block-title">💰 Order & Account</div>
+              <div class="block-desc font-desc">Set order value, start capital, and warm up bars.</div>
+              <div class="block-inputs" style="display: none;">
+                <div class="blockbody">
+                  <label>Order Value ($)</label>
+                  <input type="number" class="node-input" data-param="order_value" value="33" />
+                  <label>Account Start Value ($)</label>
+                  <input type="number" class="node-input" data-param="account_start_value" value="1000" />
+                  <label>Warmup Bars</label>
+                  <input type="number" class="node-input" data-param="warmup_bars" value="250" />
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </aside>
+
+        <!-- Canvas -->
+        <div class="designer-canvas-wrap">
+          <div id="flowy-canvas"></div>
+          <div class="canvas-actions">
+            <button id="clearCanvasBtn" onclick="clearFlowchart()">Clear Canvas</button>
+          </div>
+        </div>
+
+        <!-- Right side: Compiler & Run -->
+        <aside class="designer-compiler">
+          <h3>COMPILER LOG</h3>
+          <div id="compilerLog" class="compiler-log">No strategy compiled yet.
+
+Drag blocks onto the canvas and connect them under the root Dataset block to design your custom strategy.</div>
+          <div class="compiler-actions">
+            <button id="compileBtn" onclick="compileFlowchartStrategy()">Compile Strategy</button>
+            <button id="compileRunBtn" class="primary" onclick="compileAndRunStrategy()">Compile & Run</button>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="flowy.min.js"></script>
+  <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+  <script>
+    const state = {
+      discover: null,
+      running: false,
+      lastRunResult: null,
+      activeJobId: null,
+      replay: {
+        chart: null,
+        candleSeries: null,
+        markerSeries: null,
+        allCandles: [],
+        allTrades: [],
+        candleMeta: null,
+        playTimer: null,
+        currentIdx: 0,
+        rsiChart: null,
+        rsiLineSeries: null,
+        rsiUpperSeries: null,
+        rsiLowerSeries: null,
+        rsiAllData: [],
+      },
+    };
+
+    const els = {
+      csv: document.getElementById('csv'),
+      profile: document.getElementById('profile'),
+      symbol: document.getElementById('symbol'),
+      tf: document.getElementById('tf'),
+      order_value: document.getElementById('order_value'),
+      start: document.getElementById('start'),
+      end: document.getElementById('end'),
+      rsi_unwind_delta: document.getElementById('rsi_unwind_delta'),
+      rsi_reentry_cooldown_sec: document.getElementById('rsi_reentry_cooldown_sec'),
+      warmup_bars: document.getElementById('warmup_bars'),
+      maker_fee_bps: document.getElementById('maker_fee_bps'),
+      margin_cap: document.getElementById('margin_cap'),
+      min_order_notional: document.getElementById('min_order_notional'),
+      chart_bars_limit: document.getElementById('chart_bars_limit'),
+      play_step_bars: document.getElementById('play_step_bars'),
+      play_speed_ms: document.getElementById('play_speed_ms'),
+      account_start_value: document.getElementById('account_start_value'),
+      equity_max_points: document.getElementById('equity_max_points'),
+      rsi_threshold_pairs: document.getElementById('rsi_threshold_pairs'),
+      no_divergence: document.getElementById('no_divergence'),
+      no_trend_filter: document.getElementById('no_trend_filter'),
+      no_trend_size_bias: document.getElementById('no_trend_size_bias'),
+      no_htf_bias: document.getElementById('no_htf_bias'),
+      no_shock_guard: document.getElementById('no_shock_guard'),
+      no_atr_guard: document.getElementById('no_atr_guard'),
+      no_harvest_guard: document.getElementById('no_harvest_guard'),
+      tfChecks: Array.from(document.querySelectorAll('.tf-check')),
+      refreshBtn: document.getElementById('refreshBtn'),
+      runBtn: document.getElementById('runBtn'),
+      status: document.getElementById('status'),
+      cmdPreview: document.getElementById('cmdPreview'),
+      metricCards: document.getElementById('metricCards'),
+      summaryKv: document.getElementById('summaryKv'),
+      procOut: document.getElementById('procOut'),
+      tradesTable: document.getElementById('tradesTable'),
+      replayLoadBtn: document.getElementById('replayLoadBtn'),
+      replayPlayBtn: document.getElementById('replayPlayBtn'),
+      replayPauseBtn: document.getElementById('replayPauseBtn'),
+      replayResetBtn: document.getElementById('replayResetBtn'),
+      replaySlider: document.getElementById('replaySlider'),
+      replayIdxLabel: document.getElementById('replayIdxLabel'),
+      replayChart: document.getElementById('replayChart'),
+      rsiChart: document.getElementById('rsiChart'),
+      rsiMeta: document.getElementById('rsiMeta'),
+      replayMeta: document.getElementById('replayMeta'),
+      equityChart: document.getElementById('equityChart'),
+      equityMeta: document.getElementById('equityMeta'),
+    };
+
+    function setStatus(msg, kind='') {
+      els.status.textContent = msg;
+      els.status.className = 'status' + (kind ? ' ' + kind : '');
+    }
+
+    function opt(select, value, selected=false) {
+      const o = document.createElement('option');
+      o.value = value;
+      o.textContent = value || '(none)';
+      if (selected) o.selected = true;
+      select.appendChild(o);
+    }
+
+    async function fetchJson(url, opts) {
+      const res = await fetch(url, opts);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      return data;
+    }
+
+    function sleepMs(ms) {
+      return new Promise(resolve => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+    }
+
+    function formatRunProgress(st) {
+      const p = st?.progress || {};
+      const batchIdx = Number(p.batch_index || 0);
+      const batchTotal = Number(p.batch_total || 0);
+      const tf = String(p.current_tf || p.tf || '');
+      const cur = Number(p.current_bar || 0);
+      const tot = Number(p.total_bars || 0);
+      const fills = Number(p.fills || 0);
+      const phase = String(p.phase || st?.state || '');
+      const batchTxt = (batchTotal > 0) ? `[TF ${Math.max(0,batchIdx)}/${batchTotal}${tf ? ' ' + tf : ''}] ` : '';
+      if (tot > 0) {
+        const pct = Math.max(0, Math.min(100, (cur / tot) * 100));
+        return `${batchTxt}${cur.toLocaleString()}/${tot.toLocaleString()} candles (${pct.toFixed(1)}%)${Number.isFinite(fills) ? ` | fills ${fills}` : ''}`;
+      }
+      if (phase === 'error') return `${batchTxt}error: ${p.error || 'unknown'}`;
+      return `${batchTxt}${phase || st?.state || 'running'}...`;
+    }
+
+    async function waitForRunJob(jobId) {
+      const started = Date.now();
+      let lastMsg = '';
+      while (true) {
+        const st = await fetchJson(`/api/job_status?job_id=${encodeURIComponent(jobId)}`);
+        if (!st?.ok) throw new Error(st?.error || 'job_status_failed');
+        const msg = formatRunProgress(st);
+        if (msg !== lastMsg) {
+          setStatus(`Running... ${msg}`);
+          els.procOut.textContent = `[job ${jobId}] ${msg}\n\nWaiting for completion...`;
+          lastMsg = msg;
+        }
+        if (String(st.state || '') === 'done') {
+          return st.result || { ok: false, error: 'missing_job_result' };
+        }
+        if (Date.now() - started > (1000 * 60 * 60)) {
+          throw new Error('job_status_timeout');
+        }
+        await sleepMs(450);
+      }
+    }
+
+    async function discover() {
+      setStatus('Loading files...');
+      const d = await fetchJson('/api/discover');
+      state.discover = d;
+      els.csv.innerHTML = '';
+      (d.csvs || []).forEach(p => opt(els.csv, p, p === d.default_csv));
+      if (!(d.csvs || []).length) opt(els.csv, '');
+      els.profile.innerHTML = '';
+      opt(els.profile, '', !d.default_profile);
+      (d.profiles || []).forEach(p => opt(els.profile, p, p === d.default_profile));
+      syncTfChecklistFromSelect();
+      setStatus('Ready', 'ok');
+      buildCmdPreview();
+    }
+
+    function getPayload() {
+      const selectedTfs = (els.tfChecks || []).filter(x => x.checked).map(x => String(x?.dataset?.tf || '')).filter(Boolean);
+      const payload = {
+        csv: els.csv.value,
+        config_json: els.profile.value || '',
+        symbol: (els.symbol.value || 'BTC').trim().toUpperCase(),
+        tf: els.tf.value,
+        tfs: selectedTfs.length ? selectedTfs : [els.tf.value],
+        order_value: Number(els.order_value.value || 0),
+        start: (els.start.value || '').trim(),
+        end: (els.end.value || '').trim(),
+        rsi_unwind_delta: (els.rsi_unwind_delta.value || '').trim(),
+        rsi_reentry_cooldown_sec: (els.rsi_reentry_cooldown_sec.value || '').trim(),
+        warmup_bars: (els.warmup_bars.value || '').trim(),
+        maker_fee_bps: (els.maker_fee_bps.value || '').trim(),
+        margin_cap: (els.margin_cap.value || '').trim(),
+        min_order_notional: (els.min_order_notional.value || '').trim(),
+        chart_bars_limit: (els.chart_bars_limit.value || '').trim(),
+        play_step_bars: (els.play_step_bars.value || '').trim(),
+        play_speed_ms: (els.play_speed_ms.value || '').trim(),
+        account_start_value: (els.account_start_value.value || '').trim(),
+        equity_max_points: (els.equity_max_points.value || '').trim(),
+        rsi_threshold_pairs: (els.rsi_threshold_pairs.value || '').trim(),
+        no_divergence: !!els.no_divergence.checked,
+        no_trend_filter: !!els.no_trend_filter.checked,
+        no_trend_size_bias: !!els.no_trend_size_bias.checked,
+        no_htf_bias: !!els.no_htf_bias.checked,
+        no_shock_guard: !!els.no_shock_guard.checked,
+        no_atr_guard: !!els.no_atr_guard.checked,
+        no_harvest_guard: !!els.no_harvest_guard.checked,
+      };
+      Object.keys(payload).forEach(k => {
+        if (payload[k] === '') delete payload[k];
+      });
+      return payload;
+    }
+
+    function buildCmdPreview() {
+      const p = getPayload();
+      const cmd = ['python', 'local_rsi_backtest.py'];
+      const push = (k, v) => { if (v !== undefined && v !== null && String(v) !== '') cmd.push(k, String(v)); };
+      push('--csv', p.csv);
+      push('--symbol', p.symbol);
+      push('--tf', p.tf);
+      push('--order-value', p.order_value);
+      if (p.config_json) push('--config-json', p.config_json);
+      if (p.start) push('--start', p.start);
+      if (p.end) push('--end', p.end);
+      push('--rsi-unwind-delta', p.rsi_unwind_delta);
+      push('--rsi-reentry-cooldown-sec', p.rsi_reentry_cooldown_sec);
+      push('--warmup-bars', p.warmup_bars);
+      push('--maker-fee-bps', p.maker_fee_bps);
+      push('--margin-cap', p.margin_cap);
+      push('--account-start-value', p.account_start_value);
+      push('--min-order-notional', p.min_order_notional);
+      if (p.rsi_threshold_pairs) push('--rsi-threshold-pairs', p.rsi_threshold_pairs);
+      if (p.no_divergence) cmd.push('--no-divergence');
+      if (p.no_trend_filter) cmd.push('--no-trend-filter');
+      if (p.no_trend_size_bias) cmd.push('--no-trend-size-bias');
+      if (p.no_htf_bias) cmd.push('--no-htf-bias');
+      if (p.no_shock_guard) cmd.push('--no-shock-guard');
+      if (p.no_atr_guard) cmd.push('--no-atr-guard');
+      if (p.no_harvest_guard) cmd.push('--no-harvest-guard');
+      cmd.push('--summary-out', '<temp>', '--trades-out', '<temp>');
+      const tfs = Array.isArray(p.tfs) ? p.tfs : [];
+      const lines = [];
+      if (tfs.length > 1) lines.push(`# UI batch TFs: ${tfs.join(', ')}`);
+      lines.push(cmd.join(' '));
+      els.cmdPreview.value = lines.join('\n');
+    }
+
+    function syncTfChecklistFromSelect() {
+      const selectedTf = String(els.tf?.value || '');
+      const checks = (els.tfChecks || []);
+      const anyChecked = checks.some(cb => cb.checked);
+      checks.forEach(cb => {
+        const tf = String(cb?.dataset?.tf || '');
+        if (!tf) return;
+        if (!anyChecked && tf === selectedTf) cb.checked = true;
+      });
+    }
+
+    function bindTfChecklist() {
+      (els.tfChecks || []).forEach(cb => {
+        cb.addEventListener('change', (e) => {
+          const target = e.target;
+          const tf = String(target?.dataset?.tf || '');
+          if (!tf) return;
+          if (!target.checked) {
+            const anyChecked = (els.tfChecks || []).some(x => x.checked);
+            if (!anyChecked) target.checked = true;
+            if (els.tf.value === tf) {
+              const fallback = (els.tfChecks || []).find(x => x.checked);
+              if (fallback?.dataset?.tf) els.tf.value = fallback.dataset.tf;
+            }
+            buildCmdPreview();
+            return;
+          }
+          els.tf.value = tf;
+          buildCmdPreview();
+        });
+      });
+      els.tf.addEventListener('change', syncTfChecklistFromSelect);
+    }
+
+    function toNum(v, fallback=null) {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    function tfToSec(tf) {
+      const t = String(tf || '').toLowerCase();
+      const map = { '1m':60, '3m':180, '5m':300, '15m':900, '30m':1800, '1h':3600, '4h':14400, '1d':86400 };
+      return map[t] || 60;
+    }
+
+    function toEpochSecAuto(v) {
+      const n = Math.floor(toNum(v, 0) || 0);
+      if (!Number.isFinite(n) || n <= 0) return 0;
+      const a = Math.abs(n);
+      if (a >= 1e18) return Math.floor(n / 1e9);
+      if (a >= 1e15) return Math.floor(n / 1e6);
+      if (a >= 1e11) return Math.floor(n / 1e3);
+      return n;
+    }
+
+    function setRunEnabled(enabled) {
+      state.running = !enabled;
+      els.runBtn.disabled = !enabled;
+      els.refreshBtn.disabled = !enabled;
+    }
+
+    function fmtNum(v, digits=2) {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return '--';
+      return n.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+    }
+
+    function computeRsiSeriesFromCandles(candles, period=14) {
+      const arr = Array.isArray(candles) ? candles : [];
+      const n = Math.max(2, Math.trunc(Number(period) || 14));
+      if (arr.length < (n + 1)) return [];
+      const out = [];
+      const gains = [];
+      const losses = [];
+      let sumGain = 0;
+      let sumLoss = 0;
+      for (let i = 1; i < arr.length; i++) {
+        const prev = Number(arr[i - 1]?.close);
+        const cur = Number(arr[i]?.close);
+        const ts = Number(arr[i]?.time || 0);
+        if (!Number.isFinite(prev) || !Number.isFinite(cur) || !Number.isFinite(ts) || ts <= 0) {
+          gains.push(null);
+          losses.push(null);
+          continue;
+        }
+        const d = cur - prev;
+        const gain = Math.max(0, d);
+        const loss = Math.max(0, -d);
+        gains.push(gain);
+        losses.push(loss);
+        sumGain += gain;
+        sumLoss += loss;
+        if (gains.length > n) {
+          const g0 = gains[gains.length - 1 - n];
+          const l0 = losses[losses.length - 1 - n];
+          if (Number.isFinite(g0)) sumGain -= Number(g0);
+          if (Number.isFinite(l0)) sumLoss -= Number(l0);
+        }
+        if (gains.length >= n) {
+          const avgGain = sumGain / n;
+          const avgLoss = sumLoss / n;
+          const rs = (avgLoss === 0) ? Infinity : (avgGain / avgLoss);
+          const rsi = (avgLoss === 0) ? 100 : (100 - (100 / (1 + rs)));
+          if (Number.isFinite(rsi)) out.push({ time: ts, value: rsi });
+        }
+      }
+      return out;
+    }
+
+    function renderMetricCards(summary) {
+      const items = [
+        ['Net PnL', summary?.net_pnl, 2],
+        ['Realized PnL', summary?.realized_pnl, 2],
+        ['Win Rate', summary?.win_rate == null ? null : Number(summary.win_rate) * 100, 1, '%'],
+        ['Fills', summary?.fills, 0],
+        ['Close Fills', summary?.close_fills, 0],
+        ['Max Drawdown', summary?.max_drawdown, 2],
+      ];
+      const cards = Array.from(els.metricCards.querySelectorAll('.card'));
+      items.forEach((it, idx) => {
+        const [label, raw, digits, suffix=''] = it;
+        const card = cards[idx];
+        if (!card) return;
+        card.querySelector('.k').textContent = label;
+        const valEl = card.querySelector('.v');
+        if (raw == null || raw === '' || !Number.isFinite(Number(raw))) {
+          valEl.textContent = '--';
+          valEl.className = 'v';
+          return;
+        }
+        const n = Number(raw);
+        valEl.textContent = `${fmtNum(n, digits)}${suffix}`;
+        valEl.className = 'v' + (n > 0 && !label.includes('Drawdown') ? ' pos' : (n < 0 ? ' neg' : ''));
+      });
+    }
+
+    function renderSummary(summary) {
+      const kv = [
+        ['Symbol', summary?.symbol],
+        ['Timeframe', summary?.timeframe],
+        ['HTF Bias (local)', summary?.local_harness_htf_bias_enabled],
+        ['ATR Guard (local)', summary?.local_harness_atr_guard_enabled],
+        ['Harvest Guard (local)', summary?.local_harness_harvest_guard_enabled],
+        ['HTF TF (local)', summary?.local_harness_htf_tf],
+        ['CSV', summary?.csv],
+        ['Start UTC', summary?.start_utc],
+        ['End UTC', summary?.end_utc],
+        ['Bars (raw)', summary?.bars_raw],
+        ['Bars (tf)', summary?.bars_tf],
+        ['Fees', summary?.fees],
+        ['Unrealized PnL', summary?.unrealized_pnl],
+        ['Ending Pos Qty', summary?.ending_position_qty],
+        ['Ending Avg Px', summary?.ending_position_avg_px],
+        ['Active Orders Resting', summary?.active_orders_resting],
+        ['Last RSI Signal', summary?.last_rsi_signal],
+      ];
+      els.summaryKv.innerHTML = '';
+      kv.forEach(([k,v]) => {
+        const a = document.createElement('div'); a.textContent = k;
+        const b = document.createElement('div'); b.textContent = (v == null || v === '') ? '--' : String(v);
+        els.summaryKv.appendChild(a); els.summaryKv.appendChild(b);
+      });
+    }
+
+    function renderTrades(rows) {
+      const arr = Array.isArray(rows) ? rows : [];
+      if (!arr.length) {
+        els.tradesTable.innerHTML = '<thead><tr><th>No trades</th></tr></thead>';
+        return;
+      }
+      const cols = ['ts_utc','side','dir','px','sz','notional','closedPnl','fee','profile','level_idx','rsi_at_order','order_value_multiplier'];
+      let thead = '<thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead>';
+      let tbody = '<tbody>' + arr.map(r => '<tr>' + cols.map(c => `<td>${(r[c] ?? '')}</td>`).join('') + '</tr>').join('') + '</tbody>';
+      els.tradesTable.innerHTML = thead + tbody;
+    }
+
+    function renderProcessOutput(result) {
+      const cmd = (result?.cmd || []).join(' ');
+      const lines = [];
+      lines.push(`ok=${!!result?.ok} returncode=${result?.returncode} elapsed=${result?.elapsed_sec}s`);
+      if (result?.batch_mode) {
+        const batch = Array.isArray(result?.batch_results) ? result.batch_results : [];
+        lines.push(`batch_mode=true total_elapsed=${result?.elapsed_sec_total_batch ?? '--'}s tfs=${(result?.selected_tfs || []).join(',')}`);
+        if (result?.batch_tf_order_values && typeof result.batch_tf_order_values === 'object') {
+          const orderMapTxt = (result.selected_tfs || [])
+            .map(tf => `${tf}:${result.batch_tf_order_values?.[tf] ?? '--'}`)
+            .join(', ');
+          if (orderMapTxt) lines.push(`batch_order_values=${orderMapTxt}`);
+        }
+        lines.push('[batch]');
+        batch.forEach(row => {
+          const s = row?.summary || {};
+          lines.push(`${row?.tf || '--'} ov=${row?.order_value_used ?? '--'} ok=${!!row?.ok} fills=${s.fills ?? '--'} close_fills=${s.close_fills ?? '--'} net=${s.net_pnl ?? '--'} dd=${s.max_drawdown ?? '--'} elapsed=${row?.elapsed_sec ?? '--'}s`);
+          if (!row?.ok && row?.stderr_tail) lines.push(`  err: ${String(row.stderr_tail).replace(/\\s+/g, ' ').slice(-220)}`);
+        });
+      }
+      if (cmd) lines.push(`cmd: ${cmd}`);
+      if (result?.stderr) {
+        lines.push('\n[stderr]');
+        lines.push(String(result.stderr));
+      }
+      if (result?.stdout) {
+        lines.push('\n[stdout]');
+        lines.push(String(result.stdout));
+      }
+      els.procOut.textContent = lines.join('\n');
+    }
+
+    function ensureReplayChart() {
+      if (state.replay.chart || typeof LightweightCharts === 'undefined') return;
+      const el = els.replayChart;
+      state.replay.chart = LightweightCharts.createChart(el, {
+        width: el.clientWidth || 0,
+        height: el.clientHeight || 340,
+        layout: { background: { color: '#07101f' }, textColor: '#8da4cf' },
+        grid: {
+          vertLines: { color: 'rgba(71, 85, 105, 0.08)' },
+          horzLines: { color: 'rgba(71, 85, 105, 0.12)' },
+        },
+        rightPriceScale: { borderColor: '#22365a' },
+        timeScale: { borderColor: '#22365a', timeVisible: true, secondsVisible: false },
+        crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+        handleScroll: true,
+        handleScale: true,
+      });
+      state.replay.candleSeries = state.replay.chart.addCandlestickSeries({
+        upColor: '#10b981',
+        downColor: '#ef4444',
+        borderVisible: false,
+        wickUpColor: '#10b981',
+        wickDownColor: '#ef4444',
+      });
+      state.replay.markerSeries = state.replay.candleSeries;
+      window.addEventListener('resize', () => {
+        if (!state.replay.chart) return;
+        state.replay.chart.applyOptions({ width: el.clientWidth || 0, height: el.clientHeight || 340 });
+      });
+    }
+
+    function ensureRsiChart() {
+      if (state.replay.rsiChart || typeof LightweightCharts === 'undefined') return;
+      const el = els.rsiChart;
+      state.replay.rsiChart = LightweightCharts.createChart(el, {
+        width: el.clientWidth || 0,
+        height: el.clientHeight || 150,
+        layout: { background: { color: '#07101f' }, textColor: '#8da4cf' },
+        grid: {
+          vertLines: { color: 'rgba(71, 85, 105, 0.08)' },
+          horzLines: { color: 'rgba(71, 85, 105, 0.12)' },
+        },
+        rightPriceScale: {
+          borderColor: '#22365a',
+          autoScale: false,
+          scaleMargins: { top: 0.06, bottom: 0.06 },
+        },
+        timeScale: { borderColor: '#22365a', timeVisible: true, secondsVisible: false },
+        crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+        handleScroll: true,
+        handleScale: true,
+      });
+      state.replay.rsiLineSeries = state.replay.rsiChart.addLineSeries({
+        color: '#fbbf24',
+        lineWidth: 2,
+        priceLineVisible: false,
+        lastValueVisible: true,
+      });
+      state.replay.rsiUpperSeries = state.replay.rsiChart.addLineSeries({
+        color: 'rgba(239,68,68,0.55)',
+        lineWidth: 1,
+        lineStyle: 2,
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+      state.replay.rsiLowerSeries = state.replay.rsiChart.addLineSeries({
+        color: 'rgba(34,197,94,0.55)',
+        lineWidth: 1,
+        lineStyle: 2,
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+      try {
+        state.replay.rsiChart.priceScale().applyOptions({
+          autoScale: false,
+          mode: 0,
+          scaleMargins: { top: 0.06, bottom: 0.06 },
+        });
+        state.replay.rsiChart.timeScale().applyOptions({ timeVisible: true, secondsVisible: false });
+      } catch (_) {}
+      window.addEventListener('resize', () => {
+        if (!state.replay.rsiChart) return;
+        state.replay.rsiChart.applyOptions({ width: el.clientWidth || 0, height: el.clientHeight || 150 });
+      });
+    }
+
+    function ensureEquityChart() {
+      if (state.replay.equityChart || typeof LightweightCharts === 'undefined') return;
+      const el = els.equityChart;
+      state.replay.equityChart = LightweightCharts.createChart(el, {
+        width: el.clientWidth || 0,
+        height: el.clientHeight || 220,
+        layout: { background: { color: '#07101f' }, textColor: '#8da4cf' },
+        grid: {
+          vertLines: { color: 'rgba(71, 85, 105, 0.08)' },
+          horzLines: { color: 'rgba(71, 85, 105, 0.12)' },
+        },
+        rightPriceScale: { borderColor: '#22365a' },
+        timeScale: { borderColor: '#22365a', timeVisible: true, secondsVisible: false },
+        crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+        handleScroll: true,
+        handleScale: true,
+      });
+      state.replay.equityLineSeries = state.replay.equityChart.addLineSeries({
+        color: '#22d3ee',
+        lineWidth: 3,
+        priceLineVisible: false,
+        lastValueVisible: true,
+      });
+      state.replay.equityBaselineSeries = state.replay.equityChart.addLineSeries({
+        color: 'rgba(148,163,184,0.45)',
+        lineWidth: 1,
+        lineStyle: 2,
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+      state.replay.equityPnlSeries = state.replay.equityChart.addLineSeries({
+        priceScaleId: 'pnl',
+        color: '#f59e0b',
+        lineWidth: 1,
+        lineStyle: 2,
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+      try {
+        state.replay.equityChart.priceScale('pnl').applyOptions({
+          visible: false,
+          autoScale: true,
+          scaleMargins: { top: 0.78, bottom: 0.05 },
+        });
+      } catch (_) {}
+      window.addEventListener('resize', () => {
+        if (!state.replay.equityChart) return;
+        state.replay.equityChart.applyOptions({ width: el.clientWidth || 0, height: el.clientHeight || 220 });
+      });
+    }
+
+    function stopReplayPlayback() {
+      if (state.replay.playTimer) {
+        clearInterval(state.replay.playTimer);
+        state.replay.playTimer = null;
+      }
+    }
+
+    function buildReplayMarkers(uptoIdx) {
+      const candles = state.replay.allCandles || [];
+      const trades = state.replay.allTrades || [];
+      if (!candles.length || !trades.length) return [];
+      const cutoffTime = Number(candles[Math.max(0, Math.min(uptoIdx, candles.length - 1))]?.time || 0);
+      const firstTime = Number(candles[0]?.time || 0);
+      const candleTimes = candles.map(c => Number(c.time || 0));
+      const snapToVisibleCandle = (tsSec) => {
+        let lo = 0, hi = candleTimes.length - 1, ans = -1;
+        while (lo <= hi) {
+          const mid = (lo + hi) >> 1;
+          const t = candleTimes[mid];
+          if (t <= tsSec) { ans = mid; lo = mid + 1; } else { hi = mid - 1; }
+        }
+        return ans >= 0 ? candleTimes[ans] : null;
+      };
+      const markers = [];
+      for (const tr of trades) {
+        const ts = toEpochSecAuto(tr?.ts);
+        if (!Number.isFinite(ts) || ts <= 0 || ts < firstTime || ts > cutoffTime) continue;
+        const snapTs = snapToVisibleCandle(ts);
+        if (!Number.isFinite(Number(snapTs))) continue;
+        const side = String(tr.side || '').toUpperCase();
+        const dir = String(tr.dir || '');
+        const closedPnl = toNum(tr.closedPnl, NaN);
+        const isBuy = side === 'B';
+        const isClose = /close|flip/i.test(dir) || (Number.isFinite(closedPnl) && Math.abs(closedPnl) > 0);
+        const color = isClose ? (Number(closedPnl || 0) >= 0 ? '#22c55e' : '#ef4444') : (isBuy ? '#22d3ee' : '#f59e0b');
+        const shape = isBuy ? 'arrowUp' : 'arrowDown';
+        const pos = isBuy ? 'belowBar' : 'aboveBar';
+        const lbl = isClose ? (isBuy ? 'BC' : 'SC') : (isBuy ? 'B' : 'S');
+        const txtParts = [lbl, tr.sz || '', tr.px || ''];
+        if (dir) txtParts.push(dir);
+        if (Number.isFinite(closedPnl) && Math.abs(closedPnl) > 0) txtParts.push(`PnL ${closedPnl.toFixed(2)}`);
+        markers.push({
+          time: snapTs,
+          position: pos,
+          color,
+          shape,
+          text: txtParts.slice(0, 3).join(' '),
+        });
+      }
+      return markers;
+    }
+
+    function findFirstFillIndexInLoadedWindow() {
+      const candles = state.replay.allCandles || [];
+      const trades = state.replay.allTrades || [];
+      if (!candles.length || !trades.length) return -1;
+      const candleTimes = candles.map(c => Number(c.time || 0));
+      const firstTime = candleTimes[0];
+      const lastTime = candleTimes[candleTimes.length - 1];
+      const snapIndex = (tsSec) => {
+        let lo = 0, hi = candleTimes.length - 1, ans = -1;
+        while (lo <= hi) {
+          const mid = (lo + hi) >> 1;
+          const t = candleTimes[mid];
+          if (t <= tsSec) { ans = mid; lo = mid + 1; } else { hi = mid - 1; }
+        }
+        return ans;
+      };
+      let minIdx = Number.POSITIVE_INFINITY;
+      for (const tr of trades) {
+        const ts = toEpochSecAuto(tr?.ts);
+        if (!Number.isFinite(ts) || ts < firstTime || ts > lastTime) continue;
+        const idx = snapIndex(ts);
+        if (idx >= 0 && idx < minIdx) minIdx = idx;
+      }
+      return Number.isFinite(minIdx) ? minIdx : -1;
+    }
+
+    function countTradesInLoadedWindow() {
+      const candles = state.replay.allCandles || [];
+      const trades = state.replay.allTrades || [];
+      if (!candles.length || !trades.length) return 0;
+      const firstTime = Number(candles[0]?.time || 0);
+      const lastTime = Number(candles[candles.length - 1]?.time || 0);
+      let n = 0;
+      for (const tr of trades) {
+        const ts = toEpochSecAuto(tr?.ts);
+        if (Number.isFinite(ts) && ts >= firstTime && ts <= lastTime) n += 1;
+      }
+      return n;
+    }
+
+    function renderReplayAtIndex(idx) {
+      ensureReplayChart();
+      ensureRsiChart();
+      const candles = state.replay.allCandles || [];
+      if (!candles.length || !state.replay.candleSeries) return;
+      const clamped = Math.max(0, Math.min(Number(idx) || 0, candles.length - 1));
+      state.replay.currentIdx = clamped;
+      const visible = candles.slice(0, clamped + 1);
+      state.replay.candleSeries.setData(visible);
+      const markers = buildReplayMarkers(clamped);
+      try {
+        if (typeof state.replay.markerSeries.setMarkers === 'function') {
+          state.replay.markerSeries.setMarkers(markers);
+        } else if (typeof LightweightCharts.createSeriesMarkers === 'function') {
+          LightweightCharts.createSeriesMarkers(state.replay.markerSeries, markers);
+        }
+      } catch (e) {
+        console.error('marker render failed', e);
+      }
+      try { state.replay.chart.timeScale().fitContent(); } catch (_) {}
+      const rsiAll = Array.isArray(state.replay.rsiAllData) ? state.replay.rsiAllData : [];
+      const visibleFirst = Number(visible[0]?.time || 0);
+      const visibleLast = Number(visible[visible.length - 1]?.time || 0);
+      const rsiVisible = rsiAll.filter(p => Number(p.time) >= visibleFirst && Number(p.time) <= visibleLast);
+      try {
+        state.replay.rsiLineSeries?.setData(rsiVisible);
+        const line70 = (visible.length ? visible.map(c => ({ time: Number(c.time || 0), value: 70 })) : []);
+        const line30 = (visible.length ? visible.map(c => ({ time: Number(c.time || 0), value: 30 })) : []);
+        state.replay.rsiUpperSeries?.setData(line70);
+        state.replay.rsiLowerSeries?.setData(line30);
+        if (Number.isFinite(visibleFirst) && Number.isFinite(visibleLast) && visibleLast >= visibleFirst) {
+          state.replay.rsiChart?.timeScale().setVisibleRange({ from: visibleFirst, to: visibleLast });
+        }
+      } catch (_) {}
+      els.replaySlider.max = String(Math.max(0, candles.length - 1));
+      els.replaySlider.value = String(clamped);
+      els.replayIdxLabel.textContent = `${clamped + 1}/${candles.length}`;
+      const last = visible[visible.length - 1];
+      const rsiLast = rsiVisible.length ? Number(rsiVisible[rsiVisible.length - 1]?.value) : NaN;
+      els.rsiMeta.textContent = `RSI(14) points ${rsiVisible.length}/${rsiAll.length} | current ${Number.isFinite(rsiLast) ? rsiLast.toFixed(2) : '--'} | bands 30 / 70`;
+      renderEquityAtCutoff(Number(last?.time || 0));
+      const windowFills = countTradesInLoadedWindow();
+      const totalBars = Number(state.replay.candleMeta?.total_bars || candles.length);
+      els.replayMeta.textContent = `TF ${state.replay.lastTf || '--'} | candles ${candles.length}/${totalBars} | shown ${visible.length} | visible markers ${markers.length} | window fills ${windowFills} | all fills ${state.replay.allTrades.length} | last ${new Date(Number(last.time) * 1000).toLocaleString()}`;
+    }
+
+    function renderEquityChart(result) {
+      ensureEquityChart();
+      const rows = Array.isArray(result?.equity_curve) ? result.equity_curve : [];
+      const base = Math.max(0, toNum(els.account_start_value.value, 0) || 0);
+      if (!rows.length || !state.replay.equityLineSeries) {
+        try {
+          state.replay.equityAllData = [];
+          state.replay.equityAllPnlData = [];
+          state.replay.equityLineSeries?.setData([]);
+          state.replay.equityBaselineSeries?.setData([]);
+          state.replay.equityPnlSeries?.setData([]);
+        } catch (_) {}
+        els.equityMeta.textContent = 'No account value curve loaded.';
+        return;
+      }
+      const equityData = [];
+      const baselineData = [];
+      const pnlData = [];
+      for (const r of rows) {
+        if (!Array.isArray(r) || r.length < 2) continue;
+        const tsSec = Math.floor(Number(r[0]) / 1000);
+        const net = Number(r[1]);
+        if (!Number.isFinite(tsSec) || !Number.isFinite(net)) continue;
+        equityData.push({ time: tsSec, value: base + net });
+        baselineData.push({ time: tsSec, value: base });
+        pnlData.push({ time: tsSec, value: net });
+      }
+      state.replay.equityAllData = equityData;
+      state.replay.equityAllPnlData = pnlData;
+      state.replay.equityBaselineValue = base;
+      try {
+        state.replay.equityLineSeries.setData(equityData);
+        state.replay.equityBaselineSeries.setData(baselineData);
+        state.replay.equityPnlSeries.setData(pnlData);
+        state.replay.equityChart.timeScale().fitContent();
+      } catch (_) {}
+      const last = equityData[equityData.length - 1];
+      const first = equityData[0];
+      const netLast = pnlData[pnlData.length - 1];
+      const minEq = equityData.reduce((m, p) => Math.min(m, Number(p.value)), Number.POSITIVE_INFINITY);
+      const maxEq = equityData.reduce((m, p) => Math.max(m, Number(p.value)), Number.NEGATIVE_INFINITY);
+      const pct = (first && Number(first.value) !== 0 && last) ? (((Number(last.value) - Number(first.value)) / Number(first.value)) * 100.0) : NaN;
+      els.equityMeta.textContent = `Points ${equityData.length} | Start ${first ? first.value.toFixed(2) : '--'} | Last ${last ? last.value.toFixed(2) : '--'} | Range ${Number.isFinite(minEq) ? minEq.toFixed(2) : '--'}-${Number.isFinite(maxEq) ? maxEq.toFixed(2) : '--'} | Net ${netLast ? (netLast.value >= 0 ? '+' : '') + netLast.value.toFixed(2) : '--'} | ${(Number.isFinite(pct) ? (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%' : '--')}`;
+    }
+
+    function renderEquityAtCutoff(cutoffSec) {
+      if (!state.replay.equityChart || !state.replay.equityLineSeries) return;
+      const allEq = Array.isArray(state.replay.equityAllData) ? state.replay.equityAllData : [];
+      const allPnl = Array.isArray(state.replay.equityAllPnlData) ? state.replay.equityAllPnlData : [];
+      if (!allEq.length) return;
+      if (!Number.isFinite(Number(cutoffSec)) || Number(cutoffSec) <= 0) cutoffSec = Number(allEq[allEq.length - 1]?.time || 0);
+      const replayCandles = Array.isArray(state.replay.allCandles) ? state.replay.allCandles : [];
+      const replayFirstSec = Number(replayCandles[0]?.time || 0);
+      const replayLastSec = Number(replayCandles[replayCandles.length - 1]?.time || 0);
+      const loSec = Number.isFinite(replayFirstSec) && replayFirstSec > 0 ? replayFirstSec : Number(allEq[0]?.time || 0);
+      const hiSec = Number.isFinite(replayLastSec) && replayLastSec > 0 ? Math.min(Number(cutoffSec), replayLastSec) : Number(cutoffSec);
+      const eqVisible = allEq.filter(p => Number(p.time) >= loSec && Number(p.time) <= hiSec);
+      const pnlVisible = allPnl.filter(p => Number(p.time) >= loSec && Number(p.time) <= hiSec);
+      const eqData = eqVisible.length ? eqVisible : [allEq[0]];
+      const pnlData = pnlVisible.length ? pnlVisible : [allPnl[0]];
+      const baseline = Number(state.replay.equityBaselineValue || 0);
+      const baselineData = eqData.map(p => ({ time: p.time, value: baseline }));
+      try {
+        state.replay.equityLineSeries.setData(eqData);
+        state.replay.equityBaselineSeries.setData(baselineData);
+        state.replay.equityPnlSeries.setData(pnlData);
+        state.replay.equityChart.timeScale().setVisibleRange({ from: eqData[0].time, to: eqData[eqData.length - 1].time });
+      } catch (_) {}
+      const first = eqData[0];
+      const last = eqData[eqData.length - 1];
+      const minEq = eqData.reduce((m, p) => Math.min(m, Number(p.value)), Number.POSITIVE_INFINITY);
+      const maxEq = eqData.reduce((m, p) => Math.max(m, Number(p.value)), Number.NEGATIVE_INFINITY);
+      const net = (last && first) ? (Number(last.value) - Number(first.value)) : NaN;
+      const pct = (first && Number(first.value) !== 0 && last) ? (((Number(last.value) - Number(first.value)) / Number(first.value)) * 100.0) : NaN;
+      els.equityMeta.textContent = `Points ${eqData.length}/${allEq.length} | Start ${first ? first.value.toFixed(2) : '--'} | Last ${last ? last.value.toFixed(2) : '--'} | Range ${Number.isFinite(minEq) ? minEq.toFixed(2) : '--'}-${Number.isFinite(maxEq) ? maxEq.toFixed(2) : '--'} | Net ${Number.isFinite(net) ? (net >= 0 ? '+' : '') + net.toFixed(2) : '--'} | ${Number.isFinite(pct) ? (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%' : '--'}`;
+    }
+
+    async function loadReplayChartFromLastRun() {
+      const r = state.lastRunResult;
+      if (!r || !r.summary) {
+        setStatus('Run backtest first', 'err');
+        return;
+      }
+      const payload = getPayload();
+      const req = {
+        csv: payload.csv,
+        tf: payload.tf,
+        start: payload.start || '',
+        end: payload.end || '',
+        max_bars: Number(payload.chart_bars_limit || 3000),
+        tail_only: true,
+      };
+      const tradesAll = Array.isArray(r.trades_all) ? r.trades_all : [];
+      if (!req.start && !req.end && tradesAll.length) {
+        const tfSec = tfToSec(payload.tf);
+        const maxBars = Math.max(200, Number(req.max_bars || 3000));
+        let latestTradeSec = 0;
+        let firstTradeSec = Number.POSITIVE_INFINITY;
+        for (const tr of tradesAll) {
+          const tsSec = toEpochSecAuto(tr?.ts);
+          if (!Number.isFinite(tsSec) || tsSec <= 0) continue;
+          if (tsSec > latestTradeSec) latestTradeSec = tsSec;
+          if (tsSec < firstTradeSec) firstTradeSec = tsSec;
+        }
+        if (latestTradeSec > 0 && Number.isFinite(firstTradeSec)) {
+          const padBars = Math.max(20, Math.floor(maxBars * 0.05));
+          const spanBars = Math.max(1, Math.ceil((latestTradeSec - firstTradeSec) / tfSec));
+          const targetBars = Math.min(50000, Math.max(maxBars, spanBars + (padBars * 2)));
+          req.max_bars = targetBars;
+          if (spanBars <= maxBars) {
+            req.start = String(Math.max(0, firstTradeSec - (tfSec * padBars)));
+            req.end = String(latestTradeSec + (tfSec * padBars));
+            req.tail_only = false;
+          } else {
+            // Load the full fill span when possible; backend will stride only if still above max_bars.
+            req.start = String(Math.max(0, firstTradeSec - (tfSec * padBars)));
+            req.end = String(latestTradeSec + (tfSec * padBars));
+            req.tail_only = false;
+          }
+        }
+      }
+      setStatus('Loading chart candles...');
+      const qs = new URLSearchParams();
+      Object.entries(req).forEach(([k, v]) => { if (v !== undefined && v !== null && String(v) !== '') qs.set(k, String(v)); });
+      const cRes = await fetchJson(`/api/candles?${qs.toString()}`);
+      state.replay.allCandles = Array.isArray(cRes.candles) ? cRes.candles : [];
+      state.replay.rsiAllData = computeRsiSeriesFromCandles(state.replay.allCandles, 14);
+      state.replay.candleMeta = cRes || null;
+      state.replay.allTrades = tradesAll;
+      state.replay.lastTf = cRes.timeframe || payload.tf;
+      stopReplayPlayback();
+      if (!state.replay.allCandles.length) {
+        state.replay.rsiAllData = [];
+        try {
+          state.replay.rsiLineSeries?.setData([]);
+          state.replay.rsiUpperSeries?.setData([]);
+          state.replay.rsiLowerSeries?.setData([]);
+        } catch (_) {}
+        els.rsiMeta.textContent = 'No RSI panel loaded.';
+        renderReplayAtIndex(0);
+        setStatus('No candles for chart window', 'err');
+        return;
+      }
+      const firstFillIdx = findFirstFillIndexInLoadedWindow();
+      const initialIdx = (firstFillIdx >= 0)
+        ? Math.max(0, firstFillIdx - 5)
+        : 0;
+      renderReplayAtIndex(initialIdx);
+      setStatus('Chart loaded', 'ok');
+    }
+
+    function startReplayPlayback() {
+      stopReplayPlayback();
+      if (!state.replay.allCandles.length) return;
+      let step = Math.max(1, Math.trunc(toNum(els.play_step_bars.value, 5) || 5));
+      let speed = Math.max(10, Math.trunc(toNum(els.play_speed_ms.value, 80) || 80));
+      state.replay.playTimer = setInterval(() => {
+        const next = state.replay.currentIdx + step;
+        if (next >= state.replay.allCandles.length - 1) {
+          renderReplayAtIndex(state.replay.allCandles.length - 1);
+          stopReplayPlayback();
+          return;
+        }
+        renderReplayAtIndex(next);
+      }, speed);
+    }
+
+    function resetReplayPlayback() {
+      stopReplayPlayback();
+      if (!state.replay.allCandles.length) return;
+      renderReplayAtIndex(0);
+    }
+
+    async function runBacktest() {
+      try {
+        setRunEnabled(false);
+        setStatus('Running backtest...');
+        buildCmdPreview();
+        const payload = getPayload();
+        const jobStart = await fetchJson('/api/run_job', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!jobStart?.ok || !jobStart?.job_id) throw new Error(jobStart?.error || 'failed_to_start_job');
+        state.activeJobId = String(jobStart.job_id);
+        const result = await waitForRunJob(state.activeJobId);
+        renderMetricCards(result.summary || {});
+        renderSummary(result.summary || {});
+        renderTrades(result.trades_preview || []);
+        renderProcessOutput(result);
+        state.lastRunResult = result;
+        renderEquityChart(result);
+        await loadReplayChartFromLastRun();
+        const elapsedTxt = (result.batch_mode ? (result.elapsed_sec_total_batch ?? result.elapsed_sec) : result.elapsed_sec);
+        setStatus(result.ok ? `Done (${elapsedTxt}s)` : `Failed (${elapsedTxt ?? '--'}s)`, result.ok ? 'ok' : 'err');
+      } catch (e) {
+        setStatus(`Error: ${e.message || e}`, 'err');
+      } finally {
+        state.activeJobId = null;
+        setRunEnabled(true);
+      }
+    }
+
+    Object.values(els).forEach(el => {
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'SELECT')) {
+        el.addEventListener('change', buildCmdPreview);
+        el.addEventListener('input', buildCmdPreview);
+      }
+    });
+    els.refreshBtn.addEventListener('click', discover);
+    els.runBtn.addEventListener('click', runBacktest);
+    els.replayLoadBtn.addEventListener('click', () => loadReplayChartFromLastRun().catch(e => setStatus(`Chart error: ${e.message || e}`, 'err')));
+    els.replayPlayBtn.addEventListener('click', startReplayPlayback);
+    els.replayPauseBtn.addEventListener('click', stopReplayPlayback);
+    els.replayResetBtn.addEventListener('click', resetReplayPlayback);
+    els.replaySlider.addEventListener('input', (e) => {
+      stopReplayPlayback();
+      renderReplayAtIndex(Number(e.target.value || 0));
+    });
+
+    bindTfChecklist();
+    syncTfChecklistFromSelect();
+
+    // ----------------------------------------------------
+    // AUTHENTICATION AND GOOGLE SIGN-IN INTERACTION CODE
+    // ----------------------------------------------------
+    let googleInitialized = false;
+
+    function initializeGoogleSignIn(clientId) {
+      if (googleInitialized) return;
+      if (typeof google === 'undefined') {
+        console.error("Google accounts library is not loaded.");
+        return;
+      }
+      google.accounts.id.initialize({
+        client_id: clientId,
+        callback: handleCredentialResponse
+      });
+      google.accounts.id.renderButton(
+        document.getElementById("google-signin-btn"),
+        { theme: "filled_blue", size: "large", width: 280 }
+      );
+      googleInitialized = true;
+    }
+
+    async function handleCredentialResponse(response) {
+      const idToken = response.credential;
+      const manualClientId = document.getElementById('manual-client-id-input').value.trim();
+      try {
+        setStatus("Signing in with Google...");
+        const authRes = await fetchJson('/api/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id_token: idToken,
+            client_id: manualClientId || undefined
+          })
+        });
+        if (authRes && authRes.ok) {
+          setStatus("Signed in successfully!", "ok");
+          await checkAuth();
+        } else {
+          alert("Login failed: " + (authRes.error || "unknown error"));
+        }
+      } catch (e) {
+        alert("Login request failed: " + e.message);
+      }
+    }
+
+    async function handleManualClientId() {
+      const clientId = document.getElementById('manual-client-id-input').value.trim();
+      if (!clientId) {
+        alert("Please enter a valid Google Client ID");
+        return;
+      }
+      initializeGoogleSignIn(clientId);
+    }
+
+    async function handleLogout() {
+      try {
+        const res = await fetchJson('/api/auth/logout', { method: 'POST' });
+        if (res && res.ok) {
+          googleInitialized = false;
+          if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+            google.accounts.id.disableAutoSelect();
+          }
+          window.location.reload();
+        }
+      } catch (e) {
+        alert("Logout failed: " + e.message);
+      }
+    }
+
+    async function checkAuth() {
+      try {
+        const status = await fetchJson('/api/auth/status');
+        if (status && status.logged_in) {
+          document.getElementById('auth-overlay').classList.add('hidden');
+          const widget = document.getElementById('user-profile-widget');
+          widget.style.display = 'flex';
+          document.getElementById('user-avatar').src = status.user.picture || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y';
+          document.getElementById('user-name').textContent = status.user.name;
+          
+          // Trigger file discovery once logged in
+          await discover();
+        } else {
+          document.getElementById('auth-overlay').classList.remove('hidden');
+          const config = await fetchJson('/api/auth/config');
+          if (config && config.google_client_id) {
+            initializeGoogleSignIn(config.google_client_id);
+            document.getElementById('config-client-id-section').style.display = 'none';
+          } else {
+            document.getElementById('config-client-id-section').style.display = 'block';
+          }
+        }
+      } catch (e) {
+        console.error("Auth check failed", e);
+        setStatus("Auth status check failed", "err");
+        document.getElementById('auth-overlay').classList.remove('hidden');
+        document.getElementById('config-client-id-section').style.display = 'block';
+      }
+    }
+
+    // ----------------------------------------------------
+    // TAB AND TABS NAVIGATION SYSTEM
+    // ----------------------------------------------------
+    function switchTab(tabName) {
+      const dashView = document.getElementById('tab-dashboard-view');
+      const designerView = document.getElementById('tab-designer-view');
+      const dashBtn = document.getElementById('tab-btn-dashboard');
+      const designerBtn = document.getElementById('tab-btn-designer');
+      
+      if (tabName === 'dashboard') {
+        dashView.style.display = 'block';
+        designerView.style.display = 'none';
+        dashBtn.classList.add('active');
+        designerBtn.classList.remove('active');
+      } else {
+        dashView.style.display = 'none';
+        designerView.style.display = 'block';
+        dashBtn.classList.remove('active');
+        designerBtn.classList.add('active');
+        
+        initializeFlowy();
+      }
+    }
+
+    // ----------------------------------------------------
+    // FLOWY VISUAL FLOWCHART DESIGNER CODE
+    // ----------------------------------------------------
+    let flowyInitialized = false;
+
+    function initializeFlowy() {
+      if (flowyInitialized) return;
+      if (typeof flowy === 'undefined') {
+        console.error("Flowy library is not loaded.");
+        return;
+      }
+      
+      // Populate node-csv-select before init
+      const nodeCsvSelect = document.getElementById('node-csv-select');
+      if (nodeCsvSelect && state.discover) {
+        nodeCsvSelect.innerHTML = '';
+        (state.discover.csvs || []).forEach(p => {
+          const o = document.createElement('option');
+          o.value = p;
+          o.textContent = p;
+          if (p === state.discover.default_csv) o.selected = true;
+          nodeCsvSelect.appendChild(o);
+        });
+      }
+
+      flowy(
+        document.getElementById("flowy-canvas"),
+        function onGrab(block) {},
+        function onRelease() {},
+        function onSnap(block, first, parent) {
+          const blockType = block.getAttribute('data-blocktype');
+          if (first && blockType !== 'dataset') {
+            document.getElementById('compilerLog').textContent = "Validation Warning: Root block must be the 'Dataset & Asset' block.";
+            return false;
+          }
+          if (!first && blockType === 'dataset') {
+            document.getElementById('compilerLog').textContent = "Validation Warning: 'Dataset & Asset' block must only be placed as root.";
+            return false;
+          }
+          return true;
+        },
+        function onRearrange(block, parent) {
+          return true;
+        },
+        20, // spacing x
+        20  // spacing y
+      );
+      
+      flowyInitialized = true;
+    }
+
+    function clearFlowchart() {
+      if (confirm("Are you sure you want to clear the canvas?")) {
+        const canvas = document.getElementById("flowy-canvas");
+        canvas.innerHTML = '';
+        flowyInitialized = false;
+        initializeFlowy();
+        document.getElementById('compilerLog').textContent = "Canvas cleared.";
+      }
+    }
+
+    function compileFlowchartStrategy() {
+      const output = flowy.output();
+      const log = document.getElementById('compilerLog');
+      if (!output || !output.blockarr || !output.blockarr.length) {
+        log.textContent = "Error: Canvas is empty.\nDrag strategy blocks onto the canvas first.";
+        return null;
+      }
+      
+      const blocks = output.blockarr;
+      
+      const rootBlock = blocks.find(b => b.parent === -1 || b.parent === 0);
+      if (!rootBlock) {
+        log.textContent = "Error: No root block found.";
+        return null;
+      }
+      
+      const compiledParams = {};
+      let hasDataset = false;
+      
+      log.textContent = "Compiling strategy flowchart...\n";
+      
+      for (const block of blocks) {
+        const id = block.id;
+        const elem = document.querySelector(`.blockelem[data-blockid="${id}"]`);
+        if (!elem) continue;
+        
+        const blockType = elem.getAttribute('data-blocktype');
+        log.textContent += `Found block: ${blockType} (ID: ${id})\n`;
+        
+        if (blockType === 'dataset') hasDataset = true;
+        
+        const inputs = elem.querySelectorAll('.node-input');
+        inputs.forEach(input => {
+          const param = input.getAttribute('data-param');
+          if (!param) return;
+          
+          let val;
+          if (input.type === 'checkbox') {
+            val = input.checked;
+          } else {
+            val = input.value;
+          }
+          compiledParams[param] = val;
+          log.textContent += `  > ${param}: ${val}\n`;
+        });
+      }
+      
+      if (!hasDataset) {
+        log.textContent += "\nError: Strategy must contain a 'Dataset & Asset' block to specify the source data.";
+        return null;
+      }
+      
+      log.textContent += "\nCompilation Successful!\nAll parameters loaded.";
+      return compiledParams;
+    }
+
+    function applyCompiledParams(params) {
+      if (!params) return;
+      
+      if (params.symbol !== undefined) els.symbol.value = params.symbol;
+      if (params.tf !== undefined) {
+        els.tf.value = params.tf;
+        syncTfChecklistFromSelect();
+      }
+      if (params.csv !== undefined) els.csv.value = params.csv;
+      if (params.rsi_threshold_pairs !== undefined) els.rsi_threshold_pairs.value = params.rsi_threshold_pairs;
+      if (params.rsi_unwind_delta !== undefined) els.rsi_unwind_delta.value = params.rsi_unwind_delta;
+      if (params.rsi_reentry_cooldown_sec !== undefined) els.rsi_reentry_cooldown_sec.value = params.rsi_reentry_cooldown_sec;
+      if (params.order_value !== undefined) els.order_value.value = params.order_value;
+      if (params.account_start_value !== undefined) els.account_start_value.value = params.account_start_value;
+      if (params.warmup_bars !== undefined) els.warmup_bars.value = params.warmup_bars;
+      
+      els.no_shock_guard.checked = !!params.no_shock_guard;
+      els.no_harvest_guard.checked = !!params.no_harvest_guard;
+      els.no_atr_guard.checked = !!params.no_atr_guard;
+      els.no_trend_filter.checked = !!params.no_trend_filter;
+      els.no_divergence.checked = !!params.no_divergence;
+      els.no_trend_size_bias.checked = !!params.no_trend_size_bias;
+      els.no_htf_bias.checked = !!params.no_htf_bias;
+      
+      buildCmdPreview();
+    }
+
+    async function compileAndRunStrategy() {
+      const params = compileFlowchartStrategy();
+      if (!params) return;
+      applyCompiledParams(params);
+      
+      switchTab('dashboard');
+      await runBacktest();
+    }
+
+    // Check auth status on load
+    checkAuth();
+  </script>
+</body>
+</html>

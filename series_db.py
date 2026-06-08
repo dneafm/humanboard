@@ -94,6 +94,12 @@ def asset_record(series_id, category, asset):
         "aliases": [name] if name else [],
         "updated_at": now_iso(),
     }
+    clean_path = asset.get("clean_image_ref_path")
+    if clean_path:
+        raw_clean = str(clean_path).split("?", 1)[0].lstrip("/\\")
+        if os.path.exists(raw_clean):
+            add_ref(record, ref_entry(clean_path, "input"))
+            return record
     add_ref(record, ref_entry(asset.get("image_ref_path"), "input"))
     return record
 
@@ -101,7 +107,17 @@ def asset_record(series_id, category, asset):
 def text_mentions_name(text, name):
     if not text or not name:
         return False
-    return name.casefold() in text.casefold()
+    text = str(text)
+    name = str(name).strip()
+    if not name:
+        return False
+    escaped = re.escape(name)
+    at_pattern = rf"(?<![\w])@{escaped}(?![\w])"
+    if re.search(at_pattern, text, flags=re.IGNORECASE):
+        return True
+    plain_pattern = rf"(?<![\w@]){escaped}(?![\w])"
+    flags = 0 if len(name) <= 2 else re.IGNORECASE
+    return re.search(plain_pattern, text, flags=flags) is not None
 
 
 def rebuild_database_from_files():
@@ -337,7 +353,7 @@ def build_generation_context(topic=""):
             lines.append(f"- @{record.get('name')}: {record.get('description', '')}")
 
     lines.append("")
-    lines.append("Use this database as the source of truth. When the user types @Name, prioritize that character/asset/setting and use its descriptions and reference images for continuity. Treat previous episode images as continuity references only; do not import old names, occupations, genres, locations, or art styles unless they also appear in the active series characters/assets/settings above.")
+    lines.append("Use this database as the source of truth. When the user types @Name, prioritize that character/asset/setting and use its descriptions for identity continuity. Previous episode images are weak continuity references only: preserve recurring character identity, but do not repeat their compositions, camera angles, environments, props, poses, or business scenes. Each new episode must introduce fresh visual locations, actions, framing, emotional beats, and problem-specific imagery. Treat previous episode images as continuity references only; do not import old names, occupations, genres, locations, or art styles unless they also appear in the active series characters/assets/settings above.")
     return "\n".join(lines)
 
 

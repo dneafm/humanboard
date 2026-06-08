@@ -32,3 +32,7 @@ surplus_direct_test.png
 *.log
 .DS_Store
 Thumbs.db
+node_modules/
+package-lock.json
+package.json
+sa-key.json

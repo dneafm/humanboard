@@ -12,7 +12,33 @@ PORT = 8080
 
 CONFIG_LOCK = threading.RLock()
 ASSET_TYPES = {"characters", "objects", "settings"}
-DEFAULT_STYLE_SUFFIX = "[, high-quality graphic novel illustration, crisp ink outlines, clean cel-shading, richly detailed background, hand-drawn digital art, coherent character design, masterfully composed, 8k resolution --ar 4:3]"
+DEFAULT_STYLE_SUFFIX = "[, rough black-and-white indie comic, wobbly hand-drawn ink lines, minimal flat background, awkward deadpan expressions, imperfect anatomy, DIY zine texture, sparse composition, low-polish handmade panel art --ar 4:3]"
+DEFAULT_FRAME_COUNT = 4
+MIN_FRAME_COUNT = 1
+MAX_FRAME_COUNT = 30
+DEFAULT_COMIC_LANGUAGE = "vn"
+
+
+def parse_frame_count(value, default=DEFAULT_FRAME_COUNT):
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        count = default
+    return max(MIN_FRAME_COUNT, min(MAX_FRAME_COUNT, count))
+
+
+def normalize_comic_language(value, default=None):
+    if not value:
+        try:
+            if os.path.exists("series_config.json"):
+                with open("series_config.json", "r", encoding="utf-8") as f:
+                    value = json.load(f).get("comic_language")
+        except Exception:
+            pass
+    if not value:
+        value = default or DEFAULT_COMIC_LANGUAGE
+    language = str(value).strip().lower()
+    return "en" if language == "en" else "vn"
 
 
 def send_json(handler, status, payload):
@@ -144,6 +170,8 @@ def decorate_asset_images(config_data):
         for asset in config_data.get(category, []):
             local_path = clean_local_ref_path(asset.get("image_ref_path"))
             asset["has_image"] = bool(local_path and os.path.exists(local_path))
+    ref_path = clean_local_ref_path(config_data.get("style_reference_path"))
+    config_data["has_style_reference"] = bool(ref_path and os.path.exists(ref_path))
     return config_data
 
 
@@ -157,16 +185,111 @@ def iter_reference_files(config_data=None):
                 local_path = clean_local_ref_path(asset.get("image_ref_path"))
                 if local_path and os.path.isfile(local_path):
                     refs.add(local_path)
+        style_ref = clean_local_ref_path(config_data.get("style_reference_path"))
+        if style_ref and os.path.isfile(style_ref):
+            refs.add(style_ref)
 
     for filename in os.listdir("."):
-        if os.path.isfile(filename) and (filename.endswith("_face.png") or filename.endswith("_ref.png") or filename == "setting_ref.png"):
+        if os.path.isfile(filename) and (filename.endswith("_face.png") or filename.endswith("_ref.png") or filename == "setting_ref.png" or filename == "style_ref.png"):
             refs.add(filename)
     return sorted(refs)
+
+
+GENERATION_STATUS = {
+    "active": False,
+    "episode_number": None,
+    "stage": "idle",
+    "current_panel": 0,
+    "total_panels": 0,
+    "error": None,
+    "topic": ""
+}
+
+def save_generation_progress():
+    try:
+        with open("generation_progress.json", "w", encoding="utf-8") as f:
+            json.dump(GENERATION_STATUS, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"Error saving generation progress: {e}")
+
+def load_generation_progress():
+    global GENERATION_STATUS
+    if os.path.exists("generation_progress.json"):
+        try:
+            with open("generation_progress.json", "r", encoding="utf-8") as f:
+                GENERATION_STATUS = json.load(f)
+        except Exception:
+            pass
+    # Force inactive status on server boot to prevent lockouts from unclean shutdowns
+    GENERATION_STATUS["active"] = False
+    save_generation_progress()
+
+def run_generation_task(topic, next_num, frame_count, comic_language, existing_titles):
+    global GENERATION_STATUS
+    try:
+        from comic_engine import ComicEngine, save_episode, generate_panels_for_episode, prepare_episode_payload_for_generation
+        from series_db import build_generation_context, record_episode_payload
+        
+        engine = ComicEngine()
+        
+        if not topic:
+            GENERATION_STATUS["stage"] = "suggest_topic"
+            save_generation_progress()
+            topic = engine.suggest_next_topic(existing_titles)
+            GENERATION_STATUS["topic"] = topic
+            
+        GENERATION_STATUS["stage"] = "script"
+        save_generation_progress()
+        
+        database_context = build_generation_context(topic)
+        payload = engine.generate_episode(topic, episode_num=next_num, database_context=database_context, frame_count=frame_count, comic_language=comic_language)
+        payload["topic"] = topic
+        payload["prompt_text"] = topic
+        payload["comic_language"] = comic_language
+        payload["frame_count"] = frame_count
+        payload = prepare_episode_payload_for_generation(payload)
+        save_episode(payload)
+        record_episode_payload(payload, topic)
+        
+        GENERATION_STATUS["stage"] = "panel"
+        GENERATION_STATUS["total_panels"] = len(payload.get("frames", []))
+        GENERATION_STATUS["current_panel"] = 0
+        save_generation_progress()
+        
+        def progress_callback(current, total, done=False):
+            global GENERATION_STATUS
+            if done:
+                GENERATION_STATUS["stage"] = "completed"
+                GENERATION_STATUS["active"] = False
+                GENERATION_STATUS["current_panel"] = total
+            else:
+                GENERATION_STATUS["current_panel"] = current
+            save_generation_progress()
+            
+        generate_panels_for_episode(payload, progress_callback=progress_callback)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        GENERATION_STATUS["active"] = False
+        GENERATION_STATUS["error"] = str(e)
+        save_generation_progress()
 
 
 class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     daemon_threads = True
     allow_reuse_address = True
+
+    def handle_error(self, request, client_address):
+        import sys
+        exc_type = sys.exc_info()[0]
+        # Silently ignore connection errors (BrokenPipe, ConnectionReset) - normal for HTTP
+        if exc_type in (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            return
+        # Log unexpected errors but don't crash the server
+        import traceback
+        print(f"[Server] Unhandled error from {client_address}:")
+        traceback.print_exc()
 
 class DashboardHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
@@ -278,10 +401,18 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                         data = json.load(file)
                         ep_num = data.get("episode_number", 0)
                         panels_dir = f"episode_{ep_num}_panels"
+                        frames = data.get("frames", []) if isinstance(data.get("frames"), list) else []
+                        frame_numbers = [
+                            int(frame.get("frame_number") or idx + 1)
+                            for idx, frame in enumerate(frames)
+                            if isinstance(frame, dict)
+                        ]
+                        if not frame_numbers:
+                            frame_numbers = list(range(1, parse_frame_count(data.get("frame_count")) + 1))
                         
                         # Add image status for panels
                         images = []
-                        for i in range(1, 5):
+                        for i in frame_numbers:
                             img_relative_path = f"{panels_dir}/panel_{i}.png"
                             img_absolute_path = os.path.join(".", img_relative_path)
                             exists = os.path.exists(img_absolute_path)
@@ -290,6 +421,7 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                                 "path": f"/{img_relative_path}" if exists else None,
                                 "exists": exists
                             })
+                        data["frame_count"] = len(frame_numbers)
                         data["images"] = images
                         episodes.append(data)
                 except Exception as e:
@@ -329,11 +461,18 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 send_json(self, 500, {"error": str(e), "items": []})
             return
+
+        # API: Get background generation status
+        if request_path == "/api/generation_status":
+            send_json(self, 200, GENERATION_STATUS)
+            return
             
         return super().do_GET()
 
     def do_POST(self):
+        global GENERATION_STATUS
         request_path = urllib.parse.urlparse(self.path).path
+        print(f"DEBUG: do_POST received path: '{request_path}'")
         try:
             content_length = int(self.headers.get('Content-Length', '0'))
             post_data = self.rfile.read(content_length).decode('utf-8')
@@ -410,6 +549,11 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                     with open(filename, "wb") as f:
                         f.write(img_data)
                     print(f"Saved asset reference image to: {filename}")
+                    try:
+                        from comic_engine import clean_reference_image
+                        clean_reference_image(filename)
+                    except Exception as e_clean:
+                        print(f"Error running clean pass on uploaded asset reference: {e_clean}")
                 except Exception as e:
                     send_json(self, 400, {"error": f"Error saving base64 asset image: {e}"})
                     return
@@ -477,6 +621,183 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                         print(f"Error rebuilding series database after asset delete: {e}")
                         
                 send_json(self, 200, {"success": True})
+            except Exception as e:
+                send_json(self, 500, {"error": str(e)})
+            return
+
+        # API: Re-run the cleaning pass on an existing asset reference image
+        if request_path == "/api/assets/reclean":
+            asset_type = params.get("type")
+            name = params.get("name", "").strip()
+
+            if not name:
+                send_json(self, 400, {"error": "Asset name is required"})
+                return
+
+            # Determine the expected filename for this asset
+            if asset_type in ASSET_TYPES:
+                filename = asset_filename(asset_type, name)
+            elif name == "style_ref":
+                filename = "style_ref.png"
+            else:
+                filename = clean_local_ref_path(name)
+
+            if not filename or not os.path.exists(filename):
+                send_json(self, 404, {"error": f"Reference image not found: {filename!r}"})
+                return
+
+            try:
+                from comic_engine import clean_reference_image
+                clean_reference_image(filename)
+                # After cleaning, the file is saved as .png (possibly renamed)
+                cleaned_path = os.path.splitext(filename)[0] + ".png"
+                if not os.path.exists(cleaned_path):
+                    cleaned_path = filename
+
+                # Return the cleaned image as b64 so the UI can update immediately
+                with open(cleaned_path, "rb") as f:
+                    img_b64 = __import__("base64").b64encode(f.read()).decode()
+                send_json(self, 200, {
+                    "success": True,
+                    "image_data_url": f"data:image/png;base64,{img_b64}",
+                    "filename": cleaned_path
+                })
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                send_json(self, 500, {"error": str(e)})
+            return
+
+        # API: Save Series Harness configurations
+        if request_path == "/api/series/save_harness":
+            series_title = params.get("series_title", "").strip()
+            series_plot = params.get("series_plot", "").strip()
+            style_lock = params.get("style_lock", "").strip()
+            master_style_suffix = params.get("master_style_suffix", "").strip()
+            comic_language = normalize_comic_language(params.get("comic_language"))
+            style_ref_base64 = params.get("style_ref_base64")
+            
+            config_path = "series_config.json"
+            config_data = load_series_config(config_path)
+            
+            config_data["series_title"] = series_title
+            config_data["series_plot"] = series_plot
+            config_data["style_lock"] = style_lock
+            config_data["master_style_suffix"] = master_style_suffix
+            config_data["comic_language"] = comic_language
+            
+            if style_ref_base64:
+                try:
+                    import base64
+                    if "," in style_ref_base64:
+                        style_ref_base64 = style_ref_base64.split(",", 1)[1]
+                    img_data = base64.b64decode(style_ref_base64)
+                    filename = "style_ref.png"
+                    with open(filename, "wb") as f:
+                        f.write(img_data)
+                    config_data["style_reference_path"] = f"/{filename}"
+                    print(f"Saved series style reference image to: {filename}")
+                    try:
+                        from comic_engine import clean_reference_image
+                        clean_reference_image(filename)
+                    except Exception as e_clean:
+                        print(f"Error running clean pass on style reference: {e_clean}")
+                except Exception as e:
+                    send_json(self, 400, {"error": f"Error saving base64 style reference: {e}"})
+                    return
+            
+            try:
+                config_data, _ = normalize_series_config(config_data)
+                with open(config_path, "w", encoding="utf-8") as f:
+                    json.dump(config_data, f, ensure_ascii=False, indent=2)
+                try:
+                    from series_db import rebuild_database_from_files
+                    rebuild_database_from_files()
+                except Exception as e:
+                    print(f"Error rebuilding database: {e}")
+                
+                config_data = decorate_asset_images(config_data)
+                send_json(self, 200, {"success": True, "config": config_data})
+            except Exception as e:
+                send_json(self, 500, {"error": str(e)})
+            return
+
+        # API: Auto Deduce Series configurations
+        if request_path == "/api/series/auto_deduce":
+            series_title = params.get("series_title", "").strip()
+            series_plot = params.get("series_plot", "").strip()
+            style_ref_base64 = params.get("style_ref_base64")
+            
+            config_path = "series_config.json"
+            config_data = load_series_config(config_path)
+            
+            config_data["series_title"] = series_title
+            config_data["series_plot"] = series_plot
+            
+            if style_ref_base64:
+                try:
+                    import base64
+                    if "," in style_ref_base64:
+                        style_ref_base64 = style_ref_base64.split(",", 1)[1]
+                    img_data = base64.b64decode(style_ref_base64)
+                    filename = "style_ref.png"
+                    with open(filename, "wb") as f:
+                        f.write(img_data)
+                    config_data["style_reference_path"] = f"/{filename}"
+                    print(f"Saved series style reference image to: {filename}")
+                except Exception as e:
+                    send_json(self, 400, {"error": f"Error saving base64 style reference: {e}"})
+                    return
+            
+            try:
+                from comic_engine import ComicEngine
+                engine = ComicEngine()
+                updated_config = engine.deduce_series_style_and_characters(config_data)
+                
+                updated_config, _ = normalize_series_config(updated_config)
+                with open(config_path, "w", encoding="utf-8") as f:
+                    json.dump(updated_config, f, ensure_ascii=False, indent=2)
+                try:
+                    from series_db import rebuild_database_from_files
+                    rebuild_database_from_files()
+                except Exception as e:
+                    print(f"Error rebuilding database: {e}")
+                
+                updated_config = decorate_asset_images(updated_config)
+                send_json(self, 200, {"success": True, "config": updated_config})
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                send_json(self, 500, {"error": str(e)})
+            return
+
+        # API: Delete an archived series
+        if request_path == "/api/delete_series":
+            series_id = params.get("series_id", "").strip()
+            if not series_id:
+                send_json(self, 400, {"error": "Series ID is required"})
+                return
+            if series_id == "active":
+                send_json(self, 400, {"error": "Cannot delete the active series"})
+                return
+            if not series_id.startswith("archived_series_"):
+                send_json(self, 400, {"error": "Only archived series can be deleted"})
+                return
+
+            target_dir = os.path.join("archive", series_id)
+            if not os.path.isdir(target_dir):
+                send_json(self, 404, {"error": "Series not found"})
+                return
+
+            try:
+                import shutil
+                shutil.rmtree(target_dir)
+                try:
+                    from series_db import rebuild_database_from_files
+                    rebuild_database_from_files()
+                except Exception as e:
+                    print(f"Error rebuilding series database after delete: {e}")
+                send_json(self, 200, {"success": True, "deleted_series_id": series_id})
             except Exception as e:
                 send_json(self, 500, {"error": str(e)})
             return
@@ -584,6 +905,8 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
         # API: Initialize a brand new series
         if request_path == "/api/new_series":
             char_name = params.get("character_name", "").strip()
+            frame_count = parse_frame_count(params.get("frame_count"))
+            comic_language = normalize_comic_language(params.get("comic_language"))
             if not char_name:
                 self.send_response(400)
                 self.send_header("Content-Type", "application/json")
@@ -603,6 +926,11 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                     with open(output_path, "wb") as f:
                         f.write(img_data)
                     print(f"Saved base64 image reference to: {output_path}")
+                    try:
+                        from comic_engine import clean_reference_image
+                        clean_reference_image(output_path)
+                    except Exception as e_clean:
+                        print(f"Error running clean pass on new series reference: {e_clean}")
                     return True
                 except Exception as e:
                     print(f"Error saving base64 image: {e}")
@@ -658,20 +986,63 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                     save_base64_image(setting_ref, "setting_ref.png")
 
                 # 3. Call ComicEngine to initialize new series
-                from comic_engine import ComicEngine, save_episode, generate_panels_for_episode
-                import threading
+                from comic_engine import ComicEngine, save_episode, generate_panels_for_episode, prepare_episode_payload_for_generation
                 
+                params["comic_language"] = comic_language
                 engine = ComicEngine()
                 payload = engine.create_new_series(params)
                 
                 # Save series_config.json
-                series_config, _ = normalize_series_config(payload.get("series_config", {}))
-                series_config["series_title"] = series_config.get("series_title") or params.get("title", "").strip()
-                series_config["series_plot"] = series_config.get("series_plot") or params.get("plot", "").strip()
+                series_config = payload.get("series_config", {})
+                series_config["comic_language"] = comic_language
+                
+                # Force user's custom inputs directly
+                char_name = params.get("character_name", "").strip()
+                char_desc = params.get("character_desc", "").strip()
+                setting_desc = params.get("setting_desc", "").strip()
+                
+                if char_name:
+                    series_config["protagonist_name"] = char_name
+                if char_desc:
+                    series_config["protagonist_description"] = char_desc
+                if setting_desc:
+                    series_config["setting_description"] = setting_desc
+                
+                # Ensure characters list matches user inputs
+                characters = series_config.get("characters", [])
+                if not characters:
+                    characters = [{"name": char_name or "Protagonist", "description": char_desc}]
+                else:
+                    characters[0]["name"] = char_name or characters[0].get("name", "Protagonist")
+                    characters[0]["description"] = char_desc or characters[0].get("description", "")
+                series_config["characters"] = characters
+                
+                # Ensure settings list matches user inputs
+                settings = series_config.get("settings", [])
+                if not settings:
+                    settings = [{"name": "Bối Cảnh Chính", "description": setting_desc}]
+                else:
+                    settings[0]["name"] = "Bối Cảnh Chính"
+                    settings[0]["description"] = setting_desc or settings[0].get("description", "")
+                series_config["settings"] = settings
+
+                series_config, _ = normalize_series_config(series_config)
+                series_config["series_title"] = params.get("title", "").strip() or series_config.get("series_title", "").strip()
+                series_config["series_plot"] = params.get("plot", "").strip() or series_config.get("series_plot", "").strip()
+                series_config["style_lock"] = series_config.get("style_lock", "").strip()
+                
                 if char_ref and series_config.get("characters"):
                     series_config["characters"][0]["image_ref_path"] = f"/{asset_filename('characters', series_config['characters'][0]['name'])}"
                 if setting_ref and series_config.get("settings"):
                     series_config["settings"][0]["image_ref_path"] = "/setting_ref.png"
+                    try:
+                        import shutil
+                        if os.path.exists("setting_ref.png"):
+                            shutil.copy("setting_ref.png", "style_ref.png")
+                            series_config["style_reference_path"] = "/style_ref.png"
+                    except Exception as e_copy:
+                        print(f"Error copying setting_ref to style_ref: {e_copy}")
+                
                 series_config, _ = normalize_series_config(series_config)
                 with open("series_config.json", "w", encoding="utf-8") as f:
                     json.dump(series_config, f, ensure_ascii=False, indent=2)
@@ -680,8 +1051,11 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                 # Save episode 1 payload
                 episode_payload = payload.get("episode", {})
                 episode_payload["episode_number"] = 1
+                episode_payload["frame_count"] = frame_count
+                episode_payload["comic_language"] = comic_language
                 episode_payload["topic"] = params.get("plot", "").strip() or params.get("title", "").strip()
                 episode_payload["prompt_text"] = episode_payload["topic"]
+                episode_payload = prepare_episode_payload_for_generation(episode_payload)
                 save_episode(episode_payload)
                 try:
                     from series_db import rebuild_database_from_files
@@ -690,7 +1064,28 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                     print(f"Error rebuilding series database after new series: {e}")
                 
                 # Start panel generation for Episode 1 in background thread
-                thread = threading.Thread(target=generate_panels_for_episode, args=(episode_payload,))
+                GENERATION_STATUS = {
+                    "active": True,
+                    "episode_number": 1,
+                    "stage": "panel",
+                    "current_panel": 0,
+                    "total_panels": frame_count,
+                    "error": None,
+                    "topic": params.get("plot", "").strip() or params.get("title", "").strip() or "Tập đầu tiên"
+                }
+                save_generation_progress()
+                
+                def new_series_progress_callback(current, total, done=False):
+                    global GENERATION_STATUS
+                    if done:
+                        GENERATION_STATUS["stage"] = "completed"
+                        GENERATION_STATUS["active"] = False
+                        GENERATION_STATUS["current_panel"] = total
+                    else:
+                        GENERATION_STATUS["current_panel"] = current
+                    save_generation_progress()
+                    
+                thread = threading.Thread(target=generate_panels_for_episode, args=(episode_payload, 42691, new_series_progress_callback))
                 thread.daemon = True
                 thread.start()
                 
@@ -709,7 +1104,22 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
 
         # API: Generate new episode JSON using the ComicEngine
         if request_path == "/api/generate":
+            if GENERATION_STATUS.get("active"):
+                send_json(self, 400, {"error": "Another generation is currently in progress."})
+                return
+                
             topic = params.get("topic", "").strip()
+            frame_count = parse_frame_count(params.get("frame_count"))
+            
+            # The active series config is the single source of truth for the language.
+            comic_language = "vn"
+            if os.path.exists("series_config.json"):
+                try:
+                    with open("series_config.json", "r", encoding="utf-8") as f:
+                        comic_language = json.load(f).get("comic_language", "vn")
+                except Exception:
+                    pass
+            comic_language = normalize_comic_language(comic_language)
             
             # Find next episode number dynamically and collect existing titles to prevent duplication
             files = [f for f in os.listdir(".") if f.startswith("episode_") and f.endswith(".json")]
@@ -726,50 +1136,27 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
                     pass
             next_num = max(episodes_nums) + 1 if episodes_nums else 1
             
-            try:
-                from comic_engine import ComicEngine, save_episode, generate_panels_for_episode
-                from series_db import active_series, build_generation_context, load_database, record_episode_payload
-                import threading
-
-                db = load_database(rebuild=True)
-                series = active_series(db)
-                if series.get("protagonist_name"):
-                    existing_titles = [
-                        episode.get("title", "")
-                        for episode in db.get("episodes", [])
-                        if episode.get("mentions_primary_character") and episode.get("title")
-                    ]
-                
-                engine = ComicEngine()
-                
-                if not topic:
-                    print("Web Dashboard: Topic is empty. Asking Gemini to auto-suggest a topic...")
-                    topic = engine.suggest_next_topic(existing_titles)
-                    print(f"Web Dashboard: Auto-suggested topic -> '{topic}'")
-                
-                print(f"Web Dashboard: Triggering generation for Episode {next_num} -> Topic: '{topic}'")
-                
-                database_context = build_generation_context(topic)
-                payload = engine.generate_episode(topic, episode_num=next_num, database_context=database_context)
-                payload["topic"] = topic
-                payload["prompt_text"] = topic
-                save_episode(payload)
-                record_episode_payload(payload, topic)
-                
-                # Run the panel image generation in a background thread to prevent UI timeout
-                thread = threading.Thread(target=generate_panels_for_episode, args=(payload,))
-                thread.daemon = True
-                thread.start()
-                
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps(payload).encode("utf-8"))
-            except Exception as e:
-                self.send_response(500)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+            # Initialize background state
+            GENERATION_STATUS = {
+                "active": True,
+                "episode_number": next_num,
+                "stage": "started",
+                "current_panel": 0,
+                "total_panels": frame_count,
+                "error": None,
+                "topic": topic or "Auto-suggesting topic..."
+            }
+            save_generation_progress()
+            
+            # Spawn background generation thread
+            thread = threading.Thread(
+                target=run_generation_task, 
+                args=(topic, next_num, frame_count, comic_language, existing_titles)
+            )
+            thread.daemon = True
+            thread.start()
+            
+            send_json(self, 200, {"success": True, "episode_number": next_num})
             return
 
         # API: Publish a specific episode to Facebook Page
@@ -822,18 +1209,37 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
 def run_server():
+    import time
+    # Force CWD to the directory of app.py to prevent directory listing exposure of the home directory
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    os.chdir(app_dir)
+    print(f"Server working directory set to: {app_dir}")
+    
     try:
         from series_db import rebuild_database_from_files
         rebuild_database_from_files()
     except Exception as e:
         print(f"Error rebuilding series database on startup: {e}")
 
-    with ThreadedTCPServer(("", PORT), DashboardHandler) as httpd:
-        print(f"\n=======================================================")
-        print(f"COMIC SERIES DASHBOARD STARTED")
-        print(f"Local URL: http://localhost:{PORT}")
-        print(f"=======================================================\n")
-        httpd.serve_forever()
+    load_generation_progress()
+
+    while True:
+        try:
+            with ThreadedTCPServer(("", PORT), DashboardHandler) as httpd:
+                print(f"\n=======================================================")
+                print(f"COMIC SERIES DASHBOARD STARTED")
+                print(f"Local URL: http://localhost:{PORT}")
+                print(f"=======================================================\n")
+                httpd.serve_forever()
+        except OSError as e:
+            print(f"[Server] OSError (port may be busy): {e}. Retrying in 5s...")
+            time.sleep(5)
+        except Exception as e:
+            import traceback
+            print(f"[Server] Unexpected error in serve_forever: {e}")
+            traceback.print_exc()
+            print("[Server] Restarting in 5s...")
+            time.sleep(5)
 
 if __name__ == "__main__":
     run_server()

@@ -79,6 +79,26 @@ def publish_carousel_post(fb: FacebookHelper, photo_ids: list, caption: str) -> 
         print(f"View it live: https://facebook.com/{post_id}")
         return post_id
 
+
+def get_episode_frame_numbers(episode_data: dict) -> list:
+    frames = episode_data.get("frames", []) if isinstance(episode_data.get("frames"), list) else []
+    frame_numbers = []
+    for idx, frame in enumerate(frames):
+        if not isinstance(frame, dict):
+            continue
+        try:
+            frame_numbers.append(int(frame.get("frame_number") or idx + 1))
+        except (TypeError, ValueError):
+            frame_numbers.append(idx + 1)
+    if frame_numbers:
+        return frame_numbers
+    try:
+        frame_count = int(episode_data.get("frame_count") or 4)
+    except (TypeError, ValueError):
+        frame_count = 4
+    frame_count = max(1, min(12, frame_count))
+    return list(range(1, frame_count + 1))
+
 def main():
     print("--- Facebook Multi-Photo Carousel Publisher ---")
     
@@ -104,18 +124,12 @@ def main():
     panels_dir = f"episode_{ep_num}_panels"
     if not os.path.exists(panels_dir):
         print(f"❌ Error: Panel folder '{panels_dir}' not found.")
-        print(f"Please create a folder named '{panels_dir}' and save your 4 generated panel images as:")
-        print("  - panel_1.png")
-        print("  - panel_2.png")
-        print("  - panel_3.png")
-        print("  - panel_4.png")
+        print(f"Please create a folder named '{panels_dir}' and save generated images as panel_1.png, panel_2.png, ...")
         return
         
     panel_files = [
-        os.path.join(panels_dir, "panel_1.png"),
-        os.path.join(panels_dir, "panel_2.png"),
-        os.path.join(panels_dir, "panel_3.png"),
-        os.path.join(panels_dir, "panel_4.png")
+        os.path.join(panels_dir, f"panel_{frame_number}.png")
+        for frame_number in get_episode_frame_numbers(episode_data)
     ]
     
     # Ensure all exist
@@ -134,7 +148,7 @@ def main():
             photo_id = upload_unpublished_photo(fb, pf)
             uploaded_ids.append(photo_id)
             
-        # Publish the feed post with all 4 photos attached
+        # Publish the feed post with all panels attached
         publish_carousel_post(fb, uploaded_ids, caption)
         
     except Exception as e:

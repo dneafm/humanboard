@@ -71,16 +71,42 @@ class VeniceHelper:
         width, height = self._resolve_size(aspect_ratio)
         size_str = f"{width}x{height}"
 
-        # Inject realism suffix into every prompt
-        full_prompt = prompt.rstrip() + REALISM_SUFFIX
+        # Conditionally inject realism suffix only if it's not a hand-drawn or illustration style
+        illustration_keywords = [
+            "cartoon", "illustration", "drawing", "doodle", "sketch", 
+            "comic", "anime", "line art", "black-and-white", "monochrome", 
+            "watercolor", "vector", "painting", "pixel art", "zine", "ink lines"
+        ]
+        is_illustration = any(kw in prompt.lower() for kw in illustration_keywords)
+        
+        if is_illustration:
+            raw_prompt = prompt.rstrip()
+        else:
+            raw_prompt = prompt.rstrip() + REALISM_SUFFIX
+
+        # Limit final prompt length to 1480 characters to satisfy surplusintelligence.ai 1500 limit
+        if len(raw_prompt) > 1480:
+            full_prompt = raw_prompt[:1477] + "..."
+        else:
+            full_prompt = raw_prompt
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
 
+        # Dynamically build fallback list starting with the configured model
+        configured_model = getattr(config, "VENICE_IMAGE_MODEL", "venice-flux-2-max")
+        models_to_try = [configured_model]
+        for m in IMAGE_MODELS:
+            if m not in models_to_try:
+                models_to_try.append(m)
+        for m in ["venice-recraft-v4", "venice-recraft-v4-pro", "venice-sd35"]:
+            if m not in models_to_try:
+                models_to_try.append(m)
+
         last_error = None
-        for model in IMAGE_MODELS:
+        for model in models_to_try:
             payload = {
                 "model": model,
                 "prompt": full_prompt,

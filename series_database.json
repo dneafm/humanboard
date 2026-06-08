@@ -4,19 +4,19 @@
   "series": [
     {
       "id": "active",
-      "name": "Cường Series",
-      "context": "Ancient Huế, Vietnam, with a gentle, serene, and slightly nostalgic atmosphere, featuring traditional architecture, tranquil rivers, lush greenery, and subtle modern elements, bathed in soft, warm daylight and cool shadows.",
-      "setting_context": "Ancient Huế, Vietnam, with a gentle, serene, and slightly nostalgic atmosphere, featuring traditional architecture, tranquil rivers, lush greenery, and subtle modern elements, bathed in soft, warm daylight and cool shadows.",
-      "protagonist_name": "Cường",
-      "protagonist_description": "Cường (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 28-year-old male, short neat black hair, clear dark eyes, wearing a clean but casual t-shirt and jeans, perhaps with a subtle tech-themed accessory like a smart watch or minimalist ring, calm demeanor)",
-      "master_style_suffix": "[, high-quality graphic novel illustration, comic book style, crisp ink outlines, clean cel-shading, vibrant color palette, Studio Ghibli inspired detailed background, hand-drawn digital art, highly stylized, masterfully composed, 8k resolution --ar 4:3]",
+      "name": "Me & My Imaginary Friend",
+      "context": "Philosophical conversations and everyday reflections between Me (a confused young adult) and Immy (his sketchy imaginary friend) in quiet, minimalist settings.",
+      "setting_context": "A quiet, slightly worn cafe with a few empty tables, a single potted plant in the corner, and soft, indirect lighting filtering through a large window, drawn with sparse detail.",
+      "protagonist_name": "Freaky",
+      "protagonist_description": "small freaky alien with bright green skin, oversized bald head, huge glossy black almond eyes, tiny unimpressed mouth, thin long neck, narrow stick-like body, awkward slouched posture, and rough hand-drawn doodle energy; always looks skeptical, emotionally exhausted, and a little rude",
+      "master_style_suffix": "[, characters fully framed with a 15% margin from borders, no cropping, top 25% empty white space for text, rough black-and-white indie comic, wobbly hand-drawn ink lines, minimal flat background, awkward deadpan expressions, imperfect anatomy, DIY zine texture, sparse composition, low-polish handmade panel art, no text, no speech bubbles, no dialogue boxes --ar 4:3]",
       "character_ids": [
-        "characters_cường",
-        "characters_thảo",
-        "characters_mai"
+        "characters_freaky",
+        "characters_otherself",
+        "characters_me"
       ],
       "asset_ids": [
-        "settings_bối_cảnh_chính"
+        "settings_cafe_yên_tĩnh"
       ],
       "episode_ids": [
         "episode_1",
@@ -26,237 +26,83 @@
         "episode_5",
         "episode_6"
       ],
-      "updated_at": "2026-05-27T10:12:52.286657+00:00"
+      "updated_at": "2026-06-05T09:14:52.637170+00:00"
     }
   ],
   "characters": [
     {
-      "id": "characters_cường",
+      "id": "characters_freaky",
       "series_id": "active",
       "category": "characters",
-      "name": "Cường",
-      "description": "Cường (a stylized graphic novel illustration, clean ink outlines, cel-shaded, 28-year-old male, short neat black hair, clear dark eyes, wearing a clean but casual t-shirt and jeans, perhaps with a subtle tech-themed accessory like a smart watch or minimalist ring, calm demeanor)",
+      "name": "Freaky",
+      "description": "small freaky alien with bright green skin, oversized bald head, huge glossy black almond eyes, tiny unimpressed mouth, thin long neck, narrow stick-like body, awkward slouched posture, and rough hand-drawn doodle energy; always looks skeptical, emotionally exhausted, and a little rude",
       "image_refs": [
         {
-          "path": "/cường_face.png",
+          "path": "/freaky_face_clean.png",
           "source": "input",
           "exists": true
-        },
-        {
-          "path": "/episode_1_panels/panel_1.png",
-          "source": "episode",
-          "exists": true,
-          "episode_number": 1,
-          "frame_number": 1
-        },
-        {
-          "path": "/episode_1_panels/panel_2.png",
-          "source": "episode",
-          "exists": true,
-          "episode_number": 1,
-          "frame_number": 2
-        },
-        {
-          "path": "/episode_1_panels/panel_3.png",
-          "source": "episode",
-          "exists": true,
-          "episode_number": 1,
-          "frame_number": 3
-        },
-        {
-          "path": "/episode_1_panels/panel_4.png",
-          "source": "episode",
-          "exists": true,
-          "episode_number": 1,
-          "frame_number": 4
-        },
-        {
-          "path": "/episode_2_panels/panel_1.png",
-          "source": "episode",
-          "exists": false,
-          "episode_number": 2,
-          "frame_number": 1
-        },
-        {
-          "path": "/episode_2_panels/panel_2.png",
-          "source": "episode",
-          "exists": false,
-          "episode_number": 2,
-          "frame_number": 2
-        },
-        {
-          "path": "/episode_2_panels/panel_3.png",
-          "source": "episode",
-          "exists": false,
-          "episode_number": 2,
-          "frame_number": 3
-        },
-        {
-          "path": "/episode_2_panels/panel_4.png",
-          "source": "episode",
-          "exists": false,
-          "episode_number": 2,
-          "frame_number": 4
-        },
-        {
-          "path": "/episode_3_panels/panel_1.png",
-          "source": "episode",
-          "exists": true,
-          "episode_number": 3,
-          "frame_number": 1
-        },
-        {
-          "path": "/episode_3_panels/panel_2.png",
-          "source": "episode",
-          "exists": true,
-          "episode_number": 3,
-          "frame_number": 2
-        },
-        {
-          "path": "/episode_3_panels/panel_3.png",
-          "source": "episode",
-          "exists": true,
-          "episode_number": 3,
-          "frame_number": 3
-        },
-        {
-          "path": "/episode_3_panels/panel_4.png",
-          "source": "episode",
-          "exists": true,
-          "episode_number": 3,
-          "frame_number": 4
         }
       ],
       "aliases": [
-        "Cường"
+        "Freaky"
       ],
-      "updated_at": "2026-05-27T10:12:52.287664+00:00"
+      "updated_at": "2026-06-05T09:14:52.637170+00:00"
     },
     {
-      "id": "characters_thảo",
+      "id": "characters_otherself",
       "series_id": "active",
       "category": "characters",
-      "name": "Thảo",
-      "description": "community manager",
+      "name": "otherself",
+      "description": "same visual with 'me' . doubting and judging, ask enlightening questions",
       "image_refs": [
         {
-          "path": "/thảo_face.png",
+          "path": "/otherself_face_clean.png",
           "source": "input",
           "exists": true
-        },
-        {
-          "path": "/episode_3_panels/panel_1.png",
-          "source": "episode",
-          "exists": true,
-          "episode_number": 3,
-          "frame_number": 1
-        },
-        {
-          "path": "/episode_3_panels/panel_2.png",
-          "source": "episode",
-          "exists": true,
-          "episode_number": 3,
-          "frame_number": 2
-        },
-        {
-          "path": "/episode_3_panels/panel_4.png",
-          "source": "episode",
-          "exists": true,
-          "episode_number": 3,
-          "frame_number": 4
-        },
-        {
-          "path": "/episode_6_panels/panel_2.png",
-          "source": "episode",
-          "exists": false,
-          "episode_number": 6,
-          "frame_number": 2
-        },
-        {
-          "path": "/episode_6_panels/panel_3.png",
-          "source": "episode",
-          "exists": false,
-          "episode_number": 6,
-          "frame_number": 3
-        },
-        {
-          "path": "/episode_6_panels/panel_4.png",
-          "source": "episode",
-          "exists": false,
-          "episode_number": 6,
-          "frame_number": 4
         }
       ],
       "aliases": [
-        "Thảo"
+        "otherself"
       ],
-      "updated_at": "2026-05-27T10:12:52.287664+00:00"
+      "updated_at": "2026-06-05T09:14:52.637170+00:00"
     },
     {
-      "id": "characters_mai",
+      "id": "characters_me",
       "series_id": "active",
       "category": "characters",
-      "name": "Mai",
-      "description": "admin",
+      "name": "me",
+      "description": "main character, has no expectation in life",
       "image_refs": [
         {
-          "path": "/mai_face.png",
+          "path": "/me_face_clean.png",
           "source": "input",
           "exists": true
-        },
-        {
-          "path": "/episode_6_panels/panel_1.png",
-          "source": "episode",
-          "exists": false,
-          "episode_number": 6,
-          "frame_number": 1
-        },
-        {
-          "path": "/episode_6_panels/panel_2.png",
-          "source": "episode",
-          "exists": false,
-          "episode_number": 6,
-          "frame_number": 2
-        },
-        {
-          "path": "/episode_6_panels/panel_3.png",
-          "source": "episode",
-          "exists": false,
-          "episode_number": 6,
-          "frame_number": 3
-        },
-        {
-          "path": "/episode_6_panels/panel_4.png",
-          "source": "episode",
-          "exists": false,
-          "episode_number": 6,
-          "frame_number": 4
         }
       ],
       "aliases": [
-        "Mai"
+        "me"
       ],
-      "updated_at": "2026-05-27T10:12:52.287664+00:00"
+      "updated_at": "2026-06-05T09:14:52.637170+00:00"
     }
   ],
   "assets": [
     {
-      "id": "settings_bối_cảnh_chính",
+      "id": "settings_cafe_yên_tĩnh",
       "series_id": "active",
       "category": "settings",
-      "name": "Bối Cảnh Chính",
-      "description": "Ancient Huế, Vietnam, with a gentle, serene, and slightly nostalgic atmosphere, featuring traditional architecture, tranquil rivers, lush greenery, and subtle modern elements, bathed in soft, warm daylight and cool shadows.",
+      "name": "Cafe yên tĩnh",
+      "description": "A quiet, slightly worn cafe with a few empty tables, a single potted plant in the corner, and soft, indirect lighting filtering through a large window, drawn with sparse detail.",
       "image_refs": [
         {
-          "path": "/bối_cảnh_chính_ref.png",
+          "path": "/cafe_yên_tĩnh_ref.png",
           "source": "input",
           "exists": false
         }
       ],
       "aliases": [
-        "Bối Cảnh Chính"
+        "Cafe yên tĩnh"
       ],
-      "updated_at": "2026-05-27T10:12:52.287664+00:00"
+      "updated_at": "2026-06-05T09:14:52.637170+00:00"
     }
   ],
   "episodes": [
@@ -355,12 +201,10 @@
           "image_exists": true
         }
       ],
-      "matched_asset_ids": [
-        "characters_cường"
-      ],
-      "mentions_primary_character": true,
+      "matched_asset_ids": [],
+      "mentions_primary_character": false,
       "created_at": "2026-05-27T07:55:30.570941+00:00",
-      "updated_at": "2026-05-27T10:12:52.289663+00:00"
+      "updated_at": "2026-06-05T09:14:52.639886+00:00"
     },
     {
       "id": "episode_2",
@@ -457,12 +301,10 @@
           "image_exists": false
         }
       ],
-      "matched_asset_ids": [
-        "characters_cường"
-      ],
-      "mentions_primary_character": true,
+      "matched_asset_ids": [],
+      "mentions_primary_character": false,
       "created_at": "2026-05-27T08:10:05.793290+00:00",
-      "updated_at": "2026-05-27T10:12:52.291133+00:00"
+      "updated_at": "2026-06-05T09:14:52.642094+00:00"
     },
     {
       "id": "episode_3",
@@ -559,13 +401,10 @@
           "image_exists": true
         }
       ],
-      "matched_asset_ids": [
-        "characters_cường",
-        "characters_thảo"
-      ],
-      "mentions_primary_character": true,
+      "matched_asset_ids": [],
+      "mentions_primary_character": false,
       "created_at": "2026-05-27T08:21:05.035645+00:00",
-      "updated_at": "2026-05-27T10:12:52.293139+00:00"
+      "updated_at": "2026-06-05T09:14:52.644187+00:00"
     },
     {
       "id": "episode_4",
@@ -662,12 +501,10 @@
           "image_exists": true
         }
       ],
-      "matched_asset_ids": [
-        "characters_thảo"
-      ],
+      "matched_asset_ids": [],
       "mentions_primary_character": false,
       "created_at": "2026-05-27T09:34:45.414244+00:00",
-      "updated_at": "2026-05-27T10:12:52.295510+00:00"
+      "updated_at": "2026-06-05T09:14:52.646203+00:00"
     },
     {
       "id": "episode_5",
@@ -799,13 +636,10 @@
           "image_exists": false
         }
       ],
-      "matched_asset_ids": [
-        "characters_thảo",
-        "characters_mai"
-      ],
+      "matched_asset_ids": [],
       "mentions_primary_character": false,
       "created_at": "2026-05-27T09:38:14.114851+00:00",
-      "updated_at": "2026-05-27T10:12:52.297729+00:00"
+      "updated_at": "2026-06-05T09:14:52.648608+00:00"
     },
     {
       "id": "episode_6",
@@ -830,7 +664,7 @@
             }
           ],
           "image_path": "/episode_6_panels/panel_1.png",
-          "image_exists": false
+          "image_exists": true
         },
         {
           "frame_number": 2,
@@ -845,7 +679,7 @@
             }
           ],
           "image_path": "/episode_6_panels/panel_2.png",
-          "image_exists": false
+          "image_exists": true
         },
         {
           "frame_number": 3,
@@ -865,7 +699,7 @@
             }
           ],
           "image_path": "/episode_6_panels/panel_3.png",
-          "image_exists": false
+          "image_exists": true
         },
         {
           "frame_number": 4,
@@ -880,18 +714,14 @@
             }
           ],
           "image_path": "/episode_6_panels/panel_4.png",
-          "image_exists": false
+          "image_exists": true
         }
       ],
-      "matched_asset_ids": [
-        "characters_cường",
-        "characters_thảo",
-        "characters_mai"
-      ],
-      "mentions_primary_character": true,
+      "matched_asset_ids": [],
+      "mentions_primary_character": false,
       "created_at": "2026-05-27T10:12:52.286658+00:00",
-      "updated_at": "2026-05-27T10:12:52.320356+00:00"
+      "updated_at": "2026-06-05T09:14:52.650628+00:00"
     }
   ],
-  "updated_at": "2026-05-27T10:12:52.320356+00:00"
+  "updated_at": "2026-06-05T09:14:52.650628+00:00"
 }

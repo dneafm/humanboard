@@ -1338,20 +1338,7 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-        .asset-delete-btn:hover { border-color: #ff5050; background: rgba(255,80,80,0.08); }
-        .asset-reclean-btn {
-            padding: 6px 10px;
-            border-radius: 6px;
-            border: 1px solid rgba(100, 220, 180, 0.35);
-            background: transparent;
-            color: #40c4a0;
-            font-size: 0.72rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            white-space: nowrap;
-        }
-        .asset-reclean-btn:hover { border-color: #40c4a0; background: rgba(64,196,160,0.08); }
-        .asset-reclean-btn:disabled { opacity: 0.45; cursor: progress; }
+        .asset-delete-btn:hover { background: rgba(255, 80, 80, 0.1); }
         .asset-card-add {
             border-style: dashed;
             align-items: center;
@@ -2187,12 +2174,7 @@
                 alert_delete_generic_failed: "Xóa thất bại:",
                 asset_desc_placeholder: "Mô tả ngoại hình / đặc điểm để đưa vào prompt ảnh...",
                 btn_save_asset: "💾 Lưu",
-                btn_saving_asset: "⏳ Đang lưu...",
-                btn_reclean_asset: "🧹",
-                btn_recleaning_asset: "⏳",
-                toast_reclean_title: "🧹 Đã làm sạch!",
-                toast_reclean_body: " đã được làm sạch văn bản/huy hiệu.",
-                alert_reclean_failed: "Làm sạch thất bại:"
+                btn_saving_asset: "⏳ Đang lưu..."
             },
             en: {
                 page_lang: "en",
@@ -2280,12 +2262,7 @@
                 alert_delete_generic_failed: "Delete failed:",
                 asset_desc_placeholder: "Describe visual traits / details to include in the image prompt...",
                 btn_save_asset: "💾 Save",
-                btn_saving_asset: "⏳ Saving...",
-                btn_reclean_asset: "🧹",
-                btn_recleaning_asset: "⏳",
-                toast_reclean_title: "🧹 Cleaned!",
-                toast_reclean_body: " reference image has been cleaned.",
-                alert_reclean_failed: "Re-clean failed:"
+                btn_saving_asset: "⏳ Saving..."
             }
         };
 
@@ -3323,7 +3300,6 @@
                 <textarea class="asset-desc-input" placeholder="${escHtml(currentUiText().asset_desc_placeholder)}" rows="3">${escHtml(asset.description)}</textarea>
                 <div class="asset-card-actions">
                     <button class="asset-save-btn">${escHtml(currentUiText().btn_save_asset)}</button>
-                    ${ !isNew && asset.has_image ? `<button class="asset-reclean-btn" title="Re-run Gemini cleaning pass on this reference image">🧹</button>` : '' }
                     ${ !isNew ? `<button class="asset-delete-btn">🗑</button>` : '' }
                 </div>
             `;
@@ -3331,12 +3307,6 @@
             // ── Save button
             const saveBtn = card.querySelector('.asset-save-btn');
             saveBtn.onclick = () => saveAsset(card, type, isNew ? null : asset.name);
-
-            // ── Re-clean button
-            const recleanBtn = card.querySelector('.asset-reclean-btn');
-            if (recleanBtn) {
-                recleanBtn.onclick = () => recleanAssetRef(card, type, asset.name, recleanBtn);
-            }
 
             // ── Delete button
             const delBtn = card.querySelector('.asset-delete-btn');
@@ -3430,41 +3400,6 @@
                 zone.dataset.imageBase64 = e.target.result;
             };
             reader.readAsDataURL(file);
-        }
-
-        async function recleanAssetRef(card, type, name, btn) {
-            const uiText = currentUiText();
-            const origLabel = btn.textContent;
-            btn.disabled = true;
-            btn.textContent = uiText.btn_recleaning_asset || '⏳';
-            try {
-                const res = await fetch('/api/assets/reclean', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ type, name })
-                });
-                const result = await res.json();
-                if (res.ok && result.success) {
-                    // Update the preview image immediately from the returned data URL
-                    const zone = card.querySelector('.asset-drop-zone');
-                    let img = zone.querySelector('img');
-                    if (!img) {
-                        img = document.createElement('img');
-                        img.alt = 'ref';
-                        zone.insertBefore(img, zone.firstChild);
-                    }
-                    img.src = result.image_data_url;
-                    showToast(uiText.toast_reclean_title || '🧹 Cleaned!',
-                              uiText.toast_reclean_body   || `${name} reference cleaned.`);
-                } else {
-                    alert((uiText.alert_reclean_failed || 'Re-clean failed:') + ' ' + (result.error || 'Unknown error'));
-                }
-            } catch(e) {
-                alert((uiText.alert_connection_prefix || 'Connection error: ') + e);
-            } finally {
-                btn.disabled = false;
-                btn.textContent = origLabel;
-            }
         }
 
         async function saveAsset(card, type, oldName) {
