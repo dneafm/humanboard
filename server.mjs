@@ -335,7 +335,8 @@ for row in cur.execute('select * from personal_questions order by id').fetchall(
 print(json.dumps({'ideas': ideas}))
 `;
 
-  const result = spawnSync('python', ['-c', py, AI_ERA_DB_PATH], {
+  const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+  const result = spawnSync(pythonCmd, ['-c', py, AI_ERA_DB_PATH], {
     encoding: 'utf-8',
     maxBuffer: 1024 * 1024 * 8,
   });
@@ -416,7 +417,17 @@ app.post('/api/snapshot', express.json({ limit: '25mb' }), async (req, res) => {
   }
 });
 
-app.get('/api/ai-era-kb', (_req, res) => {
+app.get('/api/ai-era-kb', (req, res) => {
+  const ownerId = process.env.HUMANBOARD_OWNER_ID;
+  if (ownerId) {
+    const userId = getRequestUserId(req);
+    const allowedOwners = ownerId.split(',').map(id => id.trim());
+    if (!userId || !allowedOwners.includes(userId)) {
+      res.status(403).json({ error: 'Forbidden: Access to AI Era KB is restricted to the owner.' });
+      return;
+    }
+  }
+
   try {
     res.json(runAiEraBridge());
   } catch (error) {

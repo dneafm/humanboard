@@ -50,4 +50,4 @@ jobs:
             --allow-unauthenticated \
             --add-volume=name=storage-volume,type=cloud-storage,bucket=${{ env.BUCKET_NAME }} \
             --add-volume-mount=volume=storage-volume,mount-path=/app/data \
-            --set-env-vars="GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},IMAGE_GENERATOR_BACKEND=recraft,AI_BASE_URL=https://www.surplusintelligence.ai/api/inference/v1,AI_API_KEY=inf_611fd062398a40d99965782390417b2a"
+            --set-env-vars="GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},IMAGE_GENERATOR_BACKEND=recraft,AI_BASE_URL=https://www.surplusintelligence.ai/api/inference/v1,AI_API_KEY=inf_611fd062398a40d99965782390417b2a,HUMANBOARD_OWNER_ID=SITMhQ5Y4kdgbh4v6PxfFWq1XJR2,CKFW7EfrIMR4nvWkhVrQUgpY35I3"
