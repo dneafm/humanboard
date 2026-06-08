@@ -1,29 +1,33 @@
-FROM python:3.11-slim
-
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app
-ENV PORT=8080
-
+# Stage 1: Build the Vite frontend
+FROM node:22-bookworm-slim AS builder
 WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY .env ./
+COPY src/ ./src
+COPY public/ ./public
+COPY index.html ./
+COPY tsconfig.json ./
+COPY vite.config.ts ./
+RUN npm run build:prod
 
-# Install system dependencies (e.g. build tools for any compiled dependencies if needed)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+# Stage 2: Production runtime environment
+FROM node:22-bookworm-slim
+# Install Python 3 (required by the SQLite python bridge)
+RUN apt-get update && apt-get install -y python3 && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+COPY --from=builder /app/dist ./dist
+COPY server.mjs ./
+COPY scripts/ ./scripts
+COPY ai_era_kb.sqlite3 ./ai_era_kb.sqlite3
 
-# Copy requirements and install
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+ENV PORT=8080
+ENV HUMANBOARD_PORT=8080
+ENV HUMANBOARD_HOST=0.0.0.0
+ENV AI_ERA_KB_PATH=/app/ai_era_kb.sqlite3
+ENV HUMANBOARD_USER_DATA_DIR=/app/data/users
 
-# Copy the rest of the application code
-COPY . .
-
-# Make entrypoint.sh executable
-RUN chmod +x entrypoint.sh
-
-# Expose port 8080 (app.py default)
 EXPOSE 8080
-
-# Execute entrypoint script
-CMD ["/app/entrypoint.sh"]
+CMD ["node", "server.mjs"]

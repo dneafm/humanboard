@@ -1,38 +1,28 @@
-# === SECRETS ===
-.env
-
-# === Python ===
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-*.egg-info/
-dist/
-build/
-venv/
-.venv/
-*.egg
-
-# === Episode data (large, user-specific) ===
-episode_*.json
-episode_*_panels/
-archive/
-series_config.json
-
-# === Reference face images (user-specific, large) ===
-*_face.png
-*_ref.png
-
-# === Test scripts & generated test output ===
-test_*.py
-test_*.png
-surplus_direct_test.png
-
-# === Misc ===
-*.log
-.DS_Store
-Thumbs.db
 node_modules/
-package-lock.json
-package.json
-sa-key.json
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Local/user data
+data/
+snapshot.json
+snapshot.json.bak
+corrupt-snapshots/
+__pycache__/
+*.pyc
+
+# Local verification / scratch
+tmp-*.mjs
+restart-*.cmd
+vite.log
+vite.err.log
+humanboard-ui.out.log
+humanboard-ui.err.log
+humanboard-mcp.out.log
+humanboard-mcp.err.log
+.tmp-chrome-humanboard/
+tools/
