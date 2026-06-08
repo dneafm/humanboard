@@ -16,14 +16,12 @@ jobs:
     name: Build and Deploy
     runs-on: ubuntu-latest
     permissions:
-      contents: 'write'
+      contents: 'read'
       id-token: 'write'
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -40,20 +38,8 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
-          docker build -t us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/humanboard/app:latest . > docker_build.log 2>&1
-          docker push us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/humanboard/app:latest >> docker_build.log 2>&1
-
-      - name: Push Docker Build Log to Branch
-        if: always()
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout --orphan ci-logs
-          git rm -rf . --ignore-unmatch
-          cp docker_build.log last_build.log
-          git add last_build.log
-          git commit -m "ci: update docker build log" || echo "No changes"
-          git push origin ci-logs --force
+          docker build -t us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/humanboard/app:latest .
+          docker push us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/humanboard/app:latest
 
       - name: Deploy to Cloud Run
         run: |
