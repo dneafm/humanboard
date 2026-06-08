@@ -569,7 +569,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 md:bottom-6 md:right-6 w-12 h-12 bg-stone-900 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-stone-800 transition-transform hover:scale-105 z-50"
+        className="fixed bottom-4 right-4 md:bottom-6 md:right-6 w-12 h-12 bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 rounded-full flex items-center justify-center shadow-lg hover:bg-stone-800 dark:hover:bg-stone-200 transition-transform hover:scale-105 z-50"
       >
         <Bot className="w-5 h-5" />
       </button>
@@ -579,27 +579,27 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
   return (
     <div 
       className={cn(
-        "fixed z-50 bg-white border border-stone-200 shadow-2xl flex flex-col transition-all duration-300 ease-in-out overflow-hidden bottom-3 right-3 left-3 max-w-[calc(100vw-1.5rem)] md:left-auto md:bottom-6 md:right-6",
+        "fixed z-50 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 shadow-2xl flex flex-col transition-all duration-300 ease-in-out overflow-hidden bottom-3 right-3 left-3 max-w-[calc(100vw-1.5rem)] md:left-auto md:bottom-6 md:right-6",
         isExpanded
           ? "h-[85vh] md:w-[600px] md:h-[800px] rounded-xl"
           : "w-full h-[70vh] md:w-[380px] md:h-[600px] rounded-2xl"
       )}
     >
-      <div className="flex items-center justify-between p-4 border-b border-stone-100 bg-stone-50/50">
-        <div className="flex flex-col gap-1 text-stone-800 font-medium text-sm">
+      <div className="flex items-center justify-between p-4 border-b border-stone-100 dark:border-stone-800 bg-stone-50/50 dark:bg-stone-950/50">
+        <div className="flex flex-col gap-1 text-stone-800 dark:text-stone-200 font-medium text-sm">
           <div className="flex items-center gap-2">
-            <Bot className="w-4 h-4 text-blue-600" />
+            <Bot className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             HumanBoard Assistant
           </div>
-          <div className="text-[11px] text-stone-500">
+          <div className="text-[11px] text-stone-500 dark:text-stone-400">
             AI: {runtime.model} · {runtime.local ? 'local runtime' : runtime.baseUrl}
           </div>
         </div>
-        <div className="flex items-center gap-1 text-stone-400">
-          <button onClick={() => setIsExpanded(!isExpanded)} className="p-1.5 hover:bg-stone-200 rounded-md transition-colors">
+        <div className="flex items-center gap-1 text-stone-400 dark:text-stone-500">
+          <button onClick={() => setIsExpanded(!isExpanded)} className="p-1.5 hover:bg-stone-200 dark:hover:bg-stone-800 rounded-md transition-colors">
             {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
-          <button onClick={() => setIsOpen(false)} className="p-1.5 hover:bg-stone-200 rounded-md transition-colors">
+          <button onClick={() => setIsOpen(false)} className="p-1.5 hover:bg-stone-200 dark:hover:bg-stone-800 rounded-md transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -611,8 +611,8 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
             <div className={cn(
               "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
               msg.role === 'user' 
-                ? "bg-stone-900 text-white rounded-br-sm" 
-                : "bg-stone-100 text-stone-800 rounded-bl-sm prose prose-sm prose-stone"
+                ? "bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 rounded-br-sm font-medium" 
+                : "bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-200 rounded-bl-sm prose prose-sm prose-stone dark:prose-invert"
             )}>
               {msg.role === 'user' ? (
                 msg.content
@@ -624,7 +624,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
                       type="button"
                       onClick={() => handleSaveMessage(msg)}
                       disabled={savedMessageIds.includes(msg.id)}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-500 transition-colors hover:border-stone-400 hover:text-stone-800 disabled:cursor-default disabled:opacity-70"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-500 dark:text-stone-400 transition-colors hover:border-stone-400 dark:hover:border-stone-500 hover:text-stone-800 dark:hover:text-stone-200 disabled:cursor-default disabled:opacity-70"
                     >
                       {savedMessageIds.includes(msg.id) ? (
                         <>
@@ -646,20 +646,20 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
         ))}
         {(isLoading || isAnalyzingImage) && (
           <div className="flex justify-start">
-            <div className="bg-stone-100 text-stone-500 rounded-2xl rounded-bl-sm px-4 py-3 text-sm flex items-center gap-2">
-              <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce" />
-              <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-              <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+            <div className="bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 rounded-2xl rounded-bl-sm px-4 py-3 text-sm flex items-center gap-2">
+              <div className="w-1.5 h-1.5 bg-stone-400 dark:bg-stone-500 rounded-full animate-bounce" />
+              <div className="w-1.5 h-1.5 bg-stone-400 dark:bg-stone-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+              <div className="w-1.5 h-1.5 bg-stone-400 dark:bg-stone-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
             </div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 border-t border-stone-100 bg-white">
+      <div className="p-4 border-t border-stone-100 dark:border-stone-800 bg-white dark:bg-stone-900">
         {pendingImagePreview && (
           <div className="mb-3 flex items-end gap-2">
-            <div className="relative h-20 w-20 overflow-hidden rounded-md border border-stone-200 bg-stone-50">
+            <div className="relative h-20 w-20 overflow-hidden rounded-md border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950">
               <img src={pendingImagePreview} alt="Pending chat attachment" className="h-full w-full object-cover" />
               <button
                 type="button"
@@ -670,12 +670,12 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
                 <X className="h-3 w-3" />
               </button>
             </div>
-            <span className="truncate text-xs text-stone-500">{pendingImage?.name}</span>
+            <span className="truncate text-xs text-stone-500 dark:text-stone-400">{pendingImage?.name}</span>
           </div>
         )}
         <form onSubmit={handleSubmit} className="flex items-center gap-2">
           <label
-            className="shrink-0 cursor-pointer rounded-full border border-stone-200 bg-stone-50 p-3 text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900"
+            className="shrink-0 cursor-pointer rounded-full border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 p-3 text-stone-600 dark:text-stone-400 transition-colors hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-stone-200"
             title="Create note from image"
           >
             {isAnalyzingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
@@ -705,13 +705,13 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
               autoCapitalize="sentences"
               autoCorrect="on"
               spellCheck
-              className="w-full bg-stone-50 border border-stone-200 rounded-full py-3 pl-4 pr-12 text-sm text-stone-900 caret-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900/10 focus:border-stone-400"
-              style={{ WebkitTextFillColor: '#1c1917' }}
+              className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-full py-3 pl-4 pr-12 text-sm text-stone-900 dark:text-stone-100 caret-stone-900 dark:caret-stone-100 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900/10 dark:focus:ring-white/10 focus:border-stone-400 dark:focus:border-stone-600"
+              style={{ WebkitTextFillColor: 'currentColor' }}
             />
             <button
               type="submit"
               disabled={(!input.trim() && !pendingImage) || isLoading || isAnalyzingImage}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2 bg-stone-900 text-white rounded-full hover:bg-stone-800 disabled:opacity-50 transition-colors"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2 bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 rounded-full hover:bg-stone-800 dark:hover:bg-stone-200 disabled:opacity-50 transition-colors"
             >
               <Send className="w-3.5 h-3.5" />
             </button>
