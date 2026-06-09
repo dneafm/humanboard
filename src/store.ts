@@ -1130,7 +1130,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   }),
 }));
 
-void localSnapshotRepository.load().then((snapshot) => {
+export async function hydrateAppStoreFromRepository() {
+  const snapshot = await localSnapshotRepository.load();
   const hydratedSnapshot: AppSnapshot = {
     ...snapshot,
     notes: snapshot.notes.map((note) => ({ ...note, layer: 'raw' as const })),
@@ -1140,7 +1141,7 @@ void localSnapshotRepository.load().then((snapshot) => {
       snapshot.notes.map((note) => ({ ...note, layer: 'raw' as const })),
     ),
     sections: snapshot.sections.length ? snapshot.sections : defaultSections,
-    capabilityBets: snapshot.capabilityBets?.length
+    capabilityBets: Array.isArray(snapshot.capabilityBets)
       ? snapshot.capabilityBets.map((bet) => normalizeCapabilityBet({
         title: bet.title,
         thesis: bet.thesis,
@@ -1155,8 +1156,10 @@ void localSnapshotRepository.load().then((snapshot) => {
         archivedAt: bet.archivedAt,
       }, bet))
       : initialCapabilityBets,
-    signalEvents: snapshot.signalEvents ?? [],
-    capabilityTimelineEvents: snapshot.capabilityTimelineEvents ?? initialCapabilityTimelineEvents,
+    signalEvents: Array.isArray(snapshot.signalEvents) ? snapshot.signalEvents : [],
+    capabilityTimelineEvents: Array.isArray(snapshot.capabilityTimelineEvents)
+      ? snapshot.capabilityTimelineEvents
+      : initialCapabilityTimelineEvents,
   };
 
   const derived = deriveCapabilityBetFields(
@@ -1184,6 +1187,4 @@ void localSnapshotRepository.load().then((snapshot) => {
     capabilityTimelineEvents: finalSnapshot.capabilityTimelineEvents,
     isDarkMode: finalSnapshot.isDarkMode,
   });
-
-  persistSnapshot(finalSnapshot);
-});
+}

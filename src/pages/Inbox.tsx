@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAppStore, type CapabilityBet, type EvidencePolarity, type IdeaType, type Note, type SignalAssessment } from '../store';
 import { formatDistanceToNow } from 'date-fns';
-import { Plus, Archive, Lightbulb, Scale, Sparkles, Check, X } from 'lucide-react';
+import { Plus, Archive, Lightbulb, Scale, Sparkles, Check, X, ImagePlus, Loader2 } from 'lucide-react';
 import { compileRawNoteToKnowledge, extractCapabilityEvidenceReview } from '../lib/ai';
 import { Link, useSearchParams } from 'react-router-dom';
 import ExtractionReviewPanel from '../components/capability/ExtractionReviewPanel';
+import { createNoteFromImage, getClipboardImage } from '../lib/imageNote';
 
 type CompileDraft = {
   noteId: string;
@@ -172,6 +173,10 @@ export default function InboxPage() {
   const [selectedSectionId, setSelectedSectionId] = useState<string>('');
   const [compilingNoteId, setCompilingNoteId] = useState<string | null>(null);
   const [compileError, setCompileError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewingNoteId, setReviewingNoteId] = useState<string | null>(null);
   const [expandedExtractionNoteId, setExpandedExtractionNoteId] = useState<string | null>(null);
@@ -195,8 +200,38 @@ export default function InboxPage() {
     }
   }, [focusNoteId, notes.length]);
 
-  const handleAdd = (e: React.FormEvent) => {
+  useEffect(() => () => {
+    if (pendingImagePreview) URL.revokeObjectURL(pendingImagePreview);
+  }, [pendingImagePreview]);
+
+  const clearPendingImage = () => {
+    setPendingImage(null);
+    setPendingImagePreview(null);
+  };
+
+  const stageImage = (file?: File) => {
+    if (!file || isAnalyzingImage || !file.type.startsWith('image/')) return;
+    setImageError(null);
+    setPendingImage(file);
+    setPendingImagePreview(URL.createObjectURL(file));
+  };
+
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (pendingImage) {
+      setImageError(null);
+      setIsAnalyzingImage(true);
+      try {
+        addNote(await createNoteFromImage(pendingImage, newNote));
+        setNewNote('');
+        clearPendingImage();
+      } catch (error) {
+        setImageError(error instanceof Error ? error.message : 'HumanBoard could not create a note from that image.');
+      } finally {
+        setIsAnalyzingImage(false);
+      }
+      return;
+    }
     if (!newNote.trim()) return;
     addNote(newNote);
     setNewNote('');
@@ -467,28 +502,71 @@ export default function InboxPage() {
 
       <form onSubmit={handleAdd} className="mb-12">
         <div className="relative group">
+          {pendingImagePreview && (
+            <div className="absolute left-4 top-4 z-10">
+              <div className="relative h-20 w-20 overflow-hidden rounded-md border border-stone-300 bg-white shadow-sm dark:border-stone-700 dark:bg-stone-900">
+                <img src={pendingImagePreview} alt="Pending note attachment" className="h-full w-full object-cover" />
+                <button
+                  type="button"
+                  onClick={clearPendingImage}
+                  className="absolute right-1 top-1 rounded-full bg-stone-950/80 p-1 text-white hover:bg-stone-950"
+                  aria-label="Remove image"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          )}
           <textarea
             value={newNote}
             onChange={(e) => setNewNote(e.target.value)}
+            onPaste={(event) => {
+              const image = getClipboardImage(event.clipboardData);
+              if (!image) return;
+              event.preventDefault();
+              stageImage(image);
+            }}
             placeholder="What's on your mind?"
-            className="w-full bg-stone-50 dark:bg-stone-900/50 border border-stone-200 dark:border-stone-800 rounded-xl p-6 pr-14 text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-600 focus:outline-none focus:ring-4 focus:ring-stone-900/5 dark:focus:ring-stone-100/5 focus:border-stone-400 dark:focus:border-stone-700 transition-all resize-none min-h-[160px] text-lg leading-relaxed shadow-sm group-hover:shadow-md"
+            className={`w-full bg-stone-50 dark:bg-stone-900/50 border border-stone-200 dark:border-stone-800 rounded-xl p-6 pr-14 text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-600 focus:outline-none focus:ring-4 focus:ring-stone-900/5 dark:focus:ring-stone-100/5 focus:border-stone-400 dark:focus:border-stone-700 transition-all resize-none min-h-[160px] text-lg leading-relaxed shadow-sm group-hover:shadow-md ${pendingImagePreview ? 'pt-28' : ''}`}
             onKeyDown={(e) => {
+              if (pendingImage && e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                void handleAdd(e);
+                return;
+              }
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                handleAdd(e);
+                void handleAdd(e);
               }
             }}
           />
-          <div className="absolute bottom-4 right-4 flex items-center gap-3">
+          <div className="absolute bottom-4 right-4 flex items-center gap-2">
             <span className="text-[10px] font-medium text-stone-400 dark:text-stone-600 tracking-widest hidden sm:inline-block uppercase">⌘+Enter</span>
+            <label
+              className="cursor-pointer rounded-lg border border-stone-200 bg-white p-2.5 text-stone-600 shadow-sm transition-all hover:bg-stone-100 hover:text-stone-900 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800"
+              title="Create note from image"
+            >
+              {isAnalyzingImage ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                disabled={isAnalyzingImage}
+                onChange={(event) => {
+                  stageImage(event.target.files?.[0]);
+                  event.currentTarget.value = '';
+                }}
+              />
+            </label>
             <button
               type="submit"
-              disabled={!newNote.trim()}
+              disabled={(!newNote.trim() && !pendingImage) || isAnalyzingImage}
               className="p-2.5 bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 rounded-lg hover:scale-105 active:scale-95 disabled:opacity-30 disabled:scale-100 disabled:cursor-not-allowed transition-all shadow-lg shadow-stone-900/10 dark:shadow-stone-100/10"
             >
               <Plus className="w-5 h-5" />
             </button>
           </div>
         </div>
+        {imageError && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{imageError}</p>}
       </form>
 
       <div className="flex-1 overflow-y-auto pr-2 -mr-2 scrollbar-hide">

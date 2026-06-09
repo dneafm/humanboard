@@ -2,10 +2,36 @@ PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS notes (
   id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL DEFAULT '',
   title TEXT,
   content TEXT NOT NULL,
   source_type TEXT NOT NULL DEFAULT 'manual',
   status TEXT NOT NULL DEFAULT 'inbox',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  archived_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS capability_bets (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL DEFAULT '',
+  title TEXT NOT NULL,
+  thesis TEXT NOT NULL,
+  baseline_conviction INTEGER NOT NULL DEFAULT 50,
+  status TEXT NOT NULL DEFAULT 'watching',
+  conviction INTEGER NOT NULL DEFAULT 50,
+  threshold_to_commit INTEGER NOT NULL DEFAULT 80,
+  salience INTEGER NOT NULL DEFAULT 35,
+  keywords_json TEXT NOT NULL DEFAULT '[]',
+  supporting_signal_ids_json TEXT NOT NULL DEFAULT '[]',
+  contradicting_signal_ids_json TEXT NOT NULL DEFAULT '[]',
+  complicating_signal_ids_json TEXT NOT NULL DEFAULT '[]',
+  last_reviewed_at TEXT NOT NULL,
+  unlock_paths_json TEXT NOT NULL DEFAULT '[]',
+  first_use_cases_json TEXT NOT NULL DEFAULT '[]',
+  cost_of_not_knowing TEXT,
+  review_cadence TEXT,
+  strategic_note TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   archived_at TEXT
@@ -128,6 +154,8 @@ CREATE TABLE IF NOT EXISTS ai_runs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ideas_stage ON ideas(stage);
+CREATE INDEX IF NOT EXISTS idx_notes_user_id ON notes(user_id);
+CREATE INDEX IF NOT EXISTS idx_capability_bets_user_id ON capability_bets(user_id);
 CREATE INDEX IF NOT EXISTS idx_ideas_last_reviewed ON ideas(last_reviewed_at);
 CREATE INDEX IF NOT EXISTS idx_goals_status ON goals(status);
 CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);

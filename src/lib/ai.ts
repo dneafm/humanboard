@@ -1,4 +1,5 @@
 import type { CapabilityBet, EvidencePolarity, Idea } from '../store';
+import { apiUrl, buildApiHeaders } from './apiClient';
 
 type RuntimeConfig = {
   baseUrl: string;
@@ -14,7 +15,7 @@ function readEnv(key: string, fallback = '') {
 }
 
 function getRuntimeConfig(): RuntimeConfig {
-  const baseUrl = readEnv('AI_BASE_URL', readEnv('GEMMA_BASE_URL', '/api/gemma')).replace(/\/+$/, '');
+  const baseUrl = readEnv('AI_BASE_URL', readEnv('GEMMA_BASE_URL', apiUrl('/api/gemma'))).replace(/\/+$/, '');
   const model = readEnv('AI_MODEL', readEnv('GEMMA_MODEL', 'gemma4:latest'));
   const apiKey = readEnv('GEMMA_API_KEY', 'not-required');
   return { baseUrl, model, apiKey };
@@ -197,14 +198,18 @@ async function callGemma(prompt: string, systemInstruction: string) {
     throw buildRuntimeError('AI runtime is not configured.');
   }
 
+  const requestHeaders = runtime.chatCompletionsUrl.startsWith(apiUrl('/api/'))
+    ? buildApiHeaders({ 'Content-Type': 'application/json' })
+    : {
+        'Content-Type': 'application/json',
+        ...(runtime.apiKey ? { Authorization: `Bearer ${runtime.apiKey}` } : {}),
+      };
+
   let response: Response;
   try {
     response = await fetch(runtime.chatCompletionsUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(runtime.apiKey ? { Authorization: `Bearer ${runtime.apiKey}` } : {}),
-      },
+      headers: requestHeaders,
       body: JSON.stringify({
         model: runtime.model,
         temperature: 0.4,
@@ -255,6 +260,64 @@ export async function askGemma(prompt: string, systemInstruction?: string) {
     prompt,
     systemInstruction || buildMemoryShapedSystemInstruction()
   );
+}
+
+export async function analyzeImageToNote(imageDataUrl: string, fileName: string, userContext = '') {
+  const runtime = getRuntimeConfig();
+  const imageModel = readEnv('IMAGE_ANALYSIS_MODEL', 'gpt-4o-mini');
+  const endpoint = `${runtime.baseUrl}/chat/completions`;
+  const requestHeaders = endpoint.startsWith(apiUrl('/api/'))
+    ? buildApiHeaders({ 'Content-Type': 'application/json' })
+    : {
+        'Content-Type': 'application/json',
+        ...(runtime.apiKey ? { Authorization: `Bearer ${runtime.apiKey}` } : {}),
+      };
+
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: requestHeaders,
+      body: JSON.stringify({
+        model: imageModel,
+        temperature: 0.2,
+        messages: [
+          {
+            role: 'system',
+            content: `Turn an uploaded image into one durable HumanBoard inbox note.
+
+Return plain text only. Include a concise descriptive title on the first line, all useful visible text, the image's meaning or actionable insight, and uncertainty when something is unclear. Preserve important numbers and names. Do not use markdown fences.`,
+          },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Create an inbox note from this image. Original file name: ${fileName}.${userContext.trim() ? ` User context: ${userContext.trim()}` : ''}`,
+              },
+              { type: 'image_url', image_url: { url: imageDataUrl } },
+            ],
+          },
+        ],
+      }),
+    });
+  } catch (error) {
+    throw buildRuntimeError('Could not reach the image-analysis runtime.', error instanceof Error ? error.message : String(error));
+  }
+
+  if (!response.ok) {
+    throw buildRuntimeError(`Image analysis failed with HTTP ${response.status}.`, await response.text());
+  }
+
+  const payload = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+    error?: { message?: string };
+  };
+  const content = payload.choices?.[0]?.message?.content?.trim();
+  if (payload.error?.message || !content) {
+    throw buildRuntimeError('Image analysis returned no usable note.', payload.error?.message);
+  }
+  return content;
 }
 
 export async function extractCapabilityEvidenceReview(input: {

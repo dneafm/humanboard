@@ -3,8 +3,9 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs/promises';
 import { copyFileSync, existsSync, mkdirSync } from 'fs';
-import { spawnSync } from 'child_process';
+import { execFileSync, spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import { applyAiCostRecord, calculateAiCost, createEmptyAiCostState, roundUsd, toFiniteNumber } from './server/aiCostTracker.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,9 +13,9 @@ const __dirname = path.dirname(__filename);
 const PORT = Number(process.env.PORT || process.env.HUMANBOARD_PORT || 3001);
 const HOST = process.env.HUMANBOARD_HOST || '0.0.0.0';
 const DIST_DIR = path.join(__dirname, 'dist');
-const SNAPSHOT_PATH = path.resolve(process.env.HUMANBOARD_SNAPSHOT_PATH || path.join(__dirname, 'snapshot.json'));
-const SNAPSHOT_BACKUP_PATH = `${SNAPSHOT_PATH}.bak`;
-const CORRUPT_SNAPSHOT_DIR = path.join(path.dirname(SNAPSHOT_PATH), 'corrupt-snapshots');
+const PACKAGE_JSON_PATH = path.join(__dirname, 'package.json');
+const LEGACY_SNAPSHOT_PATH = path.resolve(process.env.HUMANBOARD_SNAPSHOT_PATH || path.join(__dirname, 'snapshot.json'));
+const USER_DATA_DIR = path.resolve(process.env.HUMANBOARD_USER_DATA_DIR || path.join(__dirname, 'data', 'users'));
 const AI_ERA_DB_PATH = process.env.AI_ERA_KB_PATH || 'F:/backtest/ai-era-kb/ai_era_kb.sqlite3';
 const AI_BASE_URL = String(process.env.AI_BASE_URL || process.env.GEMMA_BASE_URL || 'http://127.0.0.1:11434/v1').replace(/\/+$/, '');
 const AI_API_KEY = String(process.env.AI_API_KEY || process.env.GEMMA_API_KEY || '').trim();
@@ -55,9 +56,88 @@ const DEFAULT_SNAPSHOT = {
   isDarkMode: false,
 };
 
+let appVersion = '0.0.0';
+try {
+  const packageJson = JSON.parse(await fs.readFile(PACKAGE_JSON_PATH, 'utf-8'));
+  appVersion = String(packageJson.version || '0.0.0');
+} catch (error) {
+  console.warn('[humanboard] failed to read package.json version:', error);
+}
+
+const GITHUB_REPO = process.env.HUMANBOARD_GITHUB_REPO || 'dneafm/humanboard';
+const AI_PRICING_CACHE_TTL_MS = 1000 * 60 * 10;
+const EVENT_LOG_LIMIT = 200;
+
+let aiPricingCache = {
+  fetchedAt: 0,
+  models: new Map(),
+};
+
+const runtimeEvents = [];
+
+function pushRuntimeEvent(level, type, message, meta = {}) {
+  runtimeEvents.unshift({
+    id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    at: new Date().toISOString(),
+    level,
+    type,
+    message,
+    meta,
+  });
+  if (runtimeEvents.length > EVENT_LOG_LIMIT) {
+    runtimeEvents.length = EVENT_LOG_LIMIT;
+  }
+}
+
+function normalizeVersionTag(value) {
+  return String(value || '')
+    .trim()
+    .replace(/^refs\/tags\//, '')
+    .replace(/^v/i, '');
+}
+
+function compareVersions(a, b) {
+  const parse = (value) => normalizeVersionTag(value).split(/[^0-9]+/).filter(Boolean).map(Number);
+  const left = parse(a);
+  const right = parse(b);
+  const length = Math.max(left.length, right.length);
+  for (let i = 0; i < length; i += 1) {
+    const l = left[i] ?? 0;
+    const r = right[i] ?? 0;
+    if (l > r) return 1;
+    if (l < r) return -1;
+  }
+  return 0;
+}
+
+function resolveGithubLatestVersion() {
+  try {
+    const releaseRaw = execFileSync('git', ['ls-remote', '--tags', '--refs', `https://github.com/${GITHUB_REPO}.git`], {
+      encoding: 'utf-8',
+      timeout: 15000,
+      maxBuffer: 1024 * 1024,
+    });
+    const tags = releaseRaw
+      .split(/\r?\n/)
+      .map((line) => line.trim().split(/\s+/)[1])
+      .filter(Boolean)
+      .map((ref) => ref.replace(/^refs\/tags\//, ''));
+
+    if (!tags.length) {
+      return null;
+    }
+
+    return tags.sort((a, b) => compareVersions(b, a))[0] ?? null;
+  } catch (error) {
+    console.warn('[humanboard] failed to resolve latest GitHub tag:', error);
+    return null;
+  }
+}
+
 function cloneDefaultSnapshot() {
   return JSON.parse(JSON.stringify(DEFAULT_SNAPSHOT));
 }
+
 
 function normalizeSnapshot(raw = {}) {
   const snapshot = {
@@ -75,8 +155,79 @@ function normalizeSnapshot(raw = {}) {
   snapshot.signalEvents = Array.isArray(snapshot.signalEvents) ? snapshot.signalEvents : [];
   snapshot.capabilityTimelineEvents = Array.isArray(snapshot.capabilityTimelineEvents) ? snapshot.capabilityTimelineEvents : [];
   snapshot.isDarkMode = Boolean(snapshot.isDarkMode);
+  snapshot.aiCostTracking = snapshot.aiCostTracking && typeof snapshot.aiCostTracking === 'object'
+    ? {
+        totals: {
+          requests: toFiniteNumber(snapshot.aiCostTracking?.totals?.requests, 0),
+          promptTokens: toFiniteNumber(snapshot.aiCostTracking?.totals?.promptTokens, 0),
+          completionTokens: toFiniteNumber(snapshot.aiCostTracking?.totals?.completionTokens, 0),
+          totalTokens: toFiniteNumber(snapshot.aiCostTracking?.totals?.totalTokens, 0),
+          estimatedUsd: roundUsd(snapshot.aiCostTracking?.totals?.estimatedUsd ?? 0),
+        },
+        byModel: snapshot.aiCostTracking?.byModel && typeof snapshot.aiCostTracking.byModel === 'object'
+          ? snapshot.aiCostTracking.byModel
+          : {},
+        recent: Array.isArray(snapshot.aiCostTracking?.recent) ? snapshot.aiCostTracking.recent.slice(0, 100) : [],
+      }
+    : createEmptyAiCostState();
 
   return snapshot;
+}
+
+async function getAiModelPricingMap() {
+  const now = Date.now();
+  if (aiPricingCache.fetchedAt && now - aiPricingCache.fetchedAt < AI_PRICING_CACHE_TTL_MS && aiPricingCache.models.size) {
+    return aiPricingCache.models;
+  }
+
+  const headers = new Headers({ accept: 'application/json' });
+  if (AI_API_KEY) headers.set('authorization', `Bearer ${AI_API_KEY}`);
+
+  const response = await fetch(`${AI_BASE_URL}/models`, { headers });
+  if (!response.ok) {
+    throw new Error(`pricing lookup failed with HTTP ${response.status}`);
+  }
+
+  const payload = await response.json();
+  const models = new Map();
+  for (const model of Array.isArray(payload?.data) ? payload.data : []) {
+    models.set(String(model.id || ''), {
+      prompt: toFiniteNumber(model?.pricing?.prompt, 0),
+      completion: toFiniteNumber(model?.pricing?.completion, 0),
+      inputCacheRead: toFiniteNumber(model?.pricing?.input_cache_read, 0),
+      inputCacheWrite: toFiniteNumber(model?.pricing?.input_cache_write, 0),
+    });
+  }
+
+  aiPricingCache = { fetchedAt: now, models };
+  return models;
+}
+
+async function recordAiChatCost(userId, requestMeta, responsePayload) {
+  const modelId = String(responsePayload?.model || requestMeta?.model || '').trim();
+  const usage = responsePayload?.usage;
+  if (!userId || !modelId || !usage) return null;
+
+  const pricingMap = await getAiModelPricingMap();
+  const pricing = pricingMap.get(modelId);
+  if (!pricing) return null;
+
+  const { promptTokens, completionTokens, totalTokens, estimatedUsd } = calculateAiCost(pricing, usage);
+
+  const snapshot = await loadSnapshotSafe(userId);
+  snapshot.aiCostTracking = applyAiCostRecord(snapshot.aiCostTracking || createEmptyAiCostState(), {
+    at: new Date().toISOString(),
+    requestId: requestMeta.requestId,
+    path: requestMeta.path,
+    modelId,
+    promptTokens,
+    completionTokens,
+    totalTokens,
+    estimatedUsd,
+  });
+  await saveSnapshot(userId, snapshot);
+
+  return { modelId, promptTokens, completionTokens, totalTokens, estimatedUsd };
 }
 
 function validateSnapshotCandidate(candidate) {
@@ -86,26 +237,68 @@ function validateSnapshotCandidate(candidate) {
   return normalizeSnapshot(candidate);
 }
 
-async function archiveCorruptSnapshot(reason) {
-  if (!existsSync(SNAPSHOT_PATH)) {
+function getRequestUserId(req) {
+  const raw = req.headers['x-user-id'];
+  const userId = Array.isArray(raw) ? raw[0] : raw;
+  const normalized = String(userId || '').trim();
+
+  if (!normalized) {
     return null;
   }
 
-  mkdirSync(CORRUPT_SNAPSHOT_DIR, { recursive: true });
+  return normalized;
+}
+
+function sanitizeUserIdForPath(userId) {
+  return userId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 128);
+}
+
+function getUserSnapshotPaths(userId) {
+  const safeUserId = sanitizeUserIdForPath(userId);
+  const userDir = path.join(USER_DATA_DIR, safeUserId);
+  const snapshotPath = path.join(userDir, 'snapshot.json');
+
+  return {
+    userDir,
+    snapshotPath,
+    snapshotBackupPath: `${snapshotPath}.bak`,
+    corruptSnapshotDir: path.join(userDir, 'corrupt-snapshots'),
+  };
+}
+
+function requireUserId(req, res) {
+  const userId = getRequestUserId(req);
+
+  if (!userId) {
+    res.status(400).json({ error: 'Missing Header: X-User-ID' });
+    return null;
+  }
+
+  return userId;
+}
+
+async function archiveCorruptSnapshot(paths, reason) {
+  if (!existsSync(paths.snapshotPath)) {
+    return null;
+  }
+
+  mkdirSync(paths.corruptSnapshotDir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const archivePath = path.join(CORRUPT_SNAPSHOT_DIR, `snapshot-${stamp}-${reason}.json`);
-  copyFileSync(SNAPSHOT_PATH, archivePath);
+  const archivePath = path.join(paths.corruptSnapshotDir, `snapshot-${stamp}-${reason}.json`);
+  copyFileSync(paths.snapshotPath, archivePath);
   return archivePath;
 }
 
-async function saveSnapshot(snapshot) {
+async function saveSnapshot(userId, snapshot) {
+  const paths = getUserSnapshotPaths(userId);
   const normalized = normalizeSnapshot(snapshot);
-  await fs.mkdir(path.dirname(SNAPSHOT_PATH), { recursive: true });
+  await fs.mkdir(paths.userDir, { recursive: true });
 
-  const tmpPath = `${SNAPSHOT_PATH}.tmp`;
+  const tmpPath = `${paths.snapshotPath}.tmp`;
   await fs.writeFile(tmpPath, `${JSON.stringify(normalized, null, 2)}\n`, 'utf-8');
-  await fs.rename(tmpPath, SNAPSHOT_PATH);
-  copyFileSync(SNAPSHOT_PATH, SNAPSHOT_BACKUP_PATH);
+  await fs.rename(tmpPath, paths.snapshotPath);
+  copyFileSync(paths.snapshotPath, paths.snapshotBackupPath);
+  pushRuntimeEvent('info', 'snapshot_saved', 'User snapshot saved', { userId, snapshotPath: paths.snapshotPath });
 
   return normalized;
 }
@@ -116,20 +309,22 @@ async function loadSnapshotFrom(filePath) {
   return validateSnapshotCandidate(parsed);
 }
 
-async function loadSnapshotSafe() {
-  if (!existsSync(SNAPSHOT_PATH)) {
-    return saveSnapshot(cloneDefaultSnapshot());
+async function loadSnapshotSafe(userId) {
+  const paths = getUserSnapshotPaths(userId);
+
+  if (!existsSync(paths.snapshotPath)) {
+    return saveSnapshot(userId, cloneDefaultSnapshot());
   }
 
   try {
-    return await loadSnapshotFrom(SNAPSHOT_PATH);
+    return await loadSnapshotFrom(paths.snapshotPath);
   } catch (primaryError) {
-    const archivedPath = await archiveCorruptSnapshot('primary');
+    const archivedPath = await archiveCorruptSnapshot(paths, 'primary');
 
-    if (existsSync(SNAPSHOT_BACKUP_PATH)) {
+    if (existsSync(paths.snapshotBackupPath)) {
       try {
-        const restored = await loadSnapshotFrom(SNAPSHOT_BACKUP_PATH);
-        await saveSnapshot(restored);
+        const restored = await loadSnapshotFrom(paths.snapshotBackupPath);
+        await saveSnapshot(userId, restored);
         console.warn(`[humanboard] recovered snapshot from backup after primary parse failure: ${primaryError}`);
         return restored;
       } catch (backupError) {
@@ -137,7 +332,7 @@ async function loadSnapshotSafe() {
       }
     }
 
-    const fresh = await saveSnapshot(cloneDefaultSnapshot());
+    const fresh = await saveSnapshot(userId, cloneDefaultSnapshot());
     console.warn(`[humanboard] reset snapshot to default after corruption. archived=${archivedPath ?? 'none'}`);
     return fresh;
   }
@@ -252,26 +447,147 @@ print(json.dumps({'ideas': ideas}))
 const app = express();
 
 app.disable('x-powered-by');
+app.use('/api', (req, res, next) => {
+  const origin = req.headers.origin;
+  res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-User-ID');
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+
+  next();
+});
 app.use(express.static(DIST_DIR, { index: false }));
 
 app.get('/api/health', async (_req, res) => {
-  const snapshotExists = existsSync(SNAPSHOT_PATH);
-  const backupExists = existsSync(SNAPSHOT_BACKUP_PATH);
   res.json({
     ok: true,
     service: 'humanboard-prod',
     distReady: existsSync(path.join(DIST_DIR, 'index.html')),
-    snapshotPath: SNAPSHOT_PATH,
-    snapshotExists,
-    snapshotBackupPath: SNAPSHOT_BACKUP_PATH,
-    snapshotBackupExists: backupExists,
+    legacySnapshotPath: LEGACY_SNAPSHOT_PATH,
+    userDataDir: USER_DATA_DIR,
     aiBaseUrl: AI_BASE_URL,
   });
 });
 
-app.get('/api/snapshot', async (_req, res) => {
+app.get('/api/version', async (_req, res) => {
+  const latestGithubVersion = resolveGithubLatestVersion();
+  const updateAvailable = latestGithubVersion ? compareVersions(latestGithubVersion, appVersion) > 0 : false;
+
+  res.json({
+    version: appVersion,
+    githubRepo: GITHUB_REPO,
+    latestGithubVersion,
+    updateAvailable,
+  });
+});
+
+app.get('/api/ai-costs', async (req, res) => {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+
   try {
-    const snapshot = await loadSnapshotSafe();
+    const snapshot = await loadSnapshotSafe(userId);
+    res.json(snapshot.aiCostTracking || createEmptyAiCostState());
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load AI cost tracking' });
+  }
+});
+
+app.get('/api/admin/overview', async (_req, res) => {
+  try {
+    if (!existsSync(USER_DATA_DIR)) {
+      res.json({ users: [], totals: { users: 0, notes: 0, ideas: 0, projects: 0, goals: 0, reflections: 0, capabilityBets: 0, signalEvents: 0, trackedRequests: 0, trackedUsd: 0 } });
+      return;
+    }
+
+    const entries = await fs.readdir(USER_DATA_DIR, { withFileTypes: true });
+    const users = [];
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const userId = entry.name;
+      try {
+        const snapshot = await loadSnapshotSafe(userId);
+        const stats = await fs.stat(path.join(USER_DATA_DIR, userId, 'snapshot.json'));
+        const aiCost = snapshot.aiCostTracking || createEmptyAiCostState();
+        users.push({
+          userId,
+          notes: snapshot.notes.length,
+          ideas: snapshot.ideas.length,
+          projects: snapshot.projects.length,
+          goals: snapshot.goals.length,
+          reflections: snapshot.reflections.length,
+          capabilityBets: snapshot.capabilityBets.length,
+          signalEvents: snapshot.signalEvents.length,
+          trackedRequests: aiCost.totals.requests,
+          trackedUsd: aiCost.totals.estimatedUsd,
+          lastUpdatedAt: stats.mtime.toISOString(),
+        });
+      } catch (error) {
+        users.push({
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+          notes: 0,
+          ideas: 0,
+          projects: 0,
+          goals: 0,
+          reflections: 0,
+          capabilityBets: 0,
+          signalEvents: 0,
+          trackedRequests: 0,
+          trackedUsd: 0,
+          lastUpdatedAt: null,
+        });
+      }
+    }
+
+    users.sort((a, b) => (b.trackedUsd || 0) - (a.trackedUsd || 0));
+    const totals = users.reduce((acc, user) => {
+      acc.users += 1;
+      acc.notes += user.notes || 0;
+      acc.ideas += user.ideas || 0;
+      acc.projects += user.projects || 0;
+      acc.goals += user.goals || 0;
+      acc.reflections += user.reflections || 0;
+      acc.capabilityBets += user.capabilityBets || 0;
+      acc.signalEvents += user.signalEvents || 0;
+      acc.trackedRequests += user.trackedRequests || 0;
+      acc.trackedUsd += user.trackedUsd || 0;
+      return acc;
+    }, { users: 0, notes: 0, ideas: 0, projects: 0, goals: 0, reflections: 0, capabilityBets: 0, signalEvents: 0, trackedRequests: 0, trackedUsd: 0 });
+
+    res.json({ users, totals });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load admin overview' });
+  }
+});
+
+app.get('/api/admin/events', async (_req, res) => {
+  res.json({ events: runtimeEvents.slice(0, 100) });
+});
+
+app.post('/api/snapshot/reset', async (req, res) => {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+
+  try {
+    const snapshot = await saveSnapshot(userId, cloneDefaultSnapshot());
+    res.json({ success: true, snapshot });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to reset snapshot' });
+  }
+});
+
+app.get('/api/snapshot', async (req, res) => {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+
+  try {
+    const snapshot = await loadSnapshotSafe(userId);
     res.json(snapshot);
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
@@ -279,10 +595,13 @@ app.get('/api/snapshot', async (_req, res) => {
 });
 
 app.post('/api/snapshot', express.json({ limit: '25mb' }), async (req, res) => {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+
   try {
     const snapshot = validateSnapshotCandidate(req.body);
-    await saveSnapshot(snapshot);
-    res.json({ success: true, snapshotPath: SNAPSHOT_PATH });
+    await saveSnapshot(userId, snapshot);
+    res.json({ success: true, snapshotPath: getUserSnapshotPaths(userId).snapshotPath });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const status = /json|payload/i.test(message) ? 400 : 500;
@@ -299,23 +618,25 @@ app.get('/api/ai-era-kb', (_req, res) => {
 });
 
 app.all(['/api/ai/*', '/api/gemma/*'], express.raw({ type: '*/*', limit: '25mb' }), async (req, res) => {
+  const startedAt = Date.now();
+  const requestId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const isGemmaChat = req.originalUrl.startsWith('/api/gemma/chat/completions');
+  const userId = getRequestUserId(req);
   try {
     const suffix = req.originalUrl.replace(/^\/api\/(ai|gemma)/, '');
     const targetUrl = `${AI_BASE_URL}${suffix}`;
-    const headers = new Headers();
+    const headers = new Headers({
+      'content-type': req.headers['content-type'] || 'application/json',
+      accept: req.headers.accept || 'application/json',
+    });
 
-    for (const [key, value] of Object.entries(req.headers)) {
-      if (value == null) continue;
-      const lower = key.toLowerCase();
-      if (['host', 'content-length', 'origin', 'referer'].includes(lower)) continue;
-      if (Array.isArray(value)) {
-        headers.set(key, value.join(', '));
-      } else {
-        headers.set(key, value);
-      }
+    if (isGemmaChat) {
+      const startMessage = `[humanboard][ai-proxy][start] id=${requestId} method=${req.method} path=${req.originalUrl} origin=${req.headers.origin || '-'} ua=${JSON.stringify(req.headers['user-agent'] || '-')}`;
+      console.log(startMessage);
+      pushRuntimeEvent('info', 'ai_proxy_start', startMessage, { requestId, path: req.originalUrl, userId });
     }
 
-    if (AI_API_KEY && !headers.has('authorization')) {
+    if (AI_API_KEY) {
       headers.set('authorization', `Bearer ${AI_API_KEY}`);
     }
 
@@ -328,14 +649,53 @@ app.all(['/api/ai/*', '/api/gemma/*'], express.raw({ type: '*/*', limit: '25mb' 
 
     res.status(upstream.status);
     upstream.headers.forEach((value, key) => {
-      if (key.toLowerCase() === 'content-length') return;
+      const lower = key.toLowerCase();
+      if (lower === 'content-length') return;
+      if (lower === 'content-encoding') return;
+      if (lower === 'transfer-encoding') return;
       res.setHeader(key, value);
     });
 
     const body = Buffer.from(await upstream.arrayBuffer());
+    if (isGemmaChat && upstream.ok && userId) {
+      try {
+        const payload = JSON.parse(body.toString('utf-8'));
+        let requestModel = '';
+        try {
+          const parsedBody = JSON.parse(Buffer.from(req.body || []).toString('utf-8'));
+          requestModel = String(parsedBody?.model || '').trim();
+        } catch {
+          requestModel = '';
+        }
+
+        const costRecord = await recordAiChatCost(userId, {
+          requestId,
+          path: req.originalUrl,
+          model: requestModel,
+        }, payload);
+
+        if (costRecord) {
+          res.setHeader('x-humanboard-cost-usd', String(costRecord.estimatedUsd));
+          res.setHeader('x-humanboard-cost-model', costRecord.modelId);
+        }
+      } catch (trackingError) {
+        console.warn(`[humanboard][ai-proxy][cost-track-error] id=${requestId} message=${trackingError instanceof Error ? trackingError.message : String(trackingError)}`);
+      }
+    }
+
+    if (isGemmaChat) {
+      const doneMessage = `[humanboard][ai-proxy][done] id=${requestId} status=${upstream.status} ms=${Date.now() - startedAt} bytes=${body.length}`;
+      console.log(doneMessage);
+      pushRuntimeEvent(upstream.ok ? 'info' : 'warn', 'ai_proxy_done', doneMessage, { requestId, status: upstream.status, userId });
+    }
     res.end(body);
   } catch (error) {
-    res.status(502).json({ error: error instanceof Error ? error.message : String(error) });
+    if (isGemmaChat) {
+      const errorMessage = `[humanboard][ai-proxy][error] id=${requestId} ms=${Date.now() - startedAt} message=${error instanceof Error ? error.message : String(error)}`;
+      console.error(errorMessage);
+      pushRuntimeEvent('error', 'ai_proxy_error', errorMessage, { requestId, userId });
+    }
+    res.status(502).json({ error: error instanceof Error ? error.message : String(error), requestId });
   }
 });
 
@@ -356,5 +716,5 @@ app.use(async (req, res, next) => {
 app.listen(PORT, HOST, () => {
   console.log(`[humanboard] production server listening on http://${HOST}:${PORT}`);
   console.log(`[humanboard] dist=${DIST_DIR}`);
-  console.log(`[humanboard] snapshot=${SNAPSHOT_PATH}`);
+  console.log(`[humanboard] userDataDir=${USER_DATA_DIR}`);
 });

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useAppStore } from '../store';
+import { apiFetch } from '../lib/apiClient';
 
 type BridgePayload = {
   ideas: ReturnType<typeof useAppStore.getState>['ideas'];
@@ -13,7 +14,7 @@ export default function AiEraKbAutoBridge() {
 
     const run = async () => {
       try {
-        const response = await fetch('/api/ai-era-kb');
+        const response = await apiFetch('/api/ai-era-kb');
         if (!response.ok) return;
         const payload = (await response.json()) as BridgePayload;
         if (cancelled || !Array.isArray(payload.ideas)) return;

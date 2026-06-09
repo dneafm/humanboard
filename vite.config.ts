@@ -2,7 +2,8 @@ import { execFileSync } from 'child_process';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import fs from 'fs/promises';
+import fs from 'fs';
+import fsp from 'fs/promises';
 import {defineConfig, loadEnv} from 'vite';
 
 function createAiEraKbBridgePlugin() {
@@ -121,16 +122,38 @@ print(json.dumps({'ideas': ideas}))
 }
 
 function createSnapshotPersistencePlugin() {
-  const SNAPSHOT_PATH = path.resolve(__dirname, 'snapshot.json');
+  const USER_DATA_DIR = path.resolve(__dirname, 'data', 'users');
+
+  function getRequestUserId(req: any) {
+    const raw = req.headers['x-user-id'];
+    const userId = Array.isArray(raw) ? raw[0] : raw;
+    const normalized = String(userId || '').trim();
+    return normalized || null;
+  }
+
+  function getUserSnapshotPath(userId: string) {
+    const safeUserId = userId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 128);
+    return path.join(USER_DATA_DIR, safeUserId, 'snapshot.json');
+  }
 
   return {
     name: 'snapshot-persistence',
     configureServer(server: any) {
       server.middlewares.use('/api/snapshot', async (req: any, res: any) => {
+        const userId = getRequestUserId(req);
+        if (!userId) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'Missing Header: X-User-ID' }));
+          return;
+        }
+
+        const snapshotPath = getUserSnapshotPath(userId);
+
         try {
           if (req.method === 'GET') {
             try {
-              const data = await fs.readFile(SNAPSHOT_PATH, 'utf-8');
+              const data = await fsp.readFile(snapshotPath, 'utf-8');
               res.setHeader('Content-Type', 'application/json');
               res.end(data);
             } catch (err: any) {
@@ -150,9 +173,10 @@ function createSnapshotPersistencePlugin() {
             });
             req.on('end', async () => {
               try {
-                await fs.writeFile(SNAPSHOT_PATH, body, 'utf-8');
+                await fsp.mkdir(path.dirname(snapshotPath), { recursive: true });
+                await fsp.writeFile(snapshotPath, body, 'utf-8');
                 res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ success: true }));
+                res.end(JSON.stringify({ success: true, snapshotPath }));
               } catch (err: any) {
                 res.statusCode = 500;
                 res.end(JSON.stringify({ error: err.message }));
@@ -173,9 +197,12 @@ function createSnapshotPersistencePlugin() {
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
+  const packageJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
   return {
+
     plugins: [react(), tailwindcss(), createAiEraKbBridgePlugin(), createSnapshotPersistencePlugin()],
     define: {
+      __APP_VERSION__: JSON.stringify(String(packageJson.version || '0.0.0')),
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
       'process.env.GEMMA_BASE_URL': JSON.stringify(env.GEMMA_BASE_URL),
       'process.env.GEMMA_MODEL': JSON.stringify(env.GEMMA_MODEL),

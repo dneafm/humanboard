@@ -22,5 +22,13 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "exclude": [
+    "dist",
+    "build",
+    "coverage",
+    "data",
+    "public",
+    "node_modules"
+  ]
 }
