@@ -58,6 +58,16 @@ const uiTourSteps = [
     body: 'Review helps surface stale threads, contradictions, and items worth revisiting.',
   },
   {
+    target: 'tour-sidebar-projects',
+    title: 'Track active builds in Projects',
+    body: 'Projects separate active execution from incubation so live work stays visible and concrete.',
+  },
+  {
+    target: 'tour-chatbot-button',
+    title: 'Use the Chatbot when you want help thinking',
+    body: 'Open Chatbot to unpack a raw thought, resolve contradictions, and turn fragments into stronger ideas.',
+  },
+  {
     target: 'tour-guide-button',
     title: 'Reopen this guide anytime',
     body: 'Use Guide whenever you want the walkthrough again.',
@@ -168,11 +178,11 @@ function SpotlightTour({
               Previous
             </button>
             {stepIndex === uiTourSteps.length - 1 ? (
-              <button type="button" onClick={onClose} className="rounded-md bg-white px-3 py-2 text-sm font-medium text-stone-950">
+              <button type="button" onClick={onClose} className="ml-auto rounded-md bg-white px-3 py-2 text-sm font-medium text-stone-950">
                 Finish
               </button>
             ) : (
-              <button type="button" onClick={onNext} className="rounded-md bg-white px-3 py-2 text-sm font-medium text-stone-950">
+              <button type="button" onClick={onNext} className="ml-auto rounded-md bg-white px-3 py-2 text-sm font-medium text-stone-950">
                 Next
               </button>
             )}
@@ -421,7 +431,7 @@ function Sidebar({ onOpenTutorial }: { onOpenTutorial: () => void }) {
           <NavLink
             key={item.to}
             to={item.to}
-            data-tour={item.label === 'Inbox' ? 'tour-sidebar-inbox' : item.label === 'Ideas' ? 'tour-sidebar-ideas' : item.label === 'Goals' ? 'tour-sidebar-goals' : item.label === 'Incubation' ? 'tour-sidebar-incubation' : item.label === 'Review' ? 'tour-sidebar-review' : undefined}
+            data-tour={item.label === 'Inbox' ? 'tour-sidebar-inbox' : item.label === 'Ideas' ? 'tour-sidebar-ideas' : item.label === 'Goals' ? 'tour-sidebar-goals' : item.label === 'Incubation' ? 'tour-sidebar-incubation' : item.label === 'Review' ? 'tour-sidebar-review' : item.label === 'Projects' ? 'tour-sidebar-projects' : undefined}
             className={({ isActive }) =>
               cn(
                 "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all",
@@ -932,7 +942,7 @@ function MobileMenu({
               key={item.to}
               to={item.to}
               onClick={onClose}
-              data-tour={item.label === 'Inbox' ? 'tour-sidebar-inbox' : item.label === 'Ideas' ? 'tour-sidebar-ideas' : item.label === 'Goals' ? 'tour-sidebar-goals' : item.label === 'Incubation' ? 'tour-sidebar-incubation' : item.label === 'Review' ? 'tour-sidebar-review' : undefined}
+              data-tour={item.label === 'Inbox' ? 'tour-sidebar-inbox' : item.label === 'Ideas' ? 'tour-sidebar-ideas' : item.label === 'Goals' ? 'tour-sidebar-goals' : item.label === 'Incubation' ? 'tour-sidebar-incubation' : item.label === 'Review' ? 'tour-sidebar-review' : item.label === 'Projects' ? 'tour-sidebar-projects' : undefined}
               className={({ isActive }) =>
                 cn(
                   'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all',

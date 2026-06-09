@@ -732,7 +732,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
 
   if (!isOpen) {
     return (
-      <div className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-50 flex items-center gap-3 pointer-events-none">
+      <div data-tour="tour-chatbot-button" className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-50 flex items-center gap-3 pointer-events-none">
         {showCta && (
           <div 
             onClick={() => {
