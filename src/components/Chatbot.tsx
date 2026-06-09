@@ -15,6 +15,13 @@ type Message = {
 
 export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
+  const [showCta, setShowCta] = useState(() => {
+    try {
+      return sessionStorage.getItem('hb_hide_cta') !== 'true';
+    } catch {
+      return true;
+    }
+  });
   const runtime = getGemmaRuntimeStatus();
   const location = useLocation();
   const notes = useAppStore((state) => state.notes);
@@ -644,12 +651,49 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
 
   if (!isOpen) {
     return (
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 md:bottom-6 md:right-6 w-12 h-12 bg-stone-900 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-stone-800 transition-transform hover:scale-105 z-50"
-      >
-        <Bot className="w-5 h-5" />
-      </button>
+      <div className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-50 flex items-center gap-3 pointer-events-none">
+        {showCta && (
+          <div 
+            onClick={() => {
+              setIsOpen(true);
+              setShowCta(false);
+              try {
+                sessionStorage.setItem('hb_hide_cta', 'true');
+              } catch {}
+            }}
+            className="relative pointer-events-auto hidden sm:flex bg-white/95 dark:bg-stone-900/95 backdrop-blur-md border border-stone-200/80 dark:border-stone-850 text-stone-850 dark:text-stone-250 px-4 py-2.5 rounded-2xl shadow-xl text-xs font-semibold cursor-pointer select-none max-w-xs transition-all hover:scale-[1.02] items-center gap-2 pr-9 animate-fade-in"
+          >
+            <span className="text-sm shrink-0">💬</span>
+            <span className="leading-snug">Chat with AI: Got a raw thought or contradiction? Let's unpack it.</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowCta(false);
+                try {
+                  sessionStorage.setItem('hb_hide_cta', 'true');
+                } catch {}
+              }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-400 hover:text-stone-700 dark:hover:text-stone-250 transition-colors cursor-pointer"
+              aria-label="Dismiss greeting"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+        <button
+          onClick={() => {
+            setIsOpen(true);
+            setShowCta(false);
+            try {
+              sessionStorage.setItem('hb_hide_cta', 'true');
+            } catch {}
+          }}
+          className="pointer-events-auto w-12 h-12 bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 rounded-full flex items-center justify-center shadow-lg hover:bg-stone-800 dark:hover:bg-stone-200 transition-transform hover:scale-105 cursor-pointer"
+        >
+          <Bot className="w-5 h-5" />
+        </button>
+      </div>
     );
   }
 

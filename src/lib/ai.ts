@@ -224,6 +224,9 @@ async function callGemma(prompt: string, systemInstruction: string) {
   }
 
   if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error("Daily AI Request Limit Reached: You have reached the maximum of 1,000 AI interactions for today. Your quota resets at midnight UTC.");
+    }
     const errorText = await response.text();
     throw buildRuntimeError(`AI request failed with HTTP ${response.status}.`, errorText);
   }
@@ -306,6 +309,9 @@ Return plain text only. Include a concise descriptive title on the first line, a
   }
 
   if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error("Daily AI Request Limit Reached: You have reached the maximum of 1,000 AI interactions for today. Your quota resets at midnight UTC.");
+    }
     throw buildRuntimeError(`Image analysis failed with HTTP ${response.status}.`, await response.text());
   }
 
