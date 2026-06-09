@@ -26,7 +26,7 @@ interface AdaptiveDashboardProps {
   goals: Goal[];
   ideas: Idea[];
   capabilityBets: CapabilityBet[];
-  onSelectPrompt: (prefill: string) => void;
+  onSelectPrompt: (prefill: string, modeId: string | null) => void;
 }
 
 interface SuggestivePrompt {
@@ -34,6 +34,7 @@ interface SuggestivePrompt {
   text: string;
   category: string;
   prefill: string;
+  mode: string | null;
 }
 
 export default function AdaptiveDashboard({
@@ -69,7 +70,8 @@ export default function AdaptiveDashboard({
         id: `project-${p.id}`,
         category: 'Active Project',
         text: `What was the main outcome, win, or blocker on project '${p.title}' today?`,
-        prefill: `Regarding project [${p.title}]: `
+        prefill: `Regarding project [${p.title}]: `,
+        mode: 'context'
       });
     });
 
@@ -78,7 +80,8 @@ export default function AdaptiveDashboard({
         id: `goal-${g.id}`,
         category: 'Active Goal',
         text: `What progress did you make toward your goal '${g.title}' today?`,
-        prefill: `Regarding goal [${g.title}]: `
+        prefill: `Regarding goal [${g.title}]: `,
+        mode: 'context'
       });
     });
 
@@ -87,7 +90,8 @@ export default function AdaptiveDashboard({
         id: `dream-${idea.id}`,
         category: 'Incubating Dream',
         text: `Any new exposure, signal, or pull for the dream '${idea.title}'?`,
-        prefill: `Regarding dream [${idea.title}]: `
+        prefill: `Regarding dream [${idea.title}]: `,
+        mode: 'context'
       });
     });
 
@@ -96,7 +100,8 @@ export default function AdaptiveDashboard({
         id: `bet-${bet.id}`,
         category: 'Capability Bet',
         text: `Any fresh evidence matching or complicating the thesis: '${bet.title}'?`,
-        prefill: `Regarding capability bet [${bet.title}]: `
+        prefill: `Regarding capability bet [${bet.title}]: `,
+        mode: 'context'
       });
     });
 
@@ -105,31 +110,36 @@ export default function AdaptiveDashboard({
       id: 'general-1',
       category: 'General Reflection',
       text: 'What kept returning to your mind or orbiting in the background today?',
-      prefill: 'Orbiting my mind today: '
+      prefill: 'Orbiting my mind today: ',
+      mode: 'obsession'
     });
     list.push({
       id: 'general-2',
       category: 'General Reflection',
       text: 'What task, decision, or topic have you actively avoided thinking about today?',
-      prefill: 'Avoided topic/decision: '
+      prefill: 'Avoided topic/decision: ',
+      mode: 'avoidance'
     });
     list.push({
       id: 'general-3',
       category: 'General Reflection',
       text: 'What is something you want right now, but feel hesitant or conflicted to pursue?',
-      prefill: 'Desire/Conflict: '
+      prefill: 'Desire/Conflict: ',
+      mode: 'contradiction'
     });
     list.push({
       id: 'general-4',
       category: 'General Reflection',
       text: 'What is currently drawing your attention or curiosity, even if you cannot explain why yet?',
-      prefill: 'Curiosity/Pull: '
+      prefill: 'Curiosity/Pull: ',
+      mode: 'obsession'
     });
     list.push({
       id: 'general-5',
       category: 'General Reflection',
       text: 'What is the biggest active tension or blocker you are facing right now?',
-      prefill: 'Current tension: '
+      prefill: 'Current tension: ',
+      mode: 'avoidance'
     });
 
     return list;
@@ -177,7 +187,7 @@ export default function AdaptiveDashboard({
           </div>
           
           <button 
-            onClick={() => onSelectPrompt(currentPrompt.prefill)}
+            onClick={() => onSelectPrompt(currentPrompt.prefill, currentPrompt.mode)}
             className="w-full text-left group"
           >
             <p className="text-xl md:text-2xl font-medium tracking-tight text-stone-900 dark:text-stone-100 group-hover:text-stone-700 dark:group-hover:text-stone-300 transition-colors leading-snug">
@@ -315,7 +325,7 @@ export default function AdaptiveDashboard({
                 {activeProjects.map(project => (
                   <div key={project.id} className="group flex items-start justify-between gap-3 p-3 rounded-2xl border border-stone-100 bg-stone-50/50 hover:bg-stone-50 dark:border-stone-800/50 dark:bg-stone-900/20 dark:hover:bg-stone-900/40 transition-colors">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
+                       <div className="flex items-center gap-1.5">
                         <Activity className="h-3 w-3 text-blue-500" />
                         <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Project</span>
                       </div>
@@ -323,7 +333,7 @@ export default function AdaptiveDashboard({
                       <p className="text-xs text-stone-500 dark:text-stone-400 line-clamp-1 mt-0.5">{project.description}</p>
                     </div>
                     <button 
-                      onClick={() => onSelectPrompt(`Regarding project [${project.title}]: `)}
+                      onClick={() => onSelectPrompt(`Regarding project [${project.title}]: `, 'context')}
                       className="shrink-0 p-2 text-stone-400 hover:text-stone-950 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors"
                       title="Reflect on project"
                     >
@@ -343,7 +353,7 @@ export default function AdaptiveDashboard({
                       <p className="text-xs text-stone-500 dark:text-stone-400 line-clamp-1 mt-0.5">{goal.description}</p>
                     </div>
                     <button 
-                      onClick={() => onSelectPrompt(`Regarding goal [${goal.title}]: `)}
+                      onClick={() => onSelectPrompt(`Regarding goal [${goal.title}]: `, 'context')}
                       className="shrink-0 p-2 text-stone-400 hover:text-stone-950 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors"
                       title="Reflect on goal"
                     >
@@ -392,7 +402,7 @@ export default function AdaptiveDashboard({
                         </div>
                       </div>
                       <button 
-                        onClick={() => onSelectPrompt(`Regarding dream [${idea.title}]: `)}
+                        onClick={() => onSelectPrompt(`Regarding dream [${idea.title}]: `, 'context')}
                         className="shrink-0 p-2 text-stone-400 hover:text-stone-950 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors"
                         title="Add signal to dream"
                       >
@@ -448,7 +458,7 @@ export default function AdaptiveDashboard({
                     <div className="mt-4 pt-3 border-t border-stone-200/50 dark:border-stone-800/50 flex items-center justify-between">
                       <span className="text-[9px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-600">Status: {bet.status}</span>
                       <button 
-                        onClick={() => onSelectPrompt(`Regarding capability bet [${bet.title}]: `)}
+                        onClick={() => onSelectPrompt(`Regarding capability bet [${bet.title}]: `, 'context')}
                         className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-stone-600 group-hover:text-stone-950 dark:text-stone-400 dark:group-hover:text-stone-150 transition-colors"
                       >
                         <span>Log Signal</span>

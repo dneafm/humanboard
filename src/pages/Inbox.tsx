@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAppStore, type CapabilityBet, type EvidencePolarity, type IdeaType, type Note, type SignalAssessment } from '../store';
 import { formatDistanceToNow } from 'date-fns';
-import { Plus, Archive, Lightbulb, Scale, Sparkles, Check, X, ImagePlus, Loader2 } from 'lucide-react';
+import { Plus, Archive, Lightbulb, Scale, Sparkles, Check, X, ImagePlus, Loader2, Brain, HelpCircle, Dices, ArrowRight, Target } from 'lucide-react';
 import { compileRawNoteToKnowledge, extractCapabilityEvidenceReview } from '../lib/ai';
 import { Link, useSearchParams } from 'react-router-dom';
 import ExtractionReviewPanel from '../components/capability/ExtractionReviewPanel';
@@ -25,6 +25,146 @@ type CompileDraft = {
 };
 
 const COMPILE_TYPE_LABELS: IdeaType[] = ['Concept', 'Principle', 'Reference', 'Project', 'Question', 'Action', 'Base Skill', 'Umbrella Goal'];
+
+type TensionMode = {
+  id: string;
+  label: string;
+  icon: string;
+  colorName: string;
+  activeClass: string;
+  borderClass: string;
+  bgClass: string;
+  textClass: string;
+  ringClass: string;
+  focusBorderClass: string;
+  payoffTitle: string;
+  payoffDesc: string;
+  prefill: string;
+  prompts: string[];
+};
+
+const TENSION_MODES: TensionMode[] = [
+  {
+    id: 'contradiction',
+    label: 'Contradiction',
+    icon: '☯️',
+    colorName: 'violet',
+    activeClass: 'border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300 shadow-[0_0_12px_-3px_rgba(139,92,246,0.15)]',
+    borderClass: 'border-violet-200 dark:border-violet-800/60',
+    bgClass: 'bg-violet-50/70 dark:bg-violet-950/25',
+    textClass: 'text-violet-700 dark:text-violet-300',
+    ringClass: 'focus:ring-violet-500/20 dark:focus:ring-violet-500/10',
+    focusBorderClass: 'focus:border-violet-400 dark:focus:border-violet-700',
+    payoffTitle: 'Contradiction Spotting',
+    payoffDesc: 'Identifies discrepancies in your logic, values, or actions (e.g. saying you want X but repeatedly choosing Y).',
+    prefill: '☯️ Contradiction: I want to [desire] but I keep [behavior] because: ',
+    prompts: [
+      'I claim to value freedom/health, but I keep choosing safety/junk food.',
+      'I want to spend time on creative projects, but I actually spend my free hours scrolling.',
+      'I know I should address a certain problem, but I actively avoid it and pretend it is fine.'
+    ]
+  },
+  {
+    id: 'avoidance',
+    label: 'Avoidance',
+    icon: '🚧',
+    colorName: 'rose',
+    activeClass: 'border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300 shadow-[0_0_12px_-3px_rgba(244,63,94,0.15)]',
+    borderClass: 'border-rose-200 dark:border-rose-800/60',
+    bgClass: 'bg-rose-50/70 dark:bg-rose-950/25',
+    textClass: 'text-rose-700 dark:text-rose-300',
+    ringClass: 'focus:ring-rose-500/20 dark:focus:ring-rose-500/10',
+    focusBorderClass: 'focus:border-rose-400 dark:focus:border-rose-700',
+    payoffTitle: 'Pattern Detection',
+    payoffDesc: 'Tracks recurring cognitive loops and items you keep avoiding, warning you when you circle them repeatedly.',
+    prefill: '🚧 Avoidance: I have been actively avoiding thinking about or deciding on: ',
+    prompts: [
+      'What task, conversation, or decision have you kept in the margins today?',
+      'What is the biggest elephant in the room of your current week?',
+      'Write down the one thing you really do not want to put in this inbox.'
+    ]
+  },
+  {
+    id: 'obsession',
+    label: 'Obsession',
+    icon: '⚡',
+    colorName: 'amber',
+    activeClass: 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 shadow-[0_0_12px_-3px_rgba(245,158,11,0.15)]',
+    borderClass: 'border-amber-200 dark:border-amber-800/60',
+    bgClass: 'bg-amber-50/70 dark:bg-amber-950/25',
+    textClass: 'text-amber-700 dark:text-amber-300',
+    ringClass: 'focus:ring-amber-500/20 dark:focus:ring-amber-500/10',
+    focusBorderClass: 'focus:border-amber-400 dark:focus:border-amber-700',
+    payoffTitle: 'Unexpected Pairing',
+    payoffDesc: 'Finds surprising, non-obvious connections between your background obsessions and other active projects or goals.',
+    prefill: '⚡ Obsession: I am secretly drawn to or obsessed with: ',
+    prompts: [
+      'What is currently drawing your attention or curiosity, even if you cannot justify it?',
+      'What rabbit hole did you lose yourself in today?',
+      'What weird idea or hobby keeps calling to you in the background?'
+    ]
+  },
+  {
+    id: 'emotion',
+    label: 'Emotion',
+    icon: '💔',
+    colorName: 'pink',
+    activeClass: 'border-pink-500/40 bg-pink-500/10 text-pink-700 dark:text-pink-300 shadow-[0_0_12px_-3px_rgba(236,72,153,0.15)]',
+    borderClass: 'border-pink-200 dark:border-pink-800/60',
+    bgClass: 'bg-pink-50/70 dark:bg-pink-950/25',
+    textClass: 'text-pink-700 dark:text-pink-300',
+    ringClass: 'focus:ring-pink-500/20 dark:focus:ring-pink-500/10',
+    focusBorderClass: 'focus:border-pink-400 dark:focus:border-pink-700',
+    payoffTitle: 'Identity Mirror',
+    payoffDesc: 'Distills the topics and emotional centers that your mind is orbiting most over the course of the week.',
+    prefill: '💔 Emotion: I feel a strong sense of [anxiety/excitement/frustration/dread] about: ',
+    prompts: [
+      'What is charging you emotionally right now (fear, excitement, dread, impatience)?',
+      'What interaction or event today left a lingering emotional residue?',
+      'What feels highly charged in your environment today?'
+    ]
+  },
+  {
+    id: 'fog',
+    label: 'Fog',
+    icon: '☁️',
+    colorName: 'sky',
+    activeClass: 'border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300 shadow-[0_0_12px_-3px_rgba(14,165,233,0.15)]',
+    borderClass: 'border-sky-200 dark:border-sky-800/60',
+    bgClass: 'bg-sky-50/70 dark:bg-sky-950/25',
+    textClass: 'text-sky-700 dark:text-sky-300',
+    ringClass: 'focus:ring-sky-500/20 dark:focus:ring-sky-500/10',
+    focusBorderClass: 'focus:border-sky-400 dark:focus:border-sky-700',
+    payoffTitle: 'Memory Return',
+    payoffDesc: 'Resurfaces these vague feelings contextually when you capture future signals that might clarify them.',
+    prefill: '☁️ Fog: What feels foggy, uncertain, or ambiguous in my plans right now is: ',
+    prompts: [
+      'What is currently unclear or feels like a blind spot in your projects?',
+      'What is a question you have that you cannot find the answer to yet?',
+      'Where do you feel like you are guessing or operating in the dark?'
+    ]
+  },
+  {
+    id: 'halfbaked',
+    label: 'Half-Baked',
+    icon: '🧩',
+    colorName: 'emerald',
+    activeClass: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 shadow-[0_0_12px_-3px_rgba(16,185,129,0.15)]',
+    borderClass: 'border-emerald-200 dark:border-emerald-800/60',
+    bgClass: 'bg-emerald-50/70 dark:bg-emerald-950/25',
+    textClass: 'text-emerald-700 dark:text-emerald-300',
+    ringClass: 'focus:ring-emerald-500/20 dark:focus:ring-emerald-500/10',
+    focusBorderClass: 'focus:border-emerald-400 dark:focus:border-emerald-700',
+    payoffTitle: 'Instant Compression',
+    payoffDesc: 'Converts messy streams of consciousness into a 1-line summary, detected theme, and likely next step.',
+    prefill: '🧩 Half-Baked: A raw, unedited thought in my head is: ',
+    prompts: [
+      'Dump your raw, unedited thoughts. Avoid formatting or polishing them.',
+      'What is a hunch you have that you do not have evidence for yet?',
+      'What is a half-baked theory you are embarrassed to share with anyone?'
+    ]
+  }
+];
 
 function toggleId(list: string[] | undefined, id: string): string[] {
   const current = list ?? [];
@@ -186,6 +326,113 @@ export default function InboxPage() {
   const focusNoteId = searchParams.get('note');
   const { notes, ideas, addNote, updateNote, deleteNote, addIdea, sections, capabilityBets, projects, goals } = useAppStore();
   const activeCapabilityBets = useMemo(() => capabilityBets.filter((bet) => !bet.archivedAt), [capabilityBets]);
+
+  const [selectedTensionModeId, setSelectedTensionModeId] = useState<string | null>(null);
+
+  const activeMode = useMemo(() => TENSION_MODES.find(m => m.id === selectedTensionModeId) || null, [selectedTensionModeId]);
+
+  const handleSurpriseMe = () => {
+    const randomMode = TENSION_MODES[Math.floor(Math.random() * TENSION_MODES.length)];
+    const randomPrompt = randomMode.prompts[Math.floor(Math.random() * randomMode.prompts.length)];
+    
+    setSelectedTensionModeId(randomMode.id);
+    setNewNote(`${randomMode.icon} ${randomMode.label}: ${randomPrompt}`);
+    
+    const textarea = document.querySelector('textarea');
+    if (textarea) {
+      textarea.focus();
+    }
+  };
+
+  const textareaBorderRingClass = useMemo(() => {
+    if (activeMode) {
+      return `${activeMode.borderClass} ${activeMode.ringClass} ${activeMode.focusBorderClass}`;
+    }
+    if (selectedTensionModeId === 'context') {
+      return 'border-violet-350 dark:border-violet-800/60 focus:ring-violet-500/20 dark:focus:ring-violet-500/10 focus:border-violet-400 dark:focus:border-violet-700';
+    }
+    return 'border-stone-200 dark:border-stone-800 focus:ring-stone-900/5 dark:focus:ring-stone-100/5 focus:border-stone-400 dark:focus:border-stone-700';
+  }, [activeMode, selectedTensionModeId]);
+
+  // Generate dynamic suggestive prompts
+  const suggestivePrompts = useMemo(() => {
+    const list: { id: string; category: string; text: string; prefill: string }[] = [];
+
+    const activeProjects = projects.filter(p => p.status === 'Active');
+    const activeGoals = goals.filter(g => g.status === 'Active');
+    const incubatingIdeas = ideas.filter(idea => idea.type === 'Concept' && (idea.stage === 'Seed' || idea.stage === 'Sprouting'));
+    const activeBets = capabilityBets.filter(bet => !bet.archivedAt);
+
+    activeProjects.forEach(p => {
+      list.push({
+        id: `project-${p.id}`,
+        category: 'Active Project',
+        text: `What was the main outcome, win, or blocker on project '${p.title}' today?`,
+        prefill: `Regarding project [${p.title}]: `
+      });
+    });
+
+    activeGoals.forEach(g => {
+      list.push({
+        id: `goal-${g.id}`,
+        category: 'Active Goal',
+        text: `What progress did you make toward your goal '${g.title}' today?`,
+        prefill: `Regarding goal [${g.title}]: `
+      });
+    });
+
+    incubatingIdeas.slice(0, 2).forEach(idea => {
+      list.push({
+        id: `dream-${idea.id}`,
+        category: 'Incubating Dream',
+        text: `Any new exposure, signal, or pull for the dream '${idea.title}'?`,
+        prefill: `Regarding dream [${idea.title}]: `
+      });
+    });
+
+    activeBets.slice(0, 2).forEach(bet => {
+      list.push({
+        id: `bet-${bet.id}`,
+        category: 'Capability Bet',
+        text: `Any fresh evidence matching or complicating the thesis: '${bet.title}'?`,
+        prefill: `Regarding capability bet [${bet.title}]: `
+      });
+    });
+
+    // Default general reflection prompts
+    list.push({
+      id: 'general-1',
+      category: 'General Reflection',
+      text: 'What kept returning to your mind or orbiting in the background today?',
+      prefill: 'Orbiting my mind today: '
+    });
+    list.push({
+      id: 'general-2',
+      category: 'General Reflection',
+      text: 'What task, decision, or topic have you actively avoided thinking about today?',
+      prefill: 'Avoided topic/decision: '
+    });
+    list.push({
+      id: 'general-3',
+      category: 'General Reflection',
+      text: 'What is something you want right now, but feel hesitant or conflicted to pursue?',
+      prefill: 'Desire/Conflict: '
+    });
+    list.push({
+      id: 'general-4',
+      category: 'General Reflection',
+      text: 'What is currently drawing your attention or curiosity, even if you cannot explain why yet?',
+      prefill: 'Curiosity/Pull: '
+    });
+    list.push({
+      id: 'general-5',
+      category: 'General Reflection',
+      text: 'What is the biggest active tension or blocker you are facing right now?',
+      prefill: 'Current tension: '
+    });
+
+    return list;
+  }, [projects, goals, ideas, capabilityBets]);
 
   const compileSourceNote = useMemo(
     () => notes.find((note) => note.id === compileDraft?.noteId) ?? null,
@@ -502,6 +749,91 @@ export default function InboxPage() {
       </header>
 
       <form onSubmit={handleAdd} className="mb-12">
+        {/* Suggestive Tabs Row */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-bold text-stone-400 dark:text-stone-600 uppercase tracking-[0.2em] block">
+              Select a raw material catalyst
+            </span>
+            {selectedTensionModeId && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedTensionModeId(null);
+                  if (activeMode && newNote === activeMode.prefill) {
+                    setNewNote('');
+                  }
+                }}
+                className="text-[10px] font-bold text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 uppercase tracking-widest cursor-pointer transition-colors"
+              >
+                Reset Mode
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2 items-center">
+            {TENSION_MODES.map((mode) => {
+              const isSelected = selectedTensionModeId === mode.id;
+              return (
+                <button
+                  key={mode.id}
+                  type="button"
+                  onClick={() => {
+                    if (isSelected) {
+                      setSelectedTensionModeId(null);
+                      if (newNote === mode.prefill) {
+                        setNewNote('');
+                      }
+                    } else {
+                      setSelectedTensionModeId(mode.id);
+                      if (!newNote.trim() || TENSION_MODES.some(m => newNote === m.prefill)) {
+                        setNewNote(mode.prefill);
+                      }
+                      const textarea = document.querySelector('textarea');
+                      if (textarea) textarea.focus();
+                    }
+                  }}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-[10px] font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer select-none ${
+                    isSelected
+                      ? mode.activeClass
+                      : 'border-stone-200 dark:border-stone-850 bg-white dark:bg-stone-900/60 hover:bg-stone-50 dark:hover:bg-stone-805 text-stone-600 dark:text-stone-400'
+                  }`}
+                >
+                  <span>{mode.icon}</span>
+                  <span>{mode.label}</span>
+                </button>
+              );
+            })}
+            
+            {/* Active Context Tab */}
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedTensionModeId(selectedTensionModeId === 'context' ? null : 'context');
+                const textarea = document.querySelector('textarea');
+                if (textarea) textarea.focus();
+              }}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-[10px] font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer select-none ${
+                selectedTensionModeId === 'context'
+                  ? 'border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300 shadow-[0_0_12px_-3px_rgba(139,92,246,0.15)]'
+                  : 'border-stone-200 dark:border-stone-850 bg-white dark:bg-stone-900/60 hover:bg-stone-50 dark:hover:bg-stone-805 text-stone-600 dark:text-stone-400'
+              }`}
+            >
+              <span>🎯</span>
+              <span>Focus Context</span>
+            </button>
+
+            {/* Surprise Me Button */}
+            <button
+              type="button"
+              onClick={handleSurpriseMe}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-dashed border-amber-300 dark:border-amber-700/50 bg-amber-50/40 dark:bg-amber-950/10 hover:bg-amber-100/60 dark:hover:bg-amber-950/20 text-amber-700 dark:text-amber-400 text-[10px] font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer ml-auto"
+            >
+              <Dices className="h-3.5 w-3.5" />
+              <span>Surprise Me</span>
+            </button>
+          </div>
+        </div>
+
         <div className="relative group">
           {pendingImagePreview && (
             <div className="absolute left-4 top-4 z-10">
@@ -527,8 +859,8 @@ export default function InboxPage() {
               event.preventDefault();
               stageImage(image);
             }}
-            placeholder="What's on your mind?"
-            className={`w-full bg-stone-50 dark:bg-stone-900/50 border border-stone-200 dark:border-stone-800 rounded-xl p-6 pr-14 text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-600 focus:outline-none focus:ring-4 focus:ring-stone-900/5 dark:focus:ring-stone-100/5 focus:border-stone-400 dark:focus:border-stone-700 transition-all resize-none min-h-[160px] text-lg leading-relaxed shadow-sm group-hover:shadow-md ${pendingImagePreview ? 'pt-28' : ''}`}
+            placeholder={activeMode ? `Write your ${activeMode.label.toLowerCase()} reflection...` : "What's on your mind? Capture raw thoughts, tensions, obsessions, or conflicts here..."}
+            className={`w-full bg-stone-50 dark:bg-stone-900/50 border rounded-xl p-6 pr-14 text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-600 focus:ring-4 transition-all resize-none min-h-[160px] text-lg leading-relaxed shadow-sm group-hover:shadow-md ${textareaBorderRingClass} ${pendingImagePreview ? 'pt-28' : ''}`}
             onKeyDown={(e) => {
               if (pendingImage && e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -568,6 +900,95 @@ export default function InboxPage() {
           </div>
         </div>
         {imageError && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{imageError}</p>}
+
+        {/* Interactive Payoff Panel */}
+        {selectedTensionModeId && (
+          <div className={`mt-4 p-5 rounded-2xl border transition-all duration-300 animate-slide-down ${
+            activeMode 
+              ? `${activeMode.bgClass} ${activeMode.borderClass} ${activeMode.textClass}`
+              : 'bg-violet-50/50 dark:bg-violet-950/10 border-violet-200 dark:border-violet-850 text-violet-950 dark:text-violet-105'
+          }`}>
+            {activeMode ? (
+              <div className="flex flex-col md:flex-row gap-6 justify-between items-start">
+                <div className="flex-1 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <Brain className="h-4 w-4 shrink-0" />
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em]">
+                      Subconscious Payoff: {activeMode.payoffTitle}
+                    </span>
+                  </div>
+                  <p className="text-sm font-medium leading-relaxed">
+                    {activeMode.payoffDesc}
+                  </p>
+                </div>
+                
+                <div className="w-full md:w-auto shrink-0 md:max-w-xs space-y-2">
+                  <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-stone-500 dark:text-stone-450 block">
+                    Catalyst Prompts (click to write)
+                  </span>
+                  <div className="flex flex-col gap-1.5">
+                    {activeMode.prompts.map((prompt, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setNewNote(`${activeMode.icon} ${activeMode.label}: ${prompt}`);
+                          const textarea = document.querySelector('textarea');
+                          if (textarea) textarea.focus();
+                        }}
+                        className="text-left text-xs font-semibold px-3 py-2 rounded-xl bg-white/70 hover:bg-white border border-stone-200/50 hover:border-stone-300 dark:bg-stone-900/60 dark:hover:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-700 text-stone-700 dark:text-stone-300 transition-colors shadow-sm select-none cursor-pointer flex items-center justify-between gap-2 group/btn"
+                      >
+                        <span className="line-clamp-2 leading-relaxed">"{prompt}"</span>
+                        <ArrowRight className="h-3.5 w-3.5 shrink-0 opacity-0 group-hover/btn:opacity-100 transform translate-x-1 group-hover/btn:translate-x-0 transition-all" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : selectedTensionModeId === 'context' ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Target className="h-4 w-4 text-violet-500 shrink-0" />
+                  <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-violet-700 dark:text-violet-300">
+                    Active Focus Context Prompts
+                  </span>
+                </div>
+                <p className="text-sm text-stone-600 dark:text-stone-350 max-w-2xl leading-relaxed">
+                  Select a context prompt calibrated to your active projects, goals, or bets. The engine will associate your note with the selected item.
+                </p>
+                
+                {suggestivePrompts.length === 0 ? (
+                  <div className="text-xs text-stone-500 dark:text-stone-400 italic py-2">
+                    No active projects, goals, or bets yet. Define some to see custom context prompts here.
+                  </div>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-2 max-h-[220px] overflow-y-auto pr-1">
+                    {suggestivePrompts.map((prompt) => (
+                      <button
+                        key={prompt.id}
+                        type="button"
+                        onClick={() => {
+                          setNewNote(prompt.prefill);
+                          const textarea = document.querySelector('textarea');
+                          if (textarea) textarea.focus();
+                        }}
+                        className="text-left text-xs font-semibold px-4 py-3 rounded-xl bg-white/70 hover:bg-white border border-stone-200/50 hover:border-stone-350 dark:bg-stone-900/60 dark:hover:bg-stone-900 dark:border-stone-800 dark:hover:border-stone-750 text-stone-700 dark:text-stone-300 transition-colors shadow-sm select-none cursor-pointer flex flex-col gap-1 group/btn"
+                      >
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400">
+                          {prompt.category}
+                        </span>
+                        <div className="flex items-center justify-between gap-3 w-full">
+                          <span className="leading-relaxed">"{prompt.text}"</span>
+                          <ArrowRight className="h-3.5 w-3.5 shrink-0 opacity-0 group-hover/btn:opacity-100 transform translate-x-1 group-hover/btn:translate-x-0 transition-all text-violet-600" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        )}
       </form>
 
       <div className="flex-1 overflow-y-auto pr-2 -mr-2 scrollbar-hide">
@@ -775,6 +1196,8 @@ export default function InboxPage() {
           </div>
         )}
 
+
+
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-[10px] font-bold text-stone-400 dark:text-stone-600 uppercase tracking-[0.2em]">Recent Notes</h2>
           <div className="flex items-center gap-2">
@@ -798,8 +1221,9 @@ export default function InboxPage() {
               goals={goals}
               ideas={ideas}
               capabilityBets={capabilityBets}
-              onSelectPrompt={(prefill) => {
+              onSelectPrompt={(prefill, modeId) => {
                 setNewNote(prefill);
+                setSelectedTensionModeId(modeId);
                 const textarea = document.querySelector('textarea');
                 if (textarea) {
                   textarea.focus();
