@@ -20,6 +20,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
 COPY server.mjs ./
+COPY server/ ./server
 COPY scripts/ ./scripts
 COPY ai_era_kb.sqlite3 ./ai_era_kb.sqlite3
 
