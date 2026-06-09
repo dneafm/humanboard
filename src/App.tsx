@@ -25,6 +25,7 @@ import { isFirebaseConfigured, missingFirebaseConfigKeys } from './config/fireba
 declare const __APP_VERSION__: string;
 const enableAiEraKbBridge = import.meta.env.VITE_ENABLE_AI_ERA_KB_BRIDGE === 'true';
 const ONBOARDING_SEEN_STORAGE_KEY = 'humanboard:onboarding-seen';
+const onboardingAutoOpenedKey = (userId: string) => `humanboard:onboarding-auto-opened:${userId}`;
 
 const uiTourSteps = [
   {
@@ -1044,10 +1045,12 @@ export default function App() {
   useEffect(() => {
     if (!isAuthReady || !userId || !hasHydratedUserSnapshot) return;
     const seen = localStorage.getItem(ONBOARDING_SEEN_STORAGE_KEY);
-    if (!seen) {
+    const autoOpened = sessionStorage.getItem(onboardingAutoOpenedKey(userId));
+    if (!seen && !autoOpened) {
       setIsTutorialOpen(true);
       setIsSpotlightTourOpen(true);
       setSpotlightStepIndex(0);
+      sessionStorage.setItem(onboardingAutoOpenedKey(userId), 'true');
     }
   }, [isAuthReady, userId, hasHydratedUserSnapshot]);
 
