@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogOut, HelpCircle, X, LayoutDashboard, Menu, ArrowRight, Check, MessageSquareText, ShieldCheck, Sparkles, Image, Bell, GitBranch, WandSparkles } from 'lucide-react';
 import { cn } from './lib/utils';
 import InboxPage from './pages/Inbox';
@@ -844,6 +844,7 @@ export default function App() {
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/workflow" element={<WorkflowPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
         <Chatbot />
