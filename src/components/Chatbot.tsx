@@ -5,6 +5,7 @@ import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { askGemma, buildMemoryShapedSystemInstruction, getGemmaRuntimeStatus } from '../lib/ai';
 import { useAppStore } from '../store';
+import { useAuthStore } from '../stores/authStore';
 
 type Message = {
   id: string;
@@ -27,7 +28,9 @@ export default function Chatbot() {
   const addGoal = useAppStore((state) => state.addGoal);
   const updateIdea = useAppStore((state) => state.updateIdea);
   const updateGoal = useAppStore((state) => state.updateGoal);
+  const userId = useAuthStore((state) => state.userId);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [autoDistill, setAutoDistill] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     { id: '1', role: 'model', content: "Hi. I'm your HumanBoard assistant. I can help refine ideas, suggest experiments, summarize notes, and connect thoughts across the app. What are we working on?" }
   ]);
@@ -35,6 +38,19 @@ export default function Chatbot() {
   const [isLoading, setIsLoading] = useState(false);
   const [savedMessageIds, setSavedMessageIds] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const autoDistillStorageKey = `humanboard.chat.auto-distill.${userId || 'anonymous'}`;
+
+  useEffect(() => {
+    setAutoDistill(window.localStorage.getItem(autoDistillStorageKey) === 'true');
+  }, [autoDistillStorageKey]);
+
+  const toggleAutoDistill = () => {
+    setAutoDistill((current) => {
+      const next = !current;
+      window.localStorage.setItem(autoDistillStorageKey, String(next));
+      return next;
+    });
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -118,6 +134,12 @@ export default function Chatbot() {
 
     return true;
   };
+
+  const explicitlyRequestsBoardWrite = (raw: string) => (
+    /\b(save|store|remember|capture|record|add|create|compile|update)\b[\s\S]{0,40}\b(note|idea|board|inbox|map|knowledge)\b/i.test(raw)
+    || /\b(note|idea)\b[\s\S]{0,40}\b(save|store|remember|capture|record|add|create|compile|update)\b/i.test(raw)
+    || /\b(save|store|remember|capture|record)\s+(this|that|it)\b/i.test(raw)
+  );
 
   const handleSaveMessage = (message: Message) => {
     if (savedMessageIds.includes(message.id)) return;
@@ -327,10 +349,15 @@ export default function Chatbot() {
 
     try {
       const historyContext = messages.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n');
+      const explicitBoardWrite = explicitlyRequestsBoardWrite(userMsg);
       const systemInstruction = buildMemoryShapedSystemInstruction(`Use the provided HumanBoard knowledge context when relevant. Prefer connecting the user to existing notes, ideas, goals, projects, principles, and reflections before giving generic advice.
 
 AUTONOMOUS WRITE CAPABILITY:
-You can now autonomously write to the user's board, but you are an inbox gate, not a vacuum cleaner. Only save content that belongs in the HumanBoard database: ideas, strategic observations, principles, goals, projects, unresolved questions, signals, durable user preferences, or raw notes that may matter later. Do NOT save operational chatter about patching/debugging the app, UI bug reports, build/restart requests, or implementation instructions unless the user explicitly says to store them as knowledge. If your response implies creating a note or compiling an idea, you MUST use one of the tools by placing a toolcall block in your response.
+Auto-distill is ${autoDistill ? 'ENABLED' : 'DISABLED'}.
+${autoDistill
+  ? `Selectively distill only durable, meaningful information from the conversation. Do not save raw chat or a transcript. Save at most one cleaned note or one developed idea per response, only when it will remain useful later. Avoid duplicates, temporary details, generic advice, and operational chatter. Prefer a concise note for an early insight; create an idea only when the insight has a clear title, substance, and next action.`
+  : `Do not create notes or ideas unless the user explicitly asks you to save, capture, remember, add, create, compile, or update one. Continue answering normally without writing inferred information to the board.`}
+Only save content that belongs in the HumanBoard database. Do NOT save operational chatter about patching/debugging the app, UI bug reports, build/restart requests, or implementation instructions unless the user explicitly says to store them as knowledge.
 
 Tool 1: Create an inbox note. Use this to save an episodic memory, raw thought, or quick fact.
 <toolcall_create_note>The text of the note goes here</toolcall_create_note>
@@ -419,13 +446,16 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       let matchedIdeaUpdate = false;
       let matchedGoal = false;
       let matchedGoalUpdate = false;
+      const allowNoteIdeaWrites = autoDistill || explicitBoardWrite;
+      let blockedInferredWrite = false;
 
       // Extract Create Note tool calls
       const noteRegex = /<toolcall_create_note>([\s\S]*?)<\/toolcall_create_note>/gi;
       let noteMatch;
       while ((noteMatch = noteRegex.exec(responseText)) !== null) {
         const noteContent = noteMatch[1].trim();
-        if (noteContent && shouldCaptureAsInboxContent(noteContent)) {
+        if (!allowNoteIdeaWrites && noteContent) blockedInferredWrite = true;
+        if (allowNoteIdeaWrites && noteContent && shouldCaptureAsInboxContent(noteContent)) {
           matchedNote = true;
           addNote(noteContent);
         }
@@ -440,6 +470,10 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
           const jsonStr = ideaMatch[1].trim();
           const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
           const ideaData = JSON.parse(cleanJsonStr);
+          if (!allowNoteIdeaWrites) {
+            blockedInferredWrite = true;
+            continue;
+          }
           matchedIdea = true;
           addIdea({
             title: ideaData.title || 'Untitled AI Draft',
@@ -468,6 +502,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
           const jsonStr = updateIdeaMatch[1].trim();
           const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
           const ideaData = JSON.parse(cleanJsonStr);
+          if (!explicitBoardWrite) continue;
           const targetIdea = findIdeaByReference(ideaData.target);
           if (!targetIdea) continue;
           matchedIdeaUpdate = true;
@@ -592,7 +627,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       setMessages(prev => [...prev, { 
         id: (Date.now() + 1).toString(), 
         role: 'model', 
-        content: (cleanText || "I have saved that to your board.") + actionMessage 
+        content: (cleanText || (blockedInferredWrite ? "I kept this in the conversation because Auto-distill is off." : "I have saved that to your board.")) + actionMessage
       }]);
     } catch (error) {
       console.error("Chat error:", error);
@@ -636,6 +671,19 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
           <div className="text-[11px] text-stone-500">
             AI: {runtime.model} · {runtime.local ? 'local runtime' : runtime.baseUrl}
           </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={autoDistill}
+            onClick={toggleAutoDistill}
+            className="mt-1 inline-flex w-fit items-center gap-2 text-[11px] font-medium text-stone-500 transition-colors hover:text-stone-800"
+            title="Selectively save durable insights as cleaned notes or ideas"
+          >
+            <span className={cn("relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors", autoDistill ? "bg-emerald-500" : "bg-stone-300")}>
+              <span className={cn("absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-transform", autoDistill ? "translate-x-3.5" : "translate-x-0.5")} />
+            </span>
+            Auto-distill {autoDistill ? 'on' : 'off'}
+          </button>
         </div>
         <div className="flex items-center gap-1 text-stone-400">
           <button onClick={() => setIsExpanded(!isExpanded)} className="p-1.5 hover:bg-stone-200 rounded-md transition-colors">
