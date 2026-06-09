@@ -25,6 +25,7 @@ export default function GoalsPage() {
   const [editTodos, setEditTodos] = useState('');
   const [regenerationPrompt, setRegenerationPrompt] = useState('');
   const [showRegenerationPrompt, setShowRegenerationPrompt] = useState(false);
+  const [panelEditor, setPanelEditor] = useState<{ type: 'knowledge' | 'ideas' | 'todos'; index: number; value: string; prompt: string; mode: 'edit' | 'regenerate' } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -90,6 +91,38 @@ export default function GoalsPage() {
       },
     });
     setIsEditingPanel(false);
+  };
+
+  const updateRoadmapPanel = (goal: Goal, type: 'knowledge' | 'ideas' | 'todos', index: number, value: string) => {
+    if (!goal.roadmap || !value.trim()) return;
+    const nextItems = [...goal.roadmap[type]];
+    nextItems[index] = value.trim();
+    updateGoal(goal.id, { roadmap: { ...goal.roadmap, [type]: nextItems } });
+  };
+
+  const openRoadmapPanelEditor = (type: 'knowledge' | 'ideas' | 'todos', index: number, value: string, mode: 'edit' | 'regenerate') => {
+    setActiveAiMenu(null);
+    setPanelEditor({ type, index, value, prompt: '', mode });
+  };
+
+  const regenerateRoadmapPanel = async (goal: Goal) => {
+    if (!panelEditor?.prompt.trim()) return;
+    setUiError(null);
+    setIsPerformingAction(true);
+    try {
+      const labels = { knowledge: 'needed knowledge', ideas: 'strategic idea', todos: 'actionable step' };
+      const responseText = await askGemma(
+        `Rewrite this ${labels[panelEditor.type]} for the goal "${goal.title}".\n\nCurrent panel:\n${panelEditor.value}\n\nUser instructions:\n${panelEditor.prompt}`,
+        'You are the live goal-planning assistant for HumanBoard. Return only one concise replacement panel as plain text without introductions, labels, markdown fences, or alternatives.'
+      );
+      updateRoadmapPanel(goal, panelEditor.type, panelEditor.index, responseText);
+      setPanelEditor(null);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'AI panel regeneration failed.';
+      setUiError(`Goal panel regeneration failed. ${detail}`);
+    } finally {
+      setIsPerformingAction(false);
+    }
   };
 
   const handleRoadmapAiAction = async (action: string, itemText: string, context: string) => {
@@ -366,9 +399,15 @@ export default function GoalsPage() {
                                   initial={{ opacity: 0, scale: 0.95, y: -10 }}
                                   animate={{ opacity: 1, scale: 1, y: 0 }}
                                   exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                  className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl shadow-xl z-50 overflow-hidden"
+                                  className="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl shadow-xl z-50 overflow-hidden"
                                 >
                                   <div className="p-2 space-y-1">
+                                    <button onClick={(e) => { e.stopPropagation(); openRoadmapPanelEditor('knowledge', i, item, 'edit'); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg transition-colors text-left">
+                                      <Pencil className="w-3.5 h-3.5 text-stone-400" /> Edit panel
+                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); openRoadmapPanelEditor('knowledge', i, item, 'regenerate'); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg transition-colors text-left">
+                                      <RefreshCw className="w-3.5 h-3.5 text-stone-400" /> Regenerate with prompt
+                                    </button>
                                     <button 
                                       onClick={(e) => { e.stopPropagation(); handleRoadmapAiAction('explain', item, selectedGoal.title); }}
                                       className="w-full flex items-center gap-2 px-3 py-2 text-xs text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg transition-colors text-left"
@@ -427,9 +466,15 @@ export default function GoalsPage() {
                                   initial={{ opacity: 0, scale: 0.95, y: -10 }}
                                   animate={{ opacity: 1, scale: 1, y: 0 }}
                                   exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                  className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl shadow-xl z-50 overflow-hidden"
+                                  className="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl shadow-xl z-50 overflow-hidden"
                                 >
                                   <div className="p-2 space-y-1">
+                                    <button onClick={(e) => { e.stopPropagation(); openRoadmapPanelEditor('ideas', i, item, 'edit'); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg transition-colors text-left">
+                                      <Pencil className="w-3.5 h-3.5 text-stone-400" /> Edit panel
+                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); openRoadmapPanelEditor('ideas', i, item, 'regenerate'); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg transition-colors text-left">
+                                      <RefreshCw className="w-3.5 h-3.5 text-stone-400" /> Regenerate with prompt
+                                    </button>
                                     <button 
                                       onClick={(e) => { e.stopPropagation(); handleRoadmapAiAction('expand', item, selectedGoal.title); }}
                                       className="w-full flex items-center gap-2 px-3 py-2 text-xs text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg transition-colors text-left"
@@ -488,9 +533,15 @@ export default function GoalsPage() {
                                   initial={{ opacity: 0, scale: 0.95, y: -10 }}
                                   animate={{ opacity: 1, scale: 1, y: 0 }}
                                   exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                  className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl shadow-xl z-50 overflow-hidden"
+                                  className="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl shadow-xl z-50 overflow-hidden"
                                 >
                                   <div className="p-2 space-y-1">
+                                    <button onClick={(e) => { e.stopPropagation(); openRoadmapPanelEditor('todos', i, item, 'edit'); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg transition-colors text-left">
+                                      <Pencil className="w-3.5 h-3.5 text-stone-400" /> Edit panel
+                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); openRoadmapPanelEditor('todos', i, item, 'regenerate'); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg transition-colors text-left">
+                                      <RefreshCw className="w-3.5 h-3.5 text-stone-400" /> Regenerate with prompt
+                                    </button>
                                     <button 
                                       onClick={(e) => { e.stopPropagation(); handleRoadmapAiAction('breakdown', item, selectedGoal.title); }}
                                       className="w-full flex items-center gap-2 px-3 py-2 text-xs text-stone-600 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-lg transition-colors text-left"
@@ -547,6 +598,42 @@ export default function GoalsPage() {
           )}
         </div>
       </div>
+
+      <AnimatePresence>
+        {panelEditor && selectedGoal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/50 p-4 backdrop-blur-sm" onClick={() => setPanelEditor(null)}>
+            <motion.div initial={{ scale: 0.97, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.97, y: 12 }} onClick={(event) => event.stopPropagation()} className="w-full max-w-xl rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl dark:border-stone-800 dark:bg-stone-900">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-semibold text-stone-900 dark:text-stone-100">{panelEditor.mode === 'edit' ? 'Edit panel' : 'Regenerate panel'}</h2>
+                  <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">{panelEditor.mode === 'edit' ? 'Replace this roadmap card directly.' : 'Tell the assistant how to rewrite only this roadmap card.'}</p>
+                </div>
+                <button type="button" onClick={() => setPanelEditor(null)} className="p-2 text-stone-400 hover:text-stone-900 dark:hover:text-stone-100"><X className="h-4 w-4" /></button>
+              </div>
+              <div className="mt-5 grid gap-4">
+                <label className="grid gap-2 text-xs font-semibold uppercase tracking-wider text-stone-500">
+                  Current panel
+                  <textarea value={panelEditor.value} onChange={(event) => setPanelEditor({ ...panelEditor, value: event.target.value })} readOnly={panelEditor.mode === 'regenerate'} className="min-h-28 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-normal normal-case tracking-normal text-stone-900 outline-none focus:border-stone-400 read-only:text-stone-500 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-100" />
+                </label>
+                {panelEditor.mode === 'regenerate' && (
+                  <label className="grid gap-2 text-xs font-semibold uppercase tracking-wider text-stone-500">
+                    Rewrite prompt
+                    <textarea autoFocus value={panelEditor.prompt} onChange={(event) => setPanelEditor({ ...panelEditor, prompt: event.target.value })} placeholder="Example: Make this more specific, measurable, and achievable within seven days." className="min-h-24 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-normal normal-case tracking-normal text-stone-900 outline-none focus:border-stone-400 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-100" />
+                  </label>
+                )}
+              </div>
+              <div className="mt-6 flex justify-end gap-2">
+                <button type="button" onClick={() => setPanelEditor(null)} className="px-4 py-2 text-sm font-medium text-stone-500 hover:text-stone-900 dark:hover:text-stone-100">Cancel</button>
+                {panelEditor.mode === 'edit' ? (
+                  <button type="button" onClick={() => { updateRoadmapPanel(selectedGoal, panelEditor.type, panelEditor.index, panelEditor.value); setPanelEditor(null); }} disabled={!panelEditor.value.trim()} className="inline-flex items-center gap-2 rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-900"><Save className="h-4 w-4" />Save panel</button>
+                ) : (
+                  <button type="button" onClick={() => void regenerateRoadmapPanel(selectedGoal)} disabled={!panelEditor.prompt.trim() || isPerformingAction} className="inline-flex items-center gap-2 rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-900"><RefreshCw className={cn("h-4 w-4", isPerformingAction && "animate-spin")} />Regenerate</button>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {isEditingPanel && selectedGoal && (
