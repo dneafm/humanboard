@@ -497,9 +497,10 @@ export async function performAIAction(action: AIAction, content: string, title?:
   );
 }
 
-export async function generateGoalRoadmap(goalTitle: string, goalDescription: string) {
+export async function generateGoalRoadmap(goalTitle: string, goalDescription: string, regenerationPrompt?: string) {
   const prompt = `I have a goal: "${goalTitle}".
 Description: ${goalDescription}
+${regenerationPrompt?.trim() ? `\nUser instructions for this roadmap:\n${regenerationPrompt.trim()}\n` : ''}
 
 Please help me achieve this goal by producing valid JSON with exactly these keys:
 - knowledge: array of strings

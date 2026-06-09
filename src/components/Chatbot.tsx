@@ -509,17 +509,27 @@ Tool 6: Create a Goal. Use this when the user wants to define a new goal.
 {
   "title": "Goal title",
   "description": "Goal description",
-  "status": "Active|Paused|Completed"
+  "status": "Active|Paused|Completed",
+  "roadmap": {
+    "knowledge": ["optional knowledge item"],
+    "ideas": ["optional strategic idea"],
+    "todos": ["optional actionable step"]
+  }
 }
 </toolcall_create_goal>
 
-Tool 7: Update an existing Goal. Use this to change a goal's title, description, or status.
+Tool 7: Update an existing Goal or its roadmap panel. Use this to change a goal's details, status, or complete roadmap lists.
 <toolcall_update_goal>
 {
   "target": "existing goal title or id",
   "title": "optional new title",
   "description": "optional new description",
-  "status": "Active|Paused|Completed"
+  "status": "Active|Paused|Completed",
+  "roadmap": {
+    "knowledge": ["complete replacement list when changing knowledge"],
+    "ideas": ["complete replacement list when changing ideas"],
+    "todos": ["complete replacement list when changing todos"]
+  }
 }
 </toolcall_update_goal>
 
@@ -541,6 +551,7 @@ Tool 9: Search the board. Use this when the user asks to find, search, query, or
 
 When the user asks to create or manage a map idea node, prefer toolcall_create_idea or toolcall_update_idea instead of only describing what to do.
 To move an idea between sections, use toolcall_update_idea with the "section" field set to the target section name.
+When the user asks to edit or regenerate a goal roadmap panel, use toolcall_update_goal instead of only describing the changes.
 Include the toolcall anywhere in your response. You can use multiple toolcalls if needed.`);
 
       const responseText = await askGemma(
@@ -694,6 +705,11 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
               title: data.title.trim(),
               description: (data.description || '').trim(),
               status: (['Active', 'Paused', 'Completed'].includes(data.status) ? data.status : 'Active') as 'Active' | 'Paused' | 'Completed',
+              roadmap: data.roadmap ? {
+                knowledge: Array.isArray(data.roadmap.knowledge) ? data.roadmap.knowledge.map(String) : [],
+                ideas: Array.isArray(data.roadmap.ideas) ? data.roadmap.ideas.map(String) : [],
+                todos: Array.isArray(data.roadmap.todos) ? data.roadmap.todos.map(String) : [],
+              } : undefined,
             });
           }
         } catch (err) {
@@ -718,6 +734,13 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
           if (data.title) updates.title = data.title.trim();
           if (data.description) updates.description = data.description.trim();
           if (['Active', 'Paused', 'Completed'].includes(data.status)) updates.status = data.status;
+          if (data.roadmap) {
+            updates.roadmap = {
+              knowledge: Array.isArray(data.roadmap.knowledge) ? data.roadmap.knowledge.map(String) : targetGoal.roadmap?.knowledge ?? [],
+              ideas: Array.isArray(data.roadmap.ideas) ? data.roadmap.ideas.map(String) : targetGoal.roadmap?.ideas ?? [],
+              todos: Array.isArray(data.roadmap.todos) ? data.roadmap.todos.map(String) : targetGoal.roadmap?.todos ?? [],
+            };
+          }
           updateGoal(targetGoal.id, updates);
         } catch (err) {
           console.error("Failed to parse update_goal toolcall JSON:", err);
