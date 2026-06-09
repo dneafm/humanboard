@@ -100,7 +100,7 @@ export default function DailySynthesisCard() {
 
   return (
     <section className="rounded-xl border border-emerald-200/80 bg-emerald-50/65 px-4 py-4 dark:border-emerald-900/50 dark:bg-emerald-950/20">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-400">
             <Sparkles className="h-3.5 w-3.5" />
@@ -126,7 +126,7 @@ export default function DailySynthesisCard() {
           type="button"
           onClick={() => void run(true)}
           disabled={loading || !userId}
-          className="shrink-0 rounded-md border border-emerald-200 bg-white p-2 text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-50 dark:border-emerald-900 dark:bg-stone-950 dark:text-emerald-400 dark:hover:bg-emerald-950"
+          className="self-start shrink-0 rounded-md border border-emerald-200 bg-white p-2 text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-50 dark:border-emerald-900 dark:bg-stone-950 dark:text-emerald-400 dark:hover:bg-emerald-950 sm:self-auto"
           title="Regenerate daily synthesis"
           aria-label="Regenerate daily synthesis"
         >

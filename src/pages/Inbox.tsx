@@ -740,8 +740,8 @@ export default function InboxPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto w-full p-8 flex flex-col h-full transition-colors duration-300">
-      <header className="mb-10">
+    <div className="max-w-3xl mx-auto w-full px-4 py-6 sm:p-8 flex flex-col h-full transition-colors duration-300">
+      <header className="mb-8 sm:mb-10">
         <div className="flex items-center gap-3 mb-3">
           <span className="text-[10px] font-bold uppercase tracking-[0.25em] px-3 py-1 rounded-full bg-stone-100 dark:bg-stone-900 border border-stone-200 dark:border-stone-800 text-stone-500 dark:text-stone-400">Raw capture</span>
         </div>
