@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
-import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogIn, LogOut, HelpCircle, X, LayoutDashboard, Menu } from 'lucide-react';
+import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogOut, HelpCircle, X, LayoutDashboard, Menu, ArrowRight, Check, MessageSquareText, ShieldCheck, Sparkles } from 'lucide-react';
 import { cn } from './lib/utils';
 import InboxPage from './pages/Inbox';
 import IdeasPage from './pages/Ideas';
@@ -244,74 +244,161 @@ function AuthScreen() {
   };
 
   return (
-    <div className="min-h-dvh overflow-x-hidden bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100">
+    <div className="min-h-dvh overflow-x-hidden bg-[#f4f3ef] text-stone-950 dark:bg-[#0b0d0c] dark:text-stone-100">
       <TutorialModal open={isTutorialOpen} onClose={() => setIsTutorialOpen(false)} />
-      <div className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col justify-center px-4 py-10 sm:px-6 lg:px-8">
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-          <div className="rounded-2xl border border-stone-200 bg-white p-8 shadow-sm dark:border-stone-800 dark:bg-stone-900 sm:p-10">
-            <div className="mb-6 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-stone-900 dark:bg-stone-100">
-                <span className="text-base font-bold text-stone-50 dark:text-stone-900">H</span>
-              </div>
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">HumanBoard</h1>
-                <p className="text-sm text-stone-500 dark:text-stone-400">Think in public with yourself before you organize.</p>
-              </div>
-            </div>
-
-            <div className="max-w-2xl space-y-4">
-              <p className="text-3xl font-semibold tracking-tight text-stone-950 dark:text-stone-50 sm:text-4xl">
-                Capture messy thoughts. Turn them into durable knowledge.
-              </p>
-              <p className="text-base leading-7 text-stone-600 dark:text-stone-400 sm:text-lg">
-                HumanBoard is a personal thinking workspace for raw notes, refined ideas, projects, goals, and long-horizon bets. Start in Inbox, compile what matters, and let the board become a map of how you think.
-              </p>
-            </div>
-
-            <div className="mt-8 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/60">
-                <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">Inbox first</div>
-                <p className="mt-1 text-sm leading-6 text-stone-600 dark:text-stone-400">Drop raw thoughts fast without forcing structure too early.</p>
-              </div>
-              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/60">
-                <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">Compile ideas</div>
-                <p className="mt-1 text-sm leading-6 text-stone-600 dark:text-stone-400">Promote useful notes into principles, concepts, and decisions worth revisiting.</p>
-              </div>
-              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/60">
-                <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">Track bets</div>
-                <p className="mt-1 text-sm leading-6 text-stone-600 dark:text-stone-400">Watch signals, projects, and capabilities that may become high leverage later.</p>
-              </div>
-            </div>
+      <header className="mx-auto flex w-full max-w-[1440px] items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-stone-950 text-white dark:bg-stone-100 dark:text-stone-950">
+            <span className="text-sm font-bold">H</span>
           </div>
+          <span className="text-base font-semibold">HumanBoard</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsTutorialOpen(true)}
+          className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-stone-600 transition-colors hover:bg-white hover:text-stone-950 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"
+        >
+          <HelpCircle className="h-4 w-4" />
+          <span>How it works</span>
+        </button>
+      </header>
 
-          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm dark:border-stone-800 dark:bg-stone-900 sm:p-8">
-            <div className="mb-5">
-              <div className="text-sm font-medium uppercase tracking-[0.2em] text-stone-500 dark:text-stone-400">Get started</div>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight">Open your board</h2>
-              <p className="mt-2 text-sm leading-6 text-stone-600 dark:text-stone-400">
-                Sign in to access your personal HumanBoard workspace and synced snapshot.
-              </p>
-            </div>
+      <main className="mx-auto grid w-full max-w-[1440px] gap-10 px-5 pb-10 pt-5 sm:px-8 lg:min-h-[calc(100dvh-73px)] lg:grid-cols-[minmax(0,0.9fr)_minmax(560px,1.1fr)] lg:items-center lg:gap-14 lg:px-12 lg:pb-16 lg:pt-8">
+        <section className="max-w-xl">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300">
+            <Sparkles className="h-3.5 w-3.5" />
+            Personal thinking workspace
+          </div>
+          <h1 className="max-w-lg text-5xl font-semibold leading-[1.03] sm:text-6xl">
+            Turn scattered thoughts into direction.
+          </h1>
+          <p className="mt-6 max-w-lg text-base leading-7 text-stone-600 dark:text-stone-400 sm:text-lg">
+            Capture what is on your mind, distill the useful parts, and connect them to the goals and projects that matter.
+          </p>
 
+          <div className="mt-8 border-y border-stone-300 py-5 dark:border-stone-800">
             <button
               onClick={() => void handleSignIn()}
               disabled={!isAuthReady}
-              className="flex w-full items-center justify-center gap-2 rounded-md bg-stone-900 px-4 py-3 text-sm font-medium text-white transition-all hover:bg-stone-700 disabled:cursor-wait disabled:bg-stone-400 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-300"
+              className="group flex w-full items-center justify-between rounded-md bg-stone-950 px-4 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-wait disabled:bg-stone-400 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-emerald-400"
             >
-              <LogIn className="h-4 w-4" />
-              <span>{isAuthReady ? 'Continue with Google' : 'Checking session...'}</span>
+              <span className="flex items-center gap-3">
+                <span className="flex h-7 w-7 items-center justify-center rounded-sm bg-white text-sm font-bold text-stone-950">G</span>
+                {isAuthReady ? 'Continue with Google' : 'Checking session...'}
+              </span>
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </button>
-
-            <div className="mt-3">
-              <GuideButton onClick={() => setIsTutorialOpen(true)} />
+            <div className="mt-3 flex items-start gap-2 text-xs leading-5 text-stone-500 dark:text-stone-500">
+              <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>Your Google account identifies your private workspace. HumanBoard does not post to your account.</span>
             </div>
-
             {error && (
-              <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>
+              <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">{error}</p>
             )}
           </div>
-        </div>
-      </div>
+
+          <div className="mt-6 grid grid-cols-2 gap-x-5 gap-y-3 text-sm text-stone-700 dark:text-stone-300">
+            {['Fast inbox capture', 'Selective AI distillation', 'Connected goals and ideas', 'Your own private board'].map((item) => (
+              <div key={item} className="flex items-center gap-2">
+                <Check className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section aria-label="HumanBoard preview" className="relative min-w-0">
+          <div className="absolute -left-4 top-12 hidden h-24 w-1 bg-amber-400 lg:block" />
+          <div className="overflow-hidden rounded-lg border border-stone-300 bg-white shadow-[0_22px_70px_rgba(28,25,23,0.12)] dark:border-stone-800 dark:bg-stone-950 dark:shadow-none">
+            <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3 dark:border-stone-800">
+              <div className="flex items-center gap-2">
+                <div className="h-2.5 w-2.5 rounded-full bg-red-400" />
+                <div className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+                <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              </div>
+              <div className="text-[11px] font-medium text-stone-400">humanboard / today</div>
+              <div className="h-6 w-6 rounded-sm bg-stone-100 dark:bg-stone-900" />
+            </div>
+
+            <div className="grid min-h-[470px] grid-cols-[52px_1fr] sm:grid-cols-[150px_1fr]">
+              <div className="border-r border-stone-200 bg-stone-50 px-2 py-4 dark:border-stone-800 dark:bg-stone-900/60 sm:px-3">
+                <div className="mb-5 flex items-center gap-2 px-1">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-sm bg-stone-950 text-xs font-bold text-white dark:bg-stone-100 dark:text-stone-950">H</div>
+                  <span className="hidden text-xs font-semibold sm:block">HumanBoard</span>
+                </div>
+                <div className="space-y-1">
+                  {[
+                    { icon: Inbox, label: 'Inbox', active: true },
+                    { icon: Lightbulb, label: 'Ideas' },
+                    { icon: Target, label: 'Goals' },
+                    { icon: Network, label: 'Map' },
+                  ].map((item) => (
+                    <div key={item.label} className={cn('flex h-8 items-center gap-2 rounded-md px-2 text-xs', item.active ? 'bg-stone-200 font-semibold text-stone-950 dark:bg-stone-800 dark:text-stone-100' : 'text-stone-500')}>
+                      <item.icon className="h-3.5 w-3.5 shrink-0" />
+                      <span className="hidden sm:block">{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="min-w-0 p-4 sm:p-6">
+                <div className="flex items-end justify-between border-b border-stone-200 pb-4 dark:border-stone-800">
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase text-emerald-700 dark:text-emerald-400">Tuesday, June 9</div>
+                    <h2 className="mt-1 text-xl font-semibold sm:text-2xl">Good evening.</h2>
+                  </div>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md border border-stone-200 dark:border-stone-800">
+                    <SearchIcon className="h-3.5 w-3.5 text-stone-500" />
+                  </div>
+                </div>
+
+                <div className="mt-5 rounded-md border border-stone-300 bg-stone-50 p-3 dark:border-stone-700 dark:bg-stone-900">
+                  <div className="flex items-start gap-3">
+                    <MessageSquareText className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                    <div>
+                      <div className="text-xs font-semibold">Capture a thought</div>
+                      <p className="mt-1 text-xs leading-5 text-stone-500">What feels important enough to remember?</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="text-[10px] font-semibold uppercase text-stone-500">Recently distilled</div>
+                    <div className="text-[10px] text-stone-400">3 signals</div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-md border border-stone-200 p-3 dark:border-stone-800">
+                      <div className="mb-4 flex h-7 w-7 items-center justify-center rounded-sm bg-amber-100 dark:bg-amber-950">
+                        <Lightbulb className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400" />
+                      </div>
+                      <p className="text-xs font-semibold leading-5">Distribution is part of the product, not a task after launch.</p>
+                      <div className="mt-3 text-[10px] text-stone-400">Idea · 8 min ago</div>
+                    </div>
+                    <div className="rounded-md border border-stone-200 p-3 dark:border-stone-800">
+                      <div className="mb-4 flex h-7 w-7 items-center justify-center rounded-sm bg-emerald-100 dark:bg-emerald-950">
+                        <Target className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" />
+                      </div>
+                      <p className="text-xs font-semibold leading-5">Build one repeatable system that compounds each week.</p>
+                      <div className="mt-3 text-[10px] text-stone-400">Goal · Today</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex items-center gap-3 border-t border-stone-200 pt-4 dark:border-stone-800">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-sm bg-stone-950 dark:bg-stone-100">
+                    <Sparkles className="h-3.5 w-3.5 text-white dark:text-stone-950" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold">Assistant found a connection</div>
+                    <div className="mt-0.5 text-[10px] text-stone-400">Your goal and latest idea reinforce each other.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
   );
 }
