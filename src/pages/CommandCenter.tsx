@@ -182,21 +182,21 @@ export default function CommandCenterPage() {
     const [healthRes, versionRes, costsRes, overviewRes, eventsRes] = await Promise.all([
       apiFetch('/api/health', { cache: 'no-store' }),
       apiFetch('/api/version', { cache: 'no-store' }),
-      apiFetch('/api/ai-costs', { cache: 'no-store' }),
+      userId ? apiFetch('/api/ai-costs', { cache: 'no-store' }) : Promise.resolve(null),
       apiFetch('/api/admin/overview', { cache: 'no-store' }),
       apiFetch('/api/admin/events', { cache: 'no-store' }),
     ]);
 
     if (!healthRes.ok) throw new Error('Failed to load health');
     if (!versionRes.ok) throw new Error('Failed to load version');
-    if (!costsRes.ok) throw new Error('Failed to load AI costs');
+    if (costsRes && !costsRes.ok) throw new Error('Failed to load AI costs');
     if (!overviewRes.ok) throw new Error('Failed to load admin overview');
     if (!eventsRes.ok) throw new Error('Failed to load admin events');
 
     const [healthPayload, versionPayload, costsPayload, overviewPayload, eventsPayload] = await Promise.all([
       healthRes.json() as Promise<HealthPayload>,
       versionRes.json() as Promise<VersionPayload>,
-      costsRes.json() as Promise<AiCostTracking>,
+      costsRes ? costsRes.json() as Promise<AiCostTracking> : Promise.resolve(emptyCosts),
       overviewRes.json() as Promise<AdminOverview>,
       eventsRes.json() as Promise<AdminEvents>,
     ]);

@@ -6,6 +6,7 @@ import { compileRawNoteToKnowledge, extractCapabilityEvidenceReview } from '../l
 import { Link, useSearchParams } from 'react-router-dom';
 import ExtractionReviewPanel from '../components/capability/ExtractionReviewPanel';
 import { createNoteFromImage, getClipboardImage } from '../lib/imageNote';
+import AdaptiveDashboard from '../components/AdaptiveDashboard';
 
 type CompileDraft = {
   noteId: string;
@@ -183,7 +184,7 @@ export default function InboxPage() {
   const [compileDraft, setCompileDraft] = useState<CompileDraft | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const focusNoteId = searchParams.get('note');
-  const { notes, ideas, addNote, updateNote, deleteNote, addIdea, sections, capabilityBets } = useAppStore();
+  const { notes, ideas, addNote, updateNote, deleteNote, addIdea, sections, capabilityBets, projects, goals } = useAppStore();
   const activeCapabilityBets = useMemo(() => capabilityBets.filter((bet) => !bet.archivedAt), [capabilityBets]);
 
   const compileSourceNote = useMemo(
@@ -792,9 +793,19 @@ export default function InboxPage() {
         </div>
         <div className="space-y-6">
           {notes.length === 0 ? (
-            <div className="text-center py-16 text-stone-400 dark:text-stone-600 border border-dashed border-stone-200 dark:border-stone-800 rounded-xl bg-stone-50/50 dark:bg-stone-900/20">
-              <p className="text-sm italic">Inbox zero. Your mind is clear.</p>
-            </div>
+            <AdaptiveDashboard
+              projects={projects}
+              goals={goals}
+              ideas={ideas}
+              capabilityBets={capabilityBets}
+              onSelectPrompt={(prefill) => {
+                setNewNote(prefill);
+                const textarea = document.querySelector('textarea');
+                if (textarea) {
+                  textarea.focus();
+                }
+              }}
+            />
           ) : (
             notes.map(note => {
               const isFocused = focusNoteId === note.id;

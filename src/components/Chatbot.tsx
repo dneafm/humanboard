@@ -24,7 +24,9 @@ export default function Chatbot() {
   const sections = useAppStore((state) => state.sections);
   const addIdea = useAppStore((state) => state.addIdea);
   const addNote = useAppStore((state) => state.addNote);
+  const addGoal = useAppStore((state) => state.addGoal);
   const updateIdea = useAppStore((state) => state.updateIdea);
+  const updateGoal = useAppStore((state) => state.updateGoal);
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     { id: '1', role: 'model', content: "Hi. I'm your HumanBoard assistant. I can help refine ideas, suggest experiments, summarize notes, and connect thoughts across the app. What are we working on?" }
@@ -59,6 +61,12 @@ export default function Chatbot() {
     const normalized = normalizeText(value);
     if (!normalized) return undefined;
     return ideas.find((idea) => normalizeText(idea.id) === normalized || normalizeText(idea.title) === normalized);
+  };
+
+  const findGoalByReference = (value?: string) => {
+    const normalized = normalizeText(value);
+    if (!normalized) return undefined;
+    return goals.find((goal) => normalizeText(goal.id) === normalized || normalizeText(goal.title) === normalized);
   };
 
   const findRelatedIdeaIds = (values?: string[]) => {
@@ -367,7 +375,37 @@ Tool 4: Update your Persona. If you learn something new about the user's prefere
 }
 </toolcall_update_persona>
 
+Tool 5: Create a Goal. Use this when the user asks to create, save, or pursue a concrete outcome.
+<toolcall_create_goal>
+{
+  "title": "Goal title",
+  "description": "What success means and relevant context",
+  "status": "Active|Paused|Completed",
+  "roadmap": {
+    "knowledge": ["optional knowledge item"],
+    "ideas": ["optional strategic idea"],
+    "todos": ["optional actionable step"]
+  }
+}
+</toolcall_create_goal>
+
+Tool 6: Update an existing Goal or its roadmap panel. Use this when the user asks to edit a goal, change its status, revise its roadmap, or regenerate/rewrite panel content.
+<toolcall_update_goal>
+{
+  "target": "existing goal title or id",
+  "title": "optional new title",
+  "description": "optional new description",
+  "status": "Active|Paused|Completed",
+  "roadmap": {
+    "knowledge": ["complete replacement list when changing knowledge"],
+    "ideas": ["complete replacement list when changing ideas"],
+    "todos": ["complete replacement list when changing todos"]
+  }
+}
+</toolcall_update_goal>
+
 When the user asks to create or manage a map idea node, prefer toolcall_create_idea or toolcall_update_idea instead of only describing what to do.
+When the user asks to create or edit a goal or roadmap panel, use toolcall_create_goal or toolcall_update_goal instead of only describing what to do.
 Include the toolcall anywhere in your response. You can use multiple toolcalls if needed.`);
 
       const responseText = await askGemma(
@@ -379,6 +417,8 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       let matchedNote = false;
       let matchedIdea = false;
       let matchedIdeaUpdate = false;
+      let matchedGoal = false;
+      let matchedGoalUpdate = false;
 
       // Extract Create Note tool calls
       const noteRegex = /<toolcall_create_note>([\s\S]*?)<\/toolcall_create_note>/gi;
@@ -487,14 +527,65 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       }
       cleanText = cleanText.replace(personaRegex, '').trim();
 
+      const createGoalRegex = /<toolcall_create_goal>([\s\S]*?)<\/toolcall_create_goal>/gi;
+      let createGoalMatch;
+      while ((createGoalMatch = createGoalRegex.exec(responseText)) !== null) {
+        try {
+          const cleanJsonStr = createGoalMatch[1].trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+          const data = JSON.parse(cleanJsonStr);
+          if (!String(data.title || '').trim()) continue;
+          matchedGoal = true;
+          addGoal({
+            title: String(data.title).trim(),
+            description: String(data.description || '').trim(),
+            status: ['Active', 'Paused', 'Completed'].includes(data.status) ? data.status : 'Active',
+            roadmap: data.roadmap ? {
+              knowledge: Array.isArray(data.roadmap.knowledge) ? data.roadmap.knowledge.map(String) : [],
+              ideas: Array.isArray(data.roadmap.ideas) ? data.roadmap.ideas.map(String) : [],
+              todos: Array.isArray(data.roadmap.todos) ? data.roadmap.todos.map(String) : [],
+            } : undefined,
+          });
+        } catch (err) {
+          console.error("Failed to parse create_goal toolcall JSON:", err);
+        }
+      }
+      cleanText = cleanText.replace(createGoalRegex, '').trim();
+
+      const updateGoalRegex = /<toolcall_update_goal>([\s\S]*?)<\/toolcall_update_goal>/gi;
+      let updateGoalMatch;
+      while ((updateGoalMatch = updateGoalRegex.exec(responseText)) !== null) {
+        try {
+          const cleanJsonStr = updateGoalMatch[1].trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+          const data = JSON.parse(cleanJsonStr);
+          const targetGoal = findGoalByReference(data.target);
+          if (!targetGoal) continue;
+          matchedGoalUpdate = true;
+          updateGoal(targetGoal.id, {
+            title: data.title === undefined ? targetGoal.title : String(data.title).trim(),
+            description: data.description === undefined ? targetGoal.description : String(data.description).trim(),
+            status: ['Active', 'Paused', 'Completed'].includes(data.status) ? data.status : targetGoal.status,
+            roadmap: data.roadmap ? {
+              knowledge: Array.isArray(data.roadmap.knowledge) ? data.roadmap.knowledge.map(String) : targetGoal.roadmap?.knowledge ?? [],
+              ideas: Array.isArray(data.roadmap.ideas) ? data.roadmap.ideas.map(String) : targetGoal.roadmap?.ideas ?? [],
+              todos: Array.isArray(data.roadmap.todos) ? data.roadmap.todos.map(String) : targetGoal.roadmap?.todos ?? [],
+            } : targetGoal.roadmap,
+          });
+        } catch (err) {
+          console.error("Failed to parse update_goal toolcall JSON:", err);
+        }
+      }
+      cleanText = cleanText.replace(updateGoalRegex, '').trim();
+
       let actionMessage = '';
-      if (matchedNote || matchedIdea || matchedIdeaUpdate || matchedPersona) {
+      if (matchedNote || matchedIdea || matchedIdeaUpdate || matchedPersona || matchedGoal || matchedGoalUpdate) {
         actionMessage = "\n\n*(AI: ";
         const acts = [];
         if (matchedNote) acts.push("added to Inbox");
         if (matchedIdea) acts.push("created Idea node");
         if (matchedIdeaUpdate) acts.push("updated Idea node");
         if (matchedPersona) acts.push("updated System Persona");
+        if (matchedGoal) acts.push("created Goal");
+        if (matchedGoalUpdate) acts.push("updated Goal panel");
         actionMessage += acts.join(", ") + ")*";
       }
 

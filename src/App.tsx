@@ -315,6 +315,7 @@ function LoadingScreen() {
 export default function App() {
   const isDarkMode = useAppStore(state => state.isDarkMode);
   const { isAuthReady, userId } = useAuthStore();
+  const isLocalCommandCenter = window.location.port === '3010';
   const [hasHydratedUserSnapshot, setHasHydratedUserSnapshot] = useState(false);
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const navItems = [
@@ -353,6 +354,14 @@ export default function App() {
       cancelled = true;
     };
   }, [isAuthReady, userId]);
+
+  if (isLocalCommandCenter && isAuthReady && !userId) {
+    return (
+      <BrowserRouter>
+        <CommandCenterPage />
+      </BrowserRouter>
+    );
+  }
 
   if (!isAuthReady || !userId) {
     if (!isFirebaseConfigured) {

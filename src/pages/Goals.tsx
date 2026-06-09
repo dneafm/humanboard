@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAppStore, Goal } from '../store';
-import { Plus, Target, CheckCircle2, Circle, Clock, Sparkles, Trash2, ChevronRight, BookOpen, Lightbulb, ListTodo, RefreshCw, Wand2, AlignLeft, GitBranch, X } from 'lucide-react';
+import { Plus, Target, CheckCircle2, Circle, Clock, Sparkles, Trash2, BookOpen, Lightbulb, ListTodo, RefreshCw, Wand2, AlignLeft, GitBranch, X, Pencil, Save } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { askGemma, generateGoalRoadmap } from '../lib/ai';
@@ -17,6 +17,14 @@ export default function GoalsPage() {
   const [aiResult, setAiResult] = useState<{ title: string, content: string } | null>(null);
   const [isPerformingAction, setIsPerformingAction] = useState(false);
   const [uiError, setUiError] = useState<string | null>(null);
+  const [isEditingPanel, setIsEditingPanel] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editKnowledge, setEditKnowledge] = useState('');
+  const [editIdeas, setEditIdeas] = useState('');
+  const [editTodos, setEditTodos] = useState('');
+  const [regenerationPrompt, setRegenerationPrompt] = useState('');
+  const [showRegenerationPrompt, setShowRegenerationPrompt] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,12 +50,14 @@ export default function GoalsPage() {
     setIsAdding(false);
   };
 
-  const handleGenerateRoadmap = async (goal: Goal) => {
+  const handleGenerateRoadmap = async (goal: Goal, customPrompt?: string) => {
     setUiError(null);
     setIsGenerating(goal.id);
     try {
-      const roadmap = await generateGoalRoadmap(goal.title, goal.description);
+      const roadmap = await generateGoalRoadmap(goal.title, goal.description, customPrompt);
       updateGoal(goal.id, { roadmap });
+      setRegenerationPrompt('');
+      setShowRegenerationPrompt(false);
     } catch (error) {
       console.error("Roadmap generation failed:", error);
       const detail = error instanceof Error ? error.message : "Failed to generate roadmap. Please try again.";
@@ -55,6 +65,31 @@ export default function GoalsPage() {
     } finally {
       setIsGenerating(null);
     }
+  };
+
+  const splitPanelLines = (value: string) => value.split('\n').map((item) => item.trim()).filter(Boolean);
+
+  const openPanelEditor = (goal: Goal) => {
+    setEditTitle(goal.title);
+    setEditDescription(goal.description);
+    setEditKnowledge((goal.roadmap?.knowledge ?? []).join('\n'));
+    setEditIdeas((goal.roadmap?.ideas ?? []).join('\n'));
+    setEditTodos((goal.roadmap?.todos ?? []).join('\n'));
+    setIsEditingPanel(true);
+  };
+
+  const savePanelEditor = (goal: Goal) => {
+    if (!editTitle.trim()) return;
+    updateGoal(goal.id, {
+      title: editTitle.trim(),
+      description: editDescription.trim(),
+      roadmap: {
+        knowledge: splitPanelLines(editKnowledge),
+        ideas: splitPanelLines(editIdeas),
+        todos: splitPanelLines(editTodos),
+      },
+    });
+    setIsEditingPanel(false);
   };
 
   const handleRoadmapAiAction = async (action: string, itemText: string, context: string) => {
@@ -257,8 +292,17 @@ export default function GoalsPage() {
                   <p className="text-stone-600 dark:text-stone-400 leading-relaxed">{selectedGoal.description}</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openPanelEditor(selectedGoal)}
+                    title="Edit goal and roadmap panel"
+                    className="p-2 text-stone-400 hover:text-blue-500 transition-colors"
+                  >
+                    <Pencil className="w-5 h-5" />
+                  </button>
                   <button 
                     onClick={() => deleteGoal(selectedGoal.id)}
+                    title="Delete goal"
                     className="p-2 text-stone-400 hover:text-red-500 transition-colors"
                   >
                     <Trash2 className="w-5 h-5" />
@@ -471,15 +515,48 @@ export default function GoalsPage() {
                     </div>
                   </section>
 
-                  <div className="pt-8 border-t border-stone-100 dark:border-stone-800">
-                    <button 
-                      onClick={() => handleGenerateRoadmap(selectedGoal)}
-                      disabled={isGenerating === selectedGoal.id}
-                      className="text-[10px] font-bold uppercase tracking-widest text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 flex items-center gap-2 transition-colors"
-                    >
-                      <RefreshCw className={cn("w-3 h-3", isGenerating === selectedGoal.id && "animate-spin")} />
-                      Regenerate Roadmap
-                    </button>
+                  <div className="pt-8 border-t border-stone-100 dark:border-stone-800 space-y-3">
+                    <div className="flex flex-wrap items-center gap-4">
+                      <button
+                        type="button"
+                        onClick={() => setShowRegenerationPrompt((current) => !current)}
+                        className="text-[10px] font-bold uppercase tracking-widest text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 flex items-center gap-2 transition-colors"
+                      >
+                        <Wand2 className="w-3 h-3" />
+                        Regenerate with prompt
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openPanelEditor(selectedGoal)}
+                        className="text-[10px] font-bold uppercase tracking-widest text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 flex items-center gap-2 transition-colors"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        Edit panel
+                      </button>
+                    </div>
+                    {showRegenerationPrompt && (
+                      <div className="rounded-xl border border-stone-200 bg-white p-3 dark:border-stone-800 dark:bg-stone-950">
+                        <textarea
+                          autoFocus
+                          value={regenerationPrompt}
+                          onChange={(event) => setRegenerationPrompt(event.target.value)}
+                          placeholder="Example: Focus on a 30-day launch, low budget, and measurable weekly outcomes."
+                          className="min-h-24 w-full resize-y bg-transparent text-sm text-stone-800 outline-none placeholder:text-stone-400 dark:text-stone-200"
+                        />
+                        <div className="mt-3 flex justify-end gap-2">
+                          <button type="button" onClick={() => setShowRegenerationPrompt(false)} className="px-3 py-2 text-xs font-medium text-stone-500 hover:text-stone-900 dark:hover:text-stone-100">Cancel</button>
+                          <button
+                            type="button"
+                            onClick={() => void handleGenerateRoadmap(selectedGoal, regenerationPrompt)}
+                            disabled={!regenerationPrompt.trim() || isGenerating === selectedGoal.id}
+                            className="inline-flex items-center gap-2 rounded-lg bg-stone-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-900"
+                          >
+                            <RefreshCw className={cn("w-3.5 h-3.5", isGenerating === selectedGoal.id && "animate-spin")} />
+                            Regenerate
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -492,6 +569,64 @@ export default function GoalsPage() {
           )}
         </div>
       </div>
+
+      <AnimatePresence>
+        {isEditingPanel && selectedGoal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/50 p-4 backdrop-blur-sm"
+            onClick={() => setIsEditingPanel(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.97, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.97, y: 12 }}
+              onClick={(event) => event.stopPropagation()}
+              className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl dark:border-stone-800 dark:bg-stone-900"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-semibold text-stone-900 dark:text-stone-100">Edit goal panel</h2>
+                  <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">Use one line per roadmap item.</p>
+                </div>
+                <button type="button" onClick={() => setIsEditingPanel(false)} className="p-2 text-stone-400 hover:text-stone-900 dark:hover:text-stone-100"><X className="h-4 w-4" /></button>
+              </div>
+              <div className="mt-6 grid gap-4">
+                <label className="grid gap-2 text-xs font-semibold uppercase tracking-wider text-stone-500">
+                  Goal title
+                  <input value={editTitle} onChange={(event) => setEditTitle(event.target.value)} className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-normal normal-case tracking-normal text-stone-900 outline-none focus:border-stone-400 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-100" />
+                </label>
+                <label className="grid gap-2 text-xs font-semibold uppercase tracking-wider text-stone-500">
+                  Description
+                  <textarea value={editDescription} onChange={(event) => setEditDescription(event.target.value)} className="min-h-20 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-normal normal-case tracking-normal text-stone-900 outline-none focus:border-stone-400 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-100" />
+                </label>
+                <div className="grid gap-4 md:grid-cols-3">
+                  {[
+                    ['Needed knowledge', editKnowledge, setEditKnowledge],
+                    ['Strategic ideas', editIdeas, setEditIdeas],
+                    ['Actionable steps', editTodos, setEditTodos],
+                  ].map(([label, value, setter]) => (
+                    <label key={label as string} className="grid gap-2 text-xs font-semibold uppercase tracking-wider text-stone-500">
+                      {label as string}
+                      <textarea
+                        value={value as string}
+                        onChange={(event) => (setter as React.Dispatch<React.SetStateAction<string>>)(event.target.value)}
+                        className="min-h-56 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-normal normal-case tracking-normal text-stone-900 outline-none focus:border-stone-400 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-100"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-6 flex justify-end gap-2">
+                <button type="button" onClick={() => setIsEditingPanel(false)} className="px-4 py-2 text-sm font-medium text-stone-500 hover:text-stone-900 dark:hover:text-stone-100">Cancel</button>
+                <button type="button" onClick={() => savePanelEditor(selectedGoal)} disabled={!editTitle.trim()} className="inline-flex items-center gap-2 rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-900"><Save className="h-4 w-4" />Save panel</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* AI Action Loading Overlay */}
       <AnimatePresence>
