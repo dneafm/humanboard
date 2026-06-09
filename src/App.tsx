@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
-import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogIn, LogOut, HelpCircle, X } from 'lucide-react';
+import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogIn, LogOut, HelpCircle, X, LayoutDashboard } from 'lucide-react';
 import { cn } from './lib/utils';
 import InboxPage from './pages/Inbox';
 import IdeasPage from './pages/Ideas';
@@ -10,7 +10,8 @@ import SearchPage from './pages/Search';
 import MapPage from './pages/Map';
 import GoalsPage from './pages/Goals';
 import IncubationPage from './pages/Incubation';
-
+import CommandCenterPage from './pages/CommandCenter';
+import { WorkflowPage } from './pages/Workflow';
 import Chatbot from './components/Chatbot';
 import { hydrateAppStoreFromRepository, useAppStore } from './store';
 import { useEffect, useState } from 'react';
@@ -150,6 +151,7 @@ function Sidebar({ onOpenTutorial }: { onOpenTutorial: () => void }) {
   const { isDarkMode, toggleDarkMode } = useAppStore();
   const { user, signOutUser } = useAuthStore();
   const navItems = [
+    { to: '/command-center', icon: LayoutDashboard, label: 'Command Center' },
     { to: '/', icon: Inbox, label: 'Inbox' },
     { to: '/ideas', icon: Lightbulb, label: 'Ideas' },
     { to: '/goals', icon: Target, label: 'Goals' },
@@ -158,6 +160,7 @@ function Sidebar({ onOpenTutorial }: { onOpenTutorial: () => void }) {
     { to: '/review', icon: RefreshCw, label: 'Review' },
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
     { to: '/search', icon: SearchIcon, label: 'Search' },
+    { to: '/workflow', icon: Network, label: 'Workflow' },
   ];
 
   return (
@@ -312,9 +315,11 @@ function LoadingScreen() {
 export default function App() {
   const isDarkMode = useAppStore(state => state.isDarkMode);
   const { isAuthReady, userId } = useAuthStore();
+  const isLocalCommandCenter = window.location.port === '3010';
   const [hasHydratedUserSnapshot, setHasHydratedUserSnapshot] = useState(false);
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const navItems = [
+    { to: '/command-center', icon: LayoutDashboard, label: 'Command Center' },
     { to: '/', icon: Inbox, label: 'Inbox' },
     { to: '/ideas', icon: Lightbulb, label: 'Ideas' },
     { to: '/goals', icon: Target, label: 'Goals' },
@@ -349,6 +354,14 @@ export default function App() {
       cancelled = true;
     };
   }, [isAuthReady, userId]);
+
+  if (isLocalCommandCenter && isAuthReady && !userId) {
+    return (
+      <BrowserRouter>
+        <CommandCenterPage />
+      </BrowserRouter>
+    );
+  }
 
   if (!isAuthReady || !userId) {
     if (!isFirebaseConfigured) {
@@ -404,6 +417,7 @@ export default function App() {
             </div>
           </div>
           <Routes>
+            <Route path="/command-center" element={<CommandCenterPage />} />
             <Route path="/" element={<InboxPage />} />
             <Route path="/ideas" element={<IdeasPage />} />
             <Route path="/ideas/:id" element={<IdeaDetailPage />} />
@@ -413,6 +427,7 @@ export default function App() {
             <Route path="/review" element={<ReviewPage />} />
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/search" element={<SearchPage />} />
+            <Route path="/workflow" element={<WorkflowPage />} />
           </Routes>
         </main>
         <Chatbot />

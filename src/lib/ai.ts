@@ -15,7 +15,7 @@ function readEnv(key: string, fallback = '') {
 }
 
 function getRuntimeConfig(): RuntimeConfig {
-  const baseUrl = readEnv('AI_BASE_URL', readEnv('GEMMA_BASE_URL', apiUrl('/api/ai/v1'))).replace(/\/+$/, '');
+  const baseUrl = readEnv('AI_BASE_URL', readEnv('GEMMA_BASE_URL', apiUrl('/api/gemma'))).replace(/\/+$/, '');
   const model = readEnv('AI_MODEL', readEnv('GEMMA_MODEL', 'gemma4:latest'));
   const apiKey = readEnv('GEMMA_API_KEY', 'not-required');
   return { baseUrl, model, apiKey };
@@ -198,17 +198,12 @@ async function callGemma(prompt: string, systemInstruction: string) {
     throw buildRuntimeError('AI runtime is not configured.');
   }
 
-  const directHeaders = {
-    'Content-Type': 'application/json',
-    ...(runtime.apiKey ? { Authorization: `Bearer ${runtime.apiKey}` } : {}),
-  };
-  const proxyHeaders = {
-    'Content-Type': 'application/json',
-  };
-  const appApiPrefix = apiUrl('/api/');
-  const requestHeaders = runtime.chatCompletionsUrl.startsWith(appApiPrefix)
-    ? buildApiHeaders(proxyHeaders)
-    : directHeaders;
+  const requestHeaders = runtime.chatCompletionsUrl.startsWith(apiUrl('/api/'))
+    ? buildApiHeaders({ 'Content-Type': 'application/json' })
+    : {
+        'Content-Type': 'application/json',
+        ...(runtime.apiKey ? { Authorization: `Bearer ${runtime.apiKey}` } : {}),
+      };
 
   let response: Response;
   try {

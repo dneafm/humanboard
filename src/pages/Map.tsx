@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as d3 from 'd3';
 import { useAppStore } from '../store';
-import { Network, Plus } from 'lucide-react';
+import { Network } from 'lucide-react';
 
 type Node = d3.SimulationNodeDatum & {
   id: string;
@@ -23,18 +23,8 @@ type Link = d3.SimulationLinkDatum<Node> & {
 export default function MapPage() {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { ideas, sections, isDarkMode, addSection } = useAppStore();
+  const { ideas, sections, isDarkMode } = useAppStore();
   const navigate = useNavigate();
-  const [isAddingField, setIsAddingField] = useState(false);
-  const [newFieldName, setNewFieldName] = useState('');
-
-  const handleCreateField = () => {
-    const name = newFieldName.trim();
-    if (!name) return;
-    addSection({ name, color: '#78716c' });
-    setNewFieldName('');
-    setIsAddingField(false);
-  };
 
   useEffect(() => {
     if (!svgRef.current || !containerRef.current) return;
@@ -393,54 +383,11 @@ export default function MapPage() {
   return (
     <div className="flex flex-col h-full w-full transition-colors duration-300">
       <header className="p-8 pb-6 border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 z-10">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-4xl font-bold tracking-tight text-stone-900 dark:text-stone-100 flex items-center gap-4">
-              <Network className="w-10 h-10 text-stone-400 dark:text-stone-600" />
-              Idea Map
-            </h1>
-            <p className="text-stone-500 dark:text-stone-400 mt-2 text-lg">Visualize how your ideas connect across sections.</p>
-          </div>
-          <div className="flex items-center gap-3">
-            {isAddingField ? (
-              <form
-                onSubmit={(e) => { e.preventDefault(); handleCreateField(); }}
-                className="flex items-center gap-2"
-              >
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder="Field name..."
-                  value={newFieldName}
-                  onChange={(e) => setNewFieldName(e.target.value)}
-                  className="bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-lg px-3 py-2 text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900/10 dark:focus:ring-white/10 w-44"
-                />
-                <button
-                  type="submit"
-                  disabled={!newFieldName.trim()}
-                  className="bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-stone-800 dark:hover:bg-stone-200 disabled:opacity-40 transition-colors"
-                >
-                  Add
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setIsAddingField(false); setNewFieldName(''); }}
-                  className="text-sm text-stone-500 hover:text-stone-900 dark:hover:text-stone-100 transition-colors px-2 py-2"
-                >
-                  Cancel
-                </button>
-              </form>
-            ) : (
-              <button
-                onClick={() => setIsAddingField(true)}
-                className="flex items-center gap-2 bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 px-5 py-2.5 rounded-xl hover:scale-105 active:scale-95 transition-all text-sm font-semibold shadow-lg shadow-stone-900/10 dark:shadow-stone-100/10"
-              >
-                <Plus className="w-4 h-4" />
-                New Field
-              </button>
-            )}
-          </div>
-        </div>
+        <h1 className="text-4xl font-bold tracking-tight text-stone-900 dark:text-stone-100 flex items-center gap-4">
+          <Network className="w-10 h-10 text-stone-400 dark:text-stone-600" />
+          Idea Map
+        </h1>
+        <p className="text-stone-500 dark:text-stone-400 mt-2 text-lg">Visualize how your ideas connect across sections.</p>
       </header>
       
       <div className="flex-1 relative bg-stone-50 dark:bg-stone-950 overflow-hidden" ref={containerRef}>

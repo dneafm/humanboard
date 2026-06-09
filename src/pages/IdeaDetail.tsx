@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'motion/react';
 export default function IdeaDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { ideas, sections, notes, updateIdea, addProject } = useAppStore();
+  const { ideas, sections, notes, updateIdea } = useAppStore();
   const idea = ideas.find(i => i.id === id);
   const section = sections.find(s => s.id === idea?.sectionId);
   const relatedIdeas = ideas.filter(i => idea?.relatedIdeaIds?.includes(i.id));
@@ -99,22 +99,6 @@ export default function IdeaDetailPage() {
       activationReadiness,
     });
     setIsEditing(false);
-  };
-
-  const handleCreateProject = () => {
-    if (!idea) return;
-    // Promote idea type to 'Project' if it isn't already
-    if (idea.type !== 'Project') {
-      updateIdea(idea.id, { type: 'Project' });
-    }
-    addProject({
-      title: idea.title,
-      description: idea.summary || idea.content.slice(0, 200),
-      sourceIdeaId: idea.id,
-      status: 'Active',
-      experiments: [],
-    });
-    navigate('/projects');
   };
 
   const handleTTS = async () => {
@@ -896,7 +880,7 @@ export default function IdeaDetailPage() {
 
         <h3 className="text-[10px] font-bold text-stone-400 dark:text-stone-600 uppercase tracking-[0.3em] mb-8">Evolution</h3>
         <div className="space-y-3 mb-12">
-          <button onClick={handleCreateProject} className="w-full flex items-center gap-4 p-4 bg-white dark:bg-stone-900/40 border border-stone-200 dark:border-stone-800 rounded-2xl hover:border-stone-400 dark:hover:border-stone-600 hover:shadow-xl transition-all text-left group">
+          <button className="w-full flex items-center gap-4 p-4 bg-white dark:bg-stone-900/40 border border-stone-200 dark:border-stone-800 rounded-2xl hover:border-stone-400 dark:hover:border-stone-600 hover:shadow-xl transition-all text-left group">
             <div className="w-10 h-10 rounded-xl bg-stone-100 dark:bg-stone-800 flex items-center justify-center text-stone-600 dark:text-stone-400 group-hover:scale-110 transition-transform">
               <GitBranch className="w-5 h-5" />
             </div>
