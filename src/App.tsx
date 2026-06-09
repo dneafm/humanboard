@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
-import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogIn, LogOut, HelpCircle, X, LayoutDashboard } from 'lucide-react';
+import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogIn, LogOut, HelpCircle, X, LayoutDashboard, Menu } from 'lucide-react';
 import { cn } from './lib/utils';
 import InboxPage from './pages/Inbox';
 import IdeasPage from './pages/Ideas';
@@ -244,35 +244,73 @@ function AuthScreen() {
   };
 
   return (
-    <div className="min-h-dvh overflow-x-hidden bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100 flex items-center justify-center p-4">
+    <div className="min-h-dvh overflow-x-hidden bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100">
       <TutorialModal open={isTutorialOpen} onClose={() => setIsTutorialOpen(false)} />
-      <div className="w-full max-w-[calc(100vw-2rem)] sm:max-w-sm min-w-0 border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 rounded-lg p-6 shadow-sm">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-8 h-8 bg-stone-800 dark:bg-stone-100 rounded-sm flex items-center justify-center">
-            <span className="text-stone-50 dark:text-stone-900 text-sm font-bold">H</span>
+      <div className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col justify-center px-4 py-10 sm:px-6 lg:px-8">
+        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+          <div className="rounded-2xl border border-stone-200 bg-white p-8 shadow-sm dark:border-stone-800 dark:bg-stone-900 sm:p-10">
+            <div className="mb-6 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-stone-900 dark:bg-stone-100">
+                <span className="text-base font-bold text-stone-50 dark:text-stone-900">H</span>
+              </div>
+              <div>
+                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">HumanBoard</h1>
+                <p className="text-sm text-stone-500 dark:text-stone-400">Think in public with yourself before you organize.</p>
+              </div>
+            </div>
+
+            <div className="max-w-2xl space-y-4">
+              <p className="text-3xl font-semibold tracking-tight text-stone-950 dark:text-stone-50 sm:text-4xl">
+                Capture messy thoughts. Turn them into durable knowledge.
+              </p>
+              <p className="text-base leading-7 text-stone-600 dark:text-stone-400 sm:text-lg">
+                HumanBoard is a personal thinking workspace for raw notes, refined ideas, projects, goals, and long-horizon bets. Start in Inbox, compile what matters, and let the board become a map of how you think.
+              </p>
+            </div>
+
+            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/60">
+                <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">Inbox first</div>
+                <p className="mt-1 text-sm leading-6 text-stone-600 dark:text-stone-400">Drop raw thoughts fast without forcing structure too early.</p>
+              </div>
+              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/60">
+                <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">Compile ideas</div>
+                <p className="mt-1 text-sm leading-6 text-stone-600 dark:text-stone-400">Promote useful notes into principles, concepts, and decisions worth revisiting.</p>
+              </div>
+              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/60">
+                <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">Track bets</div>
+                <p className="mt-1 text-sm leading-6 text-stone-600 dark:text-stone-400">Watch signals, projects, and capabilities that may become high leverage later.</p>
+              </div>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight">HumanBoard</h1>
-            <p className="text-sm text-stone-500 dark:text-stone-400">Alpha tester access</p>
+
+          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm dark:border-stone-800 dark:bg-stone-900 sm:p-8">
+            <div className="mb-5">
+              <div className="text-sm font-medium uppercase tracking-[0.2em] text-stone-500 dark:text-stone-400">Get started</div>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight">Open your board</h2>
+              <p className="mt-2 text-sm leading-6 text-stone-600 dark:text-stone-400">
+                Sign in to access your personal HumanBoard workspace and synced snapshot.
+              </p>
+            </div>
+
+            <button
+              onClick={() => void handleSignIn()}
+              disabled={!isAuthReady}
+              className="flex w-full items-center justify-center gap-2 rounded-md bg-stone-900 px-4 py-3 text-sm font-medium text-white transition-all hover:bg-stone-700 disabled:cursor-wait disabled:bg-stone-400 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-300"
+            >
+              <LogIn className="h-4 w-4" />
+              <span>{isAuthReady ? 'Continue with Google' : 'Checking session...'}</span>
+            </button>
+
+            <div className="mt-3">
+              <GuideButton onClick={() => setIsTutorialOpen(true)} />
+            </div>
+
+            {error && (
+              <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>
+            )}
           </div>
         </div>
-
-        <button
-          onClick={() => void handleSignIn()}
-          disabled={!isAuthReady}
-          className="flex w-full items-center justify-center gap-2 rounded-md bg-stone-900 px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-stone-700 disabled:cursor-wait disabled:bg-stone-400 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-300"
-        >
-          <LogIn className="h-4 w-4" />
-          <span>{isAuthReady ? 'Continue with Google' : 'Checking session...'}</span>
-        </button>
-
-        <div className="mt-3">
-          <GuideButton onClick={() => setIsTutorialOpen(true)} />
-        </div>
-
-        {error && (
-          <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>
-        )}
       </div>
     </div>
   );
@@ -312,12 +350,116 @@ function LoadingScreen() {
   );
 }
 
+function MobileMenu({
+  open,
+  onClose,
+  navItems,
+  onOpenTutorial,
+}: {
+  open: boolean;
+  onClose: () => void;
+  navItems: Array<{ to: string; icon: typeof Inbox; label: string }>;
+  onOpenTutorial: () => void;
+}) {
+  const { user, signOutUser } = useAuthStore();
+  const { isDarkMode, toggleDarkMode } = useAppStore();
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[90] md:hidden">
+      <button
+        type="button"
+        aria-label="Close menu overlay"
+        className="absolute inset-0 bg-stone-950/55 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="absolute right-0 top-0 h-full w-[85vw] max-w-xs border-l border-stone-200 bg-white p-4 shadow-2xl dark:border-stone-800 dark:bg-stone-950">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">HumanBoard</div>
+            <div className="text-xs text-stone-500 dark:text-stone-400">Navigation</div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"
+            aria-label="Close menu"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mb-3 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 dark:border-stone-800 dark:bg-stone-900">
+          <div className="text-xs font-medium text-stone-700 dark:text-stone-200 truncate">{user?.displayName ?? 'Signed in'}</div>
+          <div className="text-[11px] text-stone-500 dark:text-stone-500 truncate">{user?.email}</div>
+        </div>
+
+        <div className="space-y-1">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onClick={onClose}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all',
+                  isActive
+                    ? 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900'
+                    : 'text-stone-700 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-900'
+                )
+              }
+            >
+              <item.icon className="h-4 w-4" />
+              {item.label}
+            </NavLink>
+          ))}
+        </div>
+
+        <div className="mt-4 space-y-2 border-t border-stone-200 pt-4 dark:border-stone-800">
+          <UpdateButton />
+          <NotificationCenter />
+          <GuideButton
+            onClick={() => {
+              onClose();
+              onOpenTutorial();
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              toggleDarkMode();
+              onClose();
+            }}
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-stone-600 transition-all hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"
+          >
+            {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            <span>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void signOutUser();
+              onClose();
+            }}
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-stone-600 transition-all hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"
+          >
+            <LogOut className="h-4 w-4" />
+            <span>Sign out</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const isDarkMode = useAppStore(state => state.isDarkMode);
   const { isAuthReady, userId } = useAuthStore();
   const isLocalCommandCenter = window.location.port === '3010';
   const [hasHydratedUserSnapshot, setHasHydratedUserSnapshot] = useState(false);
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navItems = [
     { to: '/command-center', icon: LayoutDashboard, label: 'Command Center' },
     { to: '/', icon: Inbox, label: 'Inbox' },
@@ -380,40 +522,34 @@ export default function App() {
       {enableAiEraKbBridge && <AiEraKbAutoBridge />}
       <NotificationEngine />
       <TutorialModal open={isTutorialOpen} onClose={() => setIsTutorialOpen(false)} />
+      <MobileMenu
+        open={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+        navItems={navItems}
+        onOpenTutorial={() => setIsTutorialOpen(true)}
+      />
       <div className="flex min-h-screen bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 font-sans selection:bg-stone-200 dark:selection:bg-stone-800 transition-colors duration-300">
         <Sidebar onOpenTutorial={() => setIsTutorialOpen(true)} />
         <main className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0">
-          <div className="md:hidden border-b border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950 px-3 py-2 overflow-x-auto">
-            <div className="mb-2">
-              <UpdateButton />
-            </div>
-            <div className="mb-2">
-              <NotificationCenter />
-            </div>
-            <div className="mb-2">
-              <GuideButton onClick={() => setIsTutorialOpen(true)} />
-            </div>
-            <div className="mb-2 px-1 text-[10px] uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">
-              Inbox = raw capture · Ideas = compiled knowledge
-            </div>
-            <div className="flex gap-2 min-w-max">
-              {navItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) =>
-                    cn(
-                      'flex items-center gap-2 px-3 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-all',
-                      isActive
-                        ? 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900'
-                        : 'bg-stone-100 text-stone-700 dark:bg-stone-900 dark:text-stone-300'
-                    )
-                  }
+          <div className="sticky top-0 z-40 md:hidden border-b border-stone-200/80 dark:border-stone-800/80 bg-stone-50/95 dark:bg-stone-950/95 backdrop-blur px-3 py-2">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400 dark:text-stone-500">HumanBoard</div>
+                <div className="truncate text-sm font-medium text-stone-900 dark:text-stone-100">Knowledge workspace</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="shrink-0">
+                  <NotificationCenter />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsMobileMenuOpen(true)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-stone-200 bg-white text-stone-700 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
+                  aria-label="Open navigation menu"
                 >
-                  <item.icon className="w-3.5 h-3.5" />
-                  {item.label}
-                </NavLink>
-              ))}
+                  <Menu className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </div>
           <Routes>
