@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { defaultSections } from './lib/storage/defaultSnapshot';
 import { localSnapshotRepository } from './lib/storage/localSnapshotRepository';
-import type { AppSnapshot } from './lib/storage/types';
+import type { AppSnapshot, ChatMessage } from './lib/storage/types';
 
 export type SignalDirection = 'Supports' | 'Weakens' | 'Mixed' | 'Unclear';
 export type PredictionHorizon = 'Near' | 'Mid' | 'Long';
@@ -294,6 +294,8 @@ interface AppState {
   signalEvents: SignalEvent[];
   capabilityTimelineEvents: CapabilityTimelineEvent[];
   isDarkMode: boolean;
+  chatMessages: ChatMessage[];
+  setChatMessages: (messages: ChatMessage[]) => void;
   addNote: (content: string) => void;
   updateNote: (id: string, updates: Partial<Note>) => void;
   deleteNote: (id: string) => void;
@@ -827,6 +829,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   signalEvents: initialSignalEvents,
   capabilityTimelineEvents: initialCapabilityTimelineEvents,
   isDarkMode: false,
+  chatMessages: [],
+  setChatMessages: (messages) => set((state) => {
+    const chatCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const nextMessages = messages.filter((m) => m && m.createdAt && m.createdAt >= chatCutoff);
+    const next = {
+      ...state,
+      chatMessages: nextMessages,
+    };
+    persistSnapshot(next);
+    return { chatMessages: nextMessages };
+  }),
   addNote: (content) => set((state) => {
     const nextNotes = [{ id: randomId(), content, createdAt: new Date().toISOString(), layer: 'raw' as const }, ...state.notes];
     const derived = deriveCapabilityBetFields(state.capabilityBets, nextNotes, state.capabilityTimelineEvents, {
@@ -1132,6 +1145,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
 export async function hydrateAppStoreFromRepository() {
   const snapshot = await localSnapshotRepository.load();
+  const chatCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const hydratedSnapshot: AppSnapshot = {
     ...snapshot,
     notes: snapshot.notes.map((note) => ({ ...note, layer: 'raw' as const })),
@@ -1186,5 +1200,7 @@ export async function hydrateAppStoreFromRepository() {
     signalEvents: finalSnapshot.signalEvents,
     capabilityTimelineEvents: finalSnapshot.capabilityTimelineEvents,
     isDarkMode: finalSnapshot.isDarkMode,
+    chatMessages: (Array.isArray(finalSnapshot.chatMessages) ? finalSnapshot.chatMessages : [])
+      .filter((m) => m && m.createdAt && m.createdAt >= chatCutoff),
   });
 }

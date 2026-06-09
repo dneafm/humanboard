@@ -55,6 +55,7 @@ const DEFAULT_SNAPSHOT = {
   signalEvents: [],
   capabilityTimelineEvents: [],
   isDarkMode: false,
+  chatMessages: [],
 };
 
 let appVersion = '0.0.0';
@@ -156,6 +157,10 @@ function normalizeSnapshot(raw = {}) {
   snapshot.signalEvents = Array.isArray(snapshot.signalEvents) ? snapshot.signalEvents : [];
   snapshot.capabilityTimelineEvents = Array.isArray(snapshot.capabilityTimelineEvents) ? snapshot.capabilityTimelineEvents : [];
   snapshot.isDarkMode = Boolean(snapshot.isDarkMode);
+  
+  const chatCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  snapshot.chatMessages = (Array.isArray(snapshot.chatMessages) ? snapshot.chatMessages : [])
+    .filter(m => m && m.createdAt && m.createdAt >= chatCutoff);
   snapshot.aiCostTracking = snapshot.aiCostTracking && typeof snapshot.aiCostTracking === 'object'
     ? {
         totals: {

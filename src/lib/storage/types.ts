@@ -1,5 +1,13 @@
 import type { CapabilityBet, CapabilityTimelineEvent, Goal, Idea, Note, Project, Reflection, Section, SignalEvent } from '../../store';
 
+export type ChatMessage = {
+  id: string;
+  role: 'user' | 'model';
+  content: string;
+  imageUrl?: string;
+  createdAt: string;
+};
+
 export interface AppSnapshot {
   notes: Note[];
   ideas: Idea[];
@@ -11,6 +19,7 @@ export interface AppSnapshot {
   signalEvents: SignalEvent[];
   capabilityTimelineEvents: CapabilityTimelineEvent[];
   isDarkMode: boolean;
+  chatMessages?: ChatMessage[];
 }
 
 export interface StorageRepository {

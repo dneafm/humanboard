@@ -7,13 +7,7 @@ import { askGemma, buildMemoryShapedSystemInstruction, getGemmaRuntimeStatus, an
 import { getClipboardImage } from '../lib/imageNote';
 import { useAppStore } from '../store';
 import { useAuthStore } from '../stores/authStore';
-
-type Message = {
-  id: string;
-  role: 'user' | 'model';
-  content: string;
-  imageUrl?: string;
-};
+import type { ChatMessage } from '../lib/storage/types';
 
 export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
@@ -40,9 +34,24 @@ export default function Chatbot() {
   const userId = useAuthStore((state) => state.userId);
   const [isExpanded, setIsExpanded] = useState(false);
   const [autoDistill, setAutoDistill] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    { id: '1', role: 'model', content: "Hi. I'm your HumanBoard assistant. I can help refine ideas, suggest experiments, summarize notes, and connect thoughts across the app. What are we working on?" }
-  ]);
+  
+  const chatMessages = useAppStore((state) => state.chatMessages);
+  const setChatMessages = useAppStore((state) => state.setChatMessages);
+
+  const displayedMessages = useMemo<ChatMessage[]>(() => {
+    if (!chatMessages || chatMessages.length === 0) {
+      return [
+        {
+          id: 'default-greeting',
+          role: 'model',
+          content: "Hi. I'm your HumanBoard assistant. I can help refine ideas, suggest experiments, summarize notes, and connect thoughts across the app. What are we working on?",
+          createdAt: new Date().toISOString(),
+        }
+      ];
+    }
+    return chatMessages;
+  }, [chatMessages]);
+
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [savedMessageIds, setSavedMessageIds] = useState<string[]>([]);
@@ -183,7 +192,7 @@ export default function Chatbot() {
     || /\b(save|store|remember|capture|record)\s+(this|that|it)\b/i.test(raw)
   );
 
-  const handleSaveMessage = (message: Message) => {
+  const handleSaveMessage = (message: ChatMessage) => {
     if (savedMessageIds.includes(message.id)) return;
     const content = message.content.trim();
     if (!content) return;
@@ -207,7 +216,7 @@ export default function Chatbot() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isOpen]);
+  }, [displayedMessages, isOpen]);
 
   const relatedContext = useMemo(() => {
     const routeHints: Record<string, string[]> = {
@@ -221,7 +230,7 @@ export default function Chatbot() {
     };
 
     const hints = routeHints[location.pathname] ?? [];
-    const recentUserText = messages
+    const recentUserText = displayedMessages
       .filter((m) => m.role === 'user')
       .slice(-3)
       .map((m) => m.content.toLowerCase())
@@ -378,7 +387,7 @@ export default function Chatbot() {
       ...relatedNotes,
       ...fallbackIdeas,
     ].filter(Boolean).join('\n');
-  }, [goals, ideas, location.pathname, messages, notes, projects, reflections, sections]);
+  }, [goals, ideas, location.pathname, displayedMessages, notes, projects, reflections, sections]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -409,17 +418,17 @@ export default function Chatbot() {
         setIsAnalyzingImage(false);
       }
 
-      setMessages(prev => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          role: 'user',
-          content: userMsg || `[Image: ${imageToProcess?.name || 'Attachment'}]`,
-          ...(base64Url ? { imageUrl: base64Url } : {})
-        }
-      ]);
+      const historyContext = displayedMessages.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n');
 
-      const historyContext = messages.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n');
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: userMsg || `[Image: ${imageToProcess?.name || 'Attachment'}]`,
+        createdAt: new Date().toISOString(),
+        ...(base64Url ? { imageUrl: base64Url } : {})
+      };
+
+      setChatMessages([...chatMessages, userMessage]);
       const explicitBoardWrite = explicitlyRequestsBoardWrite(userMsg);
       const systemInstruction = buildMemoryShapedSystemInstruction(`Use the provided HumanBoard knowledge context when relevant. Prefer connecting the user to existing notes, ideas, goals, projects, principles, and reflections before giving generic advice.
 
@@ -699,18 +708,22 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
         actionMessage += acts.join(", ") + ")*";
       }
 
-      setMessages(prev => [...prev, { 
+      const currentMessages = useAppStore.getState().chatMessages;
+      setChatMessages([...currentMessages, { 
         id: (Date.now() + 1).toString(), 
         role: 'model', 
-        content: (cleanText || (blockedInferredWrite ? "I kept this in the conversation because Auto-distill is off." : "I have saved that to your board.")) + actionMessage
+        content: (cleanText || (blockedInferredWrite ? "I kept this in the conversation because Auto-distill is off." : "I have saved that to your board.")) + actionMessage,
+        createdAt: new Date().toISOString()
       }]);
     } catch (error) {
       console.error("Chat error:", error);
       const detail = error instanceof Error ? error.message : 'Unknown AI runtime error.';
-      setMessages(prev => [...prev, { 
+      const currentMessages = useAppStore.getState().chatMessages;
+      setChatMessages([...currentMessages, { 
         id: (Date.now() + 1).toString(), 
         role: 'model', 
-        content: `AI runtime error: ${detail}` 
+        content: `AI runtime error: ${detail}`,
+        createdAt: new Date().toISOString()
       }]);
     } finally {
       setIsLoading(false);
@@ -808,7 +821,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {messages.map((msg) => (
+        {displayedMessages.map((msg) => (
           <div key={msg.id} className={cn("flex", msg.role === 'user' ? "justify-end" : "justify-start")}>
             <div className={cn(
               "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed",

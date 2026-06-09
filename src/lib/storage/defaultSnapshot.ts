@@ -18,4 +18,5 @@ export const defaultSnapshot: AppSnapshot = {
   signalEvents: [],
   capabilityTimelineEvents: [],
   isDarkMode: false,
+  chatMessages: [],
 };
