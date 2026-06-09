@@ -27,37 +27,44 @@ const enableAiEraKbBridge = import.meta.env.VITE_ENABLE_AI_ERA_KB_BRIDGE === 'tr
 
 const tutorialSteps = [
   {
-    title: 'Capture raw thoughts in Inbox',
-    body: 'Drop ideas, links, questions, market signals, or rough notes into Inbox. Do not over-organize at capture time.',
+    title: 'Understand what HumanBoard is for',
+    body: 'HumanBoard is a second-brain workspace for unfinished thinking. It helps you capture raw material first, then distill it into knowledge, goals, and patterns worth revisiting.',
   },
   {
-    title: 'Compile useful notes into Ideas',
-    body: 'Use Ideas for shaped knowledge: concepts, principles, base skills, opportunities, and decisions worth revisiting.',
+    title: 'Capture anything before it disappears',
+    body: 'Start in Inbox. Drop in rough thoughts, links, screenshots, questions, signals, and fragments without needing to organize them perfectly in the moment.',
   },
   {
-    title: 'Watch long-horizon bets in Incubation',
-    body: 'Incubation tracks capability bets and weak signals. Use it for things that are not ready yet but may become high leverage.',
+    title: 'Turn raw notes into structured knowledge',
+    body: 'When a note becomes useful, promote it into Ideas. Ideas are where vague inputs become cleaner concepts, decisions, principles, and reusable knowledge.',
   },
   {
-    title: 'Review and connect the board',
-    body: 'Review surfaces stale, orphaned, duplicate, or low-confidence items. Map shows relationships so the board becomes more than a note pile.',
+    title: 'Connect ideas to goals and long bets',
+    body: 'Use Goals for active direction and Incubation for longer-horizon bets. HumanBoard becomes powerful when notes, ideas, and ambitions are linked instead of stored in isolation.',
   },
   {
-    title: 'Use the assistant as an operator',
-    body: 'Ask the assistant to turn messy input into board items, summarize signals, or save useful answers back into HumanBoard.',
+    title: 'Let the system resurface what matters',
+    body: 'Review, maps, and AI guidance help surface stale threads, contradictions, emerging themes, and next actions so your board can think back with you over time.',
   },
-];
+] as const;
 
 function TutorialModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [currentStep, setCurrentStep] = useState(0);
+
+  useEffect(() => {
+    if (open) setCurrentStep(0);
+  }, [open]);
+
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] bg-stone-950/55 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-lg border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 shadow-2xl">
-        <div className="sticky top-0 bg-white/95 dark:bg-stone-950/95 backdrop-blur border-b border-stone-200 dark:border-stone-800 px-5 py-4 flex items-start justify-between gap-4">
+    <div className="fixed inset-0 z-[80] bg-stone-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="w-full max-w-3xl max-h-[88vh] overflow-y-auto rounded-lg border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 shadow-2xl">
+        <div className="sticky top-0 z-10 bg-white/95 dark:bg-stone-950/95 backdrop-blur border-b border-stone-200 dark:border-stone-800 px-5 py-4 flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight text-stone-900 dark:text-stone-100">HumanBoard Guide</h2>
-            <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">A quick path for using the board without turning it into a filing chore.</p>
+            <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-stone-400 dark:text-stone-500">Onboarding</div>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight text-stone-900 dark:text-stone-100">HumanBoard Guide</h2>
+            <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">Step {currentStep + 1} of {tutorialSteps.length}. Move through the board one section at a time.</p>
           </div>
           <button
             type="button"
@@ -69,23 +76,92 @@ function TutorialModal({ open, onClose }: { open: boolean; onClose: () => void }
           </button>
         </div>
         <div className="p-5">
-          <div className="grid gap-3">
+          <div className="mb-5 flex gap-2">
             {tutorialSteps.map((step, index) => (
-              <div key={step.title} className="rounded-md border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/70 p-4">
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm bg-stone-900 text-xs font-semibold text-white dark:bg-stone-100 dark:text-stone-950">
-                    {index + 1}
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100">{step.title}</h3>
-                    <p className="mt-1 text-sm leading-6 text-stone-600 dark:text-stone-400">{step.body}</p>
-                  </div>
-                </div>
-              </div>
+              <button
+                key={step.title}
+                type="button"
+                onClick={() => setCurrentStep(index)}
+                className={cn(
+                  'h-2 flex-1 rounded-full transition-all',
+                  index === currentStep
+                    ? 'bg-stone-900 dark:bg-stone-100'
+                    : 'bg-stone-200 hover:bg-stone-300 dark:bg-stone-800 dark:hover:bg-stone-700'
+                )}
+                aria-label={`Go to step ${index + 1}`}
+              />
             ))}
           </div>
+
+          <div className="grid gap-3">
+            {tutorialSteps.map((step, index) => {
+              const isActive = index === currentStep;
+              return (
+                <div
+                  key={step.title}
+                  className={cn(
+                    'rounded-md border p-4 transition-all duration-200',
+                    isActive
+                      ? 'border-stone-900 bg-stone-50 shadow-sm dark:border-stone-100 dark:bg-stone-900/90'
+                      : 'border-stone-200 bg-stone-50/50 opacity-35 dark:border-stone-800 dark:bg-stone-900/40'
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={cn(
+                      'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-xs font-semibold transition-colors',
+                      isActive
+                        ? 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-950'
+                        : 'bg-stone-300 text-stone-700 dark:bg-stone-800 dark:text-stone-300'
+                    )}>
+                      {index + 1}
+                    </div>
+                    <div>
+                      <h3 className={cn(
+                        'text-sm font-semibold transition-colors',
+                        isActive ? 'text-stone-900 dark:text-stone-100' : 'text-stone-500 dark:text-stone-400'
+                      )}>{step.title}</h3>
+                      <p className={cn(
+                        'mt-1 text-sm leading-6 transition-colors',
+                        isActive ? 'text-stone-700 dark:text-stone-300' : 'text-stone-400 dark:text-stone-500'
+                      )}>{step.body}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
           <div className="mt-5 rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200">
-            Start with one useful note in Inbox, then review whether it should become an Idea, a Project, or a capability bet.
+            Best first move: capture one real thought in Inbox, then decide whether it should stay raw, become an Idea, connect to a Goal, or turn into a longer-horizon bet.
+          </div>
+
+          <div className="mt-5 flex items-center justify-between gap-3 border-t border-stone-200 pt-4 dark:border-stone-800">
+            <button
+              type="button"
+              onClick={() => setCurrentStep((step) => Math.max(0, step - 1))}
+              disabled={currentStep === 0}
+              className="rounded-md border border-stone-200 px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-900"
+            >
+              Previous
+            </button>
+            <div className="text-xs text-stone-500 dark:text-stone-400">{tutorialSteps[currentStep].title}</div>
+            {currentStep === tutorialSteps.length - 1 ? (
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200"
+              >
+                Finish
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setCurrentStep((step) => Math.min(tutorialSteps.length - 1, step + 1))}
+                className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200"
+              >
+                Next
+              </button>
+            )}
           </div>
         </div>
       </div>
