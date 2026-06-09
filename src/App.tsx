@@ -11,7 +11,6 @@ import MapPage from './pages/Map';
 import GoalsPage from './pages/Goals';
 import IncubationPage from './pages/Incubation';
 import CommandCenterPage from './pages/CommandCenter';
-import { WorkflowPage } from './pages/Workflow';
 import Chatbot from './components/Chatbot';
 import { hydrateAppStoreFromRepository, useAppStore } from './store';
 import { useEffect, useState } from 'react';
@@ -161,7 +160,6 @@ function Sidebar({ onOpenTutorial }: { onOpenTutorial: () => void }) {
     { to: '/review', icon: RefreshCw, label: 'Review' },
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
     { to: '/search', icon: SearchIcon, label: 'Search' },
-    { to: '/workflow', icon: Network, label: 'Workflow' },
   ];
 
   return (
@@ -851,7 +849,6 @@ export default function App() {
             <Route path="/review" element={<ReviewPage />} />
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/search" element={<SearchPage />} />
-            <Route path="/workflow" element={<WorkflowPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
