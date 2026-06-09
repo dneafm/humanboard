@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Bell, BellRing, Check, RefreshCw, Trash2, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationStore } from '../stores/notificationStore';
-import { runNotificationEngine } from './NotificationEngine';
+import { runNotificationEngine, deliverBrowserNotification } from './NotificationEngine';
 
 function browserPermission() {
   return typeof Notification === 'undefined' ? 'unsupported' : Notification.permission;
@@ -32,6 +32,43 @@ export default function NotificationCenter() {
     const result = await Notification.requestPermission();
     setPermission(result);
     updateSettings({ browserEnabled: result === 'granted' });
+  };
+
+  const triggerTestAlert = () => {
+    deliverBrowserNotification({
+      id: 'test-id',
+      type: 'system_observation',
+      title: '🔔 Test Notification',
+      body: 'Browser notifications are working perfectly on HumanBoard.',
+      insight: 'This is a test notification to verify integration with your operating system.',
+      insightConfidence: 1.0,
+      tone: 'encouraging',
+      trigger: { kind: 'system', entityIds: [], ruleId: 'test-nudge', observedAt: new Date().toISOString() },
+      schedule: { scheduledFor: new Date().toISOString(), cooldownHours: 0, dedupeKey: 'test' },
+      channels: ['browser'],
+      deliveryState: 'delivered',
+      createdAt: new Date().toISOString(),
+    });
+  };
+
+  const sendTestAlert = () => {
+    if (typeof Notification === 'undefined') {
+      alert("Notifications are not supported by your browser.");
+      return;
+    }
+    if (Notification.permission !== 'granted') {
+      Notification.requestPermission().then((res) => {
+        setPermission(res);
+        if (res === 'granted') {
+          updateSettings({ browserEnabled: true });
+          triggerTestAlert();
+        } else {
+          alert("Notification permission denied.");
+        }
+      });
+    } else {
+      triggerTestAlert();
+    }
   };
 
   const openNotification = (id: string, deepLink?: string) => {
@@ -80,6 +117,14 @@ export default function NotificationCenter() {
               >
                 <RefreshCw className="h-3.5 w-3.5" />
                 Run insights
+              </button>
+              <button
+                type="button"
+                onClick={sendTestAlert}
+                className="flex items-center gap-2 rounded-md border border-stone-200 px-3 py-2 text-xs font-medium hover:bg-stone-100 dark:border-stone-800 dark:hover:bg-stone-900"
+              >
+                <BellRing className="h-3.5 w-3.5" />
+                Test alert
               </button>
               {permission !== 'granted' && permission !== 'unsupported' && (
                 <button

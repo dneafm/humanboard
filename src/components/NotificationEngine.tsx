@@ -5,7 +5,7 @@ import { useNotificationStore } from '../stores/notificationStore';
 import { buildNotificationCandidates, isQuietHours } from '../lib/notifications/engine';
 import type { HumanBoardNotification } from '../lib/notifications/schema';
 
-function deliverBrowserNotification(notification: HumanBoardNotification) {
+export function deliverBrowserNotification(notification: HumanBoardNotification) {
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return false;
   const browserNotification = new Notification(notification.title, {
     body: notification.body,
