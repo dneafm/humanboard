@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Bot, X, Send, Maximize2, Minimize2, BookmarkPlus, Check } from 'lucide-react';
+import { Bot, X, Send, Maximize2, Minimize2, BookmarkPlus, Check, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
-import { askGemma, buildMemoryShapedSystemInstruction, getGemmaRuntimeStatus } from '../lib/ai';
+import { askGemma, buildMemoryShapedSystemInstruction, getGemmaRuntimeStatus, analyzeImageToNote } from '../lib/ai';
+import { getClipboardImage } from '../lib/imageNote';
 import { useAppStore } from '../store';
 import { useAuthStore } from '../stores/authStore';
 
@@ -11,6 +12,7 @@ type Message = {
   id: string;
   role: 'user' | 'model';
   content: string;
+  imageUrl?: string;
 };
 
 export default function Chatbot() {
@@ -44,6 +46,39 @@ export default function Chatbot() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [savedMessageIds, setSavedMessageIds] = useState<string[]>([]);
+
+  // Staging image state
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
+  const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pendingImagePreview) URL.revokeObjectURL(pendingImagePreview);
+    };
+  }, [pendingImagePreview]);
+
+  const stageImage = (file?: File) => {
+    if (!file || isAnalyzingImage || !file.type.startsWith('image/')) return;
+    setImageError(null);
+    setPendingImage(file);
+    setPendingImagePreview(URL.createObjectURL(file));
+  };
+
+  const clearPendingImage = () => {
+    setPendingImage(null);
+    setPendingImagePreview(null);
+  };
+
+  const readAsDataUrl = (file: File) => {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('HumanBoard could not read that image.'));
+      reader.readAsDataURL(file);
+    });
+  };
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const autoDistillStorageKey = `humanboard.chat.auto-distill.${userId || 'anonymous'}`;
 
@@ -347,14 +382,43 @@ export default function Chatbot() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && !pendingImage) || isLoading) return;
 
     const userMsg = input.trim();
+    const imageToProcess = pendingImage;
+
     setInput('');
-    setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: userMsg }]);
+    clearPendingImage();
     setIsLoading(true);
 
     try {
+      let base64Url = '';
+      let imageAnalysisResult = '';
+
+      if (imageToProcess) {
+        setIsAnalyzingImage(true);
+        try {
+          base64Url = await readAsDataUrl(imageToProcess);
+          imageAnalysisResult = await analyzeImageToNote(base64Url, imageToProcess.name, userMsg);
+        } catch (err) {
+          setImageError(err instanceof Error ? err.message : 'HumanBoard could not analyze that image.');
+          setIsLoading(false);
+          setIsAnalyzingImage(false);
+          return;
+        }
+        setIsAnalyzingImage(false);
+      }
+
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: 'user',
+          content: userMsg || `[Image: ${imageToProcess?.name || 'Attachment'}]`,
+          ...(base64Url ? { imageUrl: base64Url } : {})
+        }
+      ]);
+
       const historyContext = messages.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n');
       const explicitBoardWrite = explicitlyRequestsBoardWrite(userMsg);
       const systemInstruction = buildMemoryShapedSystemInstruction(`Use the provided HumanBoard knowledge context when relevant. Prefer connecting the user to existing notes, ideas, goals, projects, principles, and reflections before giving generic advice.
@@ -442,8 +506,12 @@ When the user asks to create or manage a map idea node, prefer toolcall_create_i
 When the user asks to create or edit a goal or roadmap panel, use toolcall_create_goal or toolcall_update_goal instead of only describing what to do.
 Include the toolcall anywhere in your response. You can use multiple toolcalls if needed.`);
 
+      const userPrompt = imageAnalysisResult
+        ? `User uploaded an image "${imageToProcess?.name || 'image'}". Visual analysis / extracted content:\n---\n${imageAnalysisResult}\n---\nUser comment/instruction: ${userMsg || 'Please analyze this image.'}`
+        : `User: ${userMsg}`;
+
       const responseText = await askGemma(
-        `HumanBoard knowledge context:\n${relatedContext}\n\nPrevious conversation:\n${historyContext}\n\nUser: ${userMsg}`,
+        `HumanBoard knowledge context:\n${relatedContext}\n\nPrevious conversation:\n${historyContext}\n\n${userPrompt}`,
         systemInstruction
       );
 
@@ -749,7 +817,14 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
                 : "bg-stone-100 text-stone-800 rounded-bl-sm prose prose-sm prose-stone"
             )}>
               {msg.role === 'user' ? (
-                msg.content
+                <div className="space-y-2">
+                  {msg.imageUrl && (
+                    <div className="max-w-[200px] rounded-lg overflow-hidden border border-stone-200 dark:border-stone-800 bg-white/5 shadow-md">
+                      <img src={msg.imageUrl} alt="User attachment" className="w-full h-auto object-cover max-h-[160px]" />
+                    </div>
+                  )}
+                  {msg.content && <p>{msg.content}</p>}
+                </div>
               ) : (
                 <>
                   <ReactMarkdown>{msg.content}</ReactMarkdown>
@@ -791,25 +866,80 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       </div>
 
       <div className="p-4 border-t border-stone-100 bg-white">
-        <form onSubmit={handleSubmit} className="relative">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask anything..."
-            autoCapitalize="sentences"
-            autoCorrect="on"
-            spellCheck
-            className="w-full bg-stone-50 border border-stone-200 rounded-full py-3 pl-4 pr-12 text-sm text-stone-900 caret-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900/10 focus:border-stone-400"
-            style={{ WebkitTextFillColor: '#1c1917' }}
-          />
-          <button 
-            type="submit"
-            disabled={!input.trim() || isLoading}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2 bg-stone-900 text-white rounded-full hover:bg-stone-800 disabled:opacity-50 transition-colors"
-          >
-            <Send className="w-3.5 h-3.5" />
-          </button>
+        {pendingImagePreview && (
+          <div className="mb-3 flex items-center gap-3 bg-stone-50 p-2 rounded-xl border border-stone-200/60 relative">
+            <div className="relative h-12 w-12 rounded-lg overflow-hidden border border-stone-200 bg-white flex-shrink-0">
+              <img src={pendingImagePreview} alt="Pending attachment" className="h-full w-full object-cover" />
+              <button
+                type="button"
+                onClick={clearPendingImage}
+                className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-stone-950/60 hover:bg-stone-950 text-white transition-colors cursor-pointer"
+                aria-label="Remove image"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Pending Attachment</div>
+              <div className="text-xs text-stone-600 truncate">{pendingImage?.name}</div>
+            </div>
+            {isAnalyzingImage && (
+              <Loader2 className="w-4 h-4 animate-spin text-stone-500" />
+            )}
+          </div>
+        )}
+        {imageError && (
+          <div className="mb-3 px-3 py-2 border border-red-200 bg-red-50 text-xs text-red-700 rounded-xl flex items-center justify-between gap-2">
+            <span className="truncate">{imageError}</span>
+            <button type="button" onClick={() => setImageError(null)} className="text-red-400 hover:text-red-600">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="relative flex items-center gap-2">
+          <label className="cursor-pointer p-2 rounded-full hover:bg-stone-100 text-stone-500 hover:text-stone-850 transition-colors flex-shrink-0">
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => stageImage(e.target.files?.[0])}
+              disabled={isAnalyzingImage || isLoading}
+            />
+            <ImageIcon className="w-4 h-4" />
+          </label>
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onPaste={(e) => {
+                const image = getClipboardImage(e.clipboardData);
+                if (image) {
+                  e.preventDefault();
+                  stageImage(image);
+                }
+              }}
+              placeholder="Ask anything or paste image..."
+              autoCapitalize="sentences"
+              autoCorrect="on"
+              spellCheck
+              className="w-full bg-stone-50 border border-stone-200 rounded-full py-2.5 pl-4 pr-12 text-sm text-stone-900 caret-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900/10 focus:border-stone-400"
+              style={{ WebkitTextFillColor: '#1c1917' }}
+              disabled={isAnalyzingImage || isLoading}
+            />
+            <button 
+              type="submit"
+              disabled={(!input.trim() && !pendingImage) || isAnalyzingImage || isLoading}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 bg-stone-900 text-white rounded-full hover:bg-stone-800 disabled:opacity-50 transition-colors"
+            >
+              {isAnalyzingImage || isLoading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Send className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </div>
         </form>
       </div>
     </div>
