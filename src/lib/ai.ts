@@ -717,3 +717,79 @@ Rules:
     throw buildRuntimeError('Gemma returned non-JSON reflection output.', error instanceof Error ? error.message : String(error));
   }
 }
+
+export async function generateDailySynthesis(
+  boardSummary: {
+    activeGoals: string[];
+    stalledItems: string[];
+    recentEdits: string[];
+    repeatedThemes: string[];
+    openQuestions: string[];
+    currentTensions: string[];
+    upcomingDeadlines: string[];
+  },
+  sourceEntityIds: string[],
+  day: string,
+) {
+  const prompt = `You are HumanBoard's daily guidance engine.
+
+Your job is to generate one short, useful daily insight for the user based on their current board.
+
+Use the user's active goals, stalled items, recurring themes, recent edits, and unresolved tensions to infer the most relevant subject for today.
+
+Do not sound generic, preachy, or like a motivational quote account.
+Do not repeat the board back mechanically.
+Do not produce vague productivity advice.
+
+Your output should help the user think better, decide better, or act better today.
+
+Priorities:
+1. Pick the most relevant subject from the board state.
+2. Make the insight feel personalized to the user's current situation.
+3. Keep it short enough for a dashboard card and notification.
+4. Focus on clarity, leverage, bottlenecks, tradeoffs, or next-step quality.
+5. Prefer useful reframing over cheerleading.
+
+Style: calm, sharp, human, grounded, not corporate, not overly polished, and not AI-assistant sounding.
+
+User board summary:
+${JSON.stringify(boardSummary, null, 2)}
+
+Return valid JSON only with exactly these keys:
+- subject: a 1-3 word theme
+- insight: 2-4 concrete, thoughtful sentences
+- action: one small practical action or reflection question for today
+- notification: max 180 characters, same subject, one sharp insight or action, no clickbait`;
+
+  const raw = await callGemma(
+    prompt,
+    buildMemoryShapedSystemInstruction('Generate one grounded daily guidance artifact from the current board. Return only valid JSON.')
+  );
+
+  try {
+    const parsed = JSON.parse(extractJsonObject(raw || '{}')) as {
+      subject?: string;
+      insight?: string;
+      action?: string;
+      notification?: string;
+    };
+    const subject = String(parsed.subject || 'Today').replace(/^[^:]+:\s*/, '').trim().split(/\s+/).slice(0, 3).join(' ').slice(0, 40);
+    const insight = String(parsed.insight || '').trim().slice(0, 700);
+    const action = String(parsed.action || '').trim().slice(0, 320);
+    const notificationBody = String(parsed.notification || action || insight).replace(/\s+/g, ' ').trim();
+    const escapedSubject = subject.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const notification = `${subject}: ${notificationBody.replace(new RegExp(`^${escapedSubject}:?\\s*`, 'i'), '')}`.slice(0, 180);
+    if (!insight || !action) throw new Error('Missing insight or action.');
+    return {
+      day,
+      subject,
+      insight,
+      action,
+      notification,
+      generatedAt: new Date().toISOString(),
+      sourceEntityIds,
+    };
+  } catch (error) {
+    throw buildRuntimeError('Daily synthesis returned invalid JSON.', error instanceof Error ? error.message : String(error));
+  }
+}

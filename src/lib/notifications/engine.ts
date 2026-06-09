@@ -7,12 +7,6 @@ type NotificationInput = {
   goals: Goal[];
 };
 
-function startOfDay(value = new Date()) {
-  const date = new Date(value);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
 function candidate(input: Omit<NotificationCandidate, 'schedule' | 'channels'> & {
   dedupeKey: string;
   cooldownHours: number;
@@ -39,29 +33,7 @@ function candidate(input: Omit<NotificationCandidate, 'schedule' | 'channels'> &
 
 export function buildNotificationCandidates({ notes, ideas, goals }: NotificationInput): NotificationCandidate[] {
   const now = new Date();
-  const todayStart = startOfDay(now).getTime();
-  const todayNotes = notes.filter((note) => new Date(note.createdAt).getTime() >= todayStart);
   const candidates: NotificationCandidate[] = [];
-
-  if (todayNotes.length >= 2) {
-    candidates.push(candidate({
-      type: 'daily_synthesis',
-      title: 'Today is taking shape',
-      body: `${todayNotes.length} new notes are waiting to be compressed into a clearer signal.`,
-      insight: 'Several captures landed today; a short synthesis pass may reveal the common thread.',
-      insightConfidence: Math.min(0.95, 0.55 + todayNotes.length * 0.08),
-      tone: 'quiet',
-      trigger: {
-        kind: 'note',
-        entityIds: todayNotes.map((note) => note.id),
-        ruleId: 'daily-notes-synthesis-v1',
-        observedAt: now.toISOString(),
-      },
-      action: { label: 'Review today', deepLink: '/review' },
-      cooldownHours: 20,
-      dedupeKey: `daily_synthesis:${now.toISOString().slice(0, 10)}`,
-    }));
-  }
 
   const weakenedNotes = notes.filter((note) => note.signalAssessment?.direction === 'Weakens');
   if (weakenedNotes.length) {

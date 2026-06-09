@@ -7,6 +7,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import ExtractionReviewPanel from '../components/capability/ExtractionReviewPanel';
 import { createNoteFromImage, getClipboardImage } from '../lib/imageNote';
 import AdaptiveDashboard from '../components/AdaptiveDashboard';
+import DailySynthesisCard from '../components/DailySynthesisCard';
 
 type CompileDraft = {
   noteId: string;
@@ -747,6 +748,10 @@ export default function InboxPage() {
         <h1 className="text-4xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">Inbox</h1>
         <p className="text-stone-500 dark:text-stone-400 mt-2 text-lg">Fast capture for raw thoughts that have not been compiled into knowledge yet.</p>
       </header>
+
+      <div className="mb-6">
+        <DailySynthesisCard />
+      </div>
 
       <form onSubmit={handleAdd} className="mb-12">
         {/* Suggestive Tabs Row */}
