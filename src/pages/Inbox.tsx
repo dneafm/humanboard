@@ -753,7 +753,7 @@ export default function InboxPage() {
         <DailySynthesisCard />
       </div>
 
-      <form onSubmit={handleAdd} className="mb-12">
+      <form onSubmit={handleAdd} className="mb-12" data-tour="tour-inbox-capture">
         {/* Suggestive Tabs Row */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">

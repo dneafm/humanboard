@@ -13,7 +13,7 @@ import IncubationPage from './pages/Incubation';
 import CommandCenterPage from './pages/CommandCenter';
 import Chatbot from './components/Chatbot';
 import { hydrateAppStoreFromRepository, useAppStore } from './store';
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import MemoryConsolidator from './components/MemoryConsolidator';
 import { useAuthStore } from './stores/authStore';
 import { apiFetch } from './lib/apiClient';
@@ -24,6 +24,150 @@ import { isFirebaseConfigured, missingFirebaseConfigKeys } from './config/fireba
 
 declare const __APP_VERSION__: string;
 const enableAiEraKbBridge = import.meta.env.VITE_ENABLE_AI_ERA_KB_BRIDGE === 'true';
+const ONBOARDING_SEEN_STORAGE_KEY = 'humanboard:onboarding-seen';
+
+const uiTourSteps = [
+  {
+    target: 'tour-sidebar-inbox',
+    title: 'Start in Inbox',
+    body: 'Capture raw thoughts, links, screenshots, and fragments here before they disappear.',
+  },
+  {
+    target: 'tour-inbox-capture',
+    title: 'Use the real capture area',
+    body: 'This is the live input area where new thoughts enter HumanBoard.',
+  },
+  {
+    target: 'tour-sidebar-ideas',
+    title: 'Promote useful notes into Ideas',
+    body: 'Ideas hold cleaner concepts, principles, decisions, and reusable knowledge.',
+  },
+  {
+    target: 'tour-sidebar-goals',
+    title: 'Connect work to Goals',
+    body: 'Goals turn interesting thoughts into active direction and execution.',
+  },
+  {
+    target: 'tour-sidebar-incubation',
+    title: 'Keep long bets in Incubation',
+    body: 'Use Incubation for weak signals and higher-latency opportunities that are not ready yet.',
+  },
+  {
+    target: 'tour-sidebar-review',
+    title: 'Review what needs attention',
+    body: 'Review helps surface stale threads, contradictions, and items worth revisiting.',
+  },
+  {
+    target: 'tour-guide-button',
+    title: 'Reopen this guide anytime',
+    body: 'Use Guide whenever you want the walkthrough again.',
+  },
+] as const;
+
+type UiTourStep = typeof uiTourSteps[number];
+
+function SpotlightTour({
+  open,
+  stepIndex,
+  onPrev,
+  onNext,
+  onClose,
+}: {
+  open: boolean;
+  stepIndex: number;
+  onPrev: () => void;
+  onNext: () => void;
+  onClose: () => void;
+}) {
+  const [rect, setRect] = useState<DOMRect | null>(null);
+
+  const step = uiTourSteps[stepIndex];
+
+  useLayoutEffect(() => {
+    if (!open) return;
+
+    const updateRect = () => {
+      const element = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`);
+      if (!element) {
+        setRect(null);
+        return;
+      }
+      element.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+      window.setTimeout(() => {
+        setRect(element.getBoundingClientRect());
+      }, 120);
+    };
+
+    updateRect();
+    window.addEventListener('resize', updateRect);
+    window.addEventListener('scroll', updateRect, true);
+    return () => {
+      window.removeEventListener('resize', updateRect);
+      window.removeEventListener('scroll', updateRect, true);
+    };
+  }, [open, step.target]);
+
+  if (!open || !step) return null;
+
+  const padding = 10;
+  const top = rect ? Math.max(rect.top - padding, 0) : 0;
+  const left = rect ? Math.max(rect.left - padding, 0) : 0;
+  const width = rect ? rect.width + padding * 2 : 0;
+  const height = rect ? rect.height + padding * 2 : 0;
+  const cardTop = rect ? Math.min(top + height + 16, window.innerHeight - 220) : window.innerHeight / 2 - 100;
+  const cardLeft = rect ? Math.min(Math.max(left, 16), window.innerWidth - 380) : 16;
+
+  return (
+    <div className="pointer-events-none fixed inset-0 z-[120]">
+      <div className="absolute inset-0 bg-stone-950/72" />
+      {rect && (
+        <>
+          <div
+            className="absolute rounded-xl border-2 border-white/90 shadow-[0_0_0_9999px_rgba(12,10,9,0.72),0_0_0_6px_rgba(255,255,255,0.14)] transition-all duration-200"
+            style={{ top, left, width, height }}
+          />
+          <div
+            className="absolute rounded-xl bg-white/8 ring-1 ring-white/20 transition-all duration-200"
+            style={{ top, left, width, height }}
+          />
+        </>
+      )}
+      <div
+        className="pointer-events-auto absolute w-[min(360px,calc(100vw-32px))] rounded-xl border border-stone-700 bg-stone-950/96 p-4 text-stone-100 shadow-2xl"
+        style={{ top: cardTop, left: cardLeft }}
+      >
+        <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-stone-400">Interactive guide</div>
+        <h3 className="mt-2 text-base font-semibold">{step.title}</h3>
+        <p className="mt-2 text-sm leading-6 text-stone-300">{step.body}</p>
+        <div className="mt-4 flex items-center gap-2">
+          {uiTourSteps.map((_, index) => (
+            <div key={index} className={cn('h-1.5 flex-1 rounded-full', index === stepIndex ? 'bg-white' : 'bg-stone-700')} />
+          ))}
+        </div>
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={onPrev}
+            disabled={stepIndex === 0}
+            className="rounded-md border border-stone-700 px-3 py-2 text-sm text-stone-200 disabled:opacity-40"
+          >
+            Previous
+          </button>
+          <div className="text-xs text-stone-400">{stepIndex + 1} / {uiTourSteps.length}</div>
+          {stepIndex === uiTourSteps.length - 1 ? (
+            <button type="button" onClick={onClose} className="rounded-md bg-white px-3 py-2 text-sm font-medium text-stone-950">
+              Finish
+            </button>
+          ) : (
+            <button type="button" onClick={onNext} className="rounded-md bg-white px-3 py-2 text-sm font-medium text-stone-950">
+              Next
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const tutorialSteps = [
   {
@@ -55,6 +199,11 @@ function TutorialModal({ open, onClose }: { open: boolean; onClose: () => void }
     if (open) setCurrentStep(0);
   }, [open]);
 
+  const handleClose = () => {
+    localStorage.setItem(ONBOARDING_SEEN_STORAGE_KEY, 'true');
+    onClose();
+  };
+
   if (!open) return null;
 
   return (
@@ -68,7 +217,7 @@ function TutorialModal({ open, onClose }: { open: boolean; onClose: () => void }
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="shrink-0 rounded-md p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"
             aria-label="Close guide"
           >
@@ -148,7 +297,7 @@ function TutorialModal({ open, onClose }: { open: boolean; onClose: () => void }
             {currentStep === tutorialSteps.length - 1 ? (
               <button
                 type="button"
-                onClick={onClose}
+                onClick={handleClose}
                 className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200"
               >
                 Finish
@@ -174,6 +323,7 @@ function GuideButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
+      data-tour="tour-guide-button"
       className="flex items-center justify-center gap-2 rounded-md border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 hover:text-stone-950 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
     >
       <HelpCircle className="h-4 w-4" />
@@ -253,6 +403,7 @@ function Sidebar({ onOpenTutorial }: { onOpenTutorial: () => void }) {
           <NavLink
             key={item.to}
             to={item.to}
+            data-tour={item.label === 'Inbox' ? 'tour-sidebar-inbox' : item.label === 'Ideas' ? 'tour-sidebar-ideas' : item.label === 'Goals' ? 'tour-sidebar-goals' : item.label === 'Incubation' ? 'tour-sidebar-incubation' : item.label === 'Review' ? 'tour-sidebar-review' : undefined}
             className={({ isActive }) =>
               cn(
                 "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all",
@@ -763,6 +914,7 @@ function MobileMenu({
               key={item.to}
               to={item.to}
               onClick={onClose}
+              data-tour={item.label === 'Inbox' ? 'tour-sidebar-inbox' : item.label === 'Ideas' ? 'tour-sidebar-ideas' : item.label === 'Goals' ? 'tour-sidebar-goals' : item.label === 'Incubation' ? 'tour-sidebar-incubation' : item.label === 'Review' ? 'tour-sidebar-review' : undefined}
               className={({ isActive }) =>
                 cn(
                   'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all',
@@ -821,6 +973,8 @@ export default function App() {
   const isLocalCommandCenter = window.location.port === '3010';
   const [hasHydratedUserSnapshot, setHasHydratedUserSnapshot] = useState(false);
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isSpotlightTourOpen, setIsSpotlightTourOpen] = useState(false);
+  const [spotlightStepIndex, setSpotlightStepIndex] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navItems = [
     ...(isLocalCommandCenter ? [{ to: '/command-center', icon: LayoutDashboard, label: 'Command Center' }] : []),
@@ -859,6 +1013,27 @@ export default function App() {
     };
   }, [isAuthReady, userId]);
 
+  useEffect(() => {
+    if (!isAuthReady || !userId || !hasHydratedUserSnapshot) return;
+    const seen = localStorage.getItem(ONBOARDING_SEEN_STORAGE_KEY);
+    if (!seen) {
+      setIsTutorialOpen(true);
+      setIsSpotlightTourOpen(true);
+      setSpotlightStepIndex(0);
+    }
+  }, [isAuthReady, userId, hasHydratedUserSnapshot]);
+
+  const openGuide = () => {
+    setIsTutorialOpen(true);
+    setIsSpotlightTourOpen(true);
+    setSpotlightStepIndex(0);
+  };
+
+  const closeGuide = () => {
+    setIsTutorialOpen(false);
+    setIsSpotlightTourOpen(false);
+  };
+
   if (isLocalCommandCenter && isAuthReady && !userId) {
     return (
       <BrowserRouter>
@@ -883,15 +1058,22 @@ export default function App() {
     <BrowserRouter>
       {enableAiEraKbBridge && <AiEraKbAutoBridge />}
       <NotificationEngine />
-      <TutorialModal open={isTutorialOpen} onClose={() => setIsTutorialOpen(false)} />
+      <TutorialModal open={isTutorialOpen} onClose={closeGuide} />
+      <SpotlightTour
+        open={isSpotlightTourOpen}
+        stepIndex={spotlightStepIndex}
+        onPrev={() => setSpotlightStepIndex((step) => Math.max(0, step - 1))}
+        onNext={() => setSpotlightStepIndex((step) => Math.min(uiTourSteps.length - 1, step + 1))}
+        onClose={closeGuide}
+      />
       <MobileMenu
         open={isMobileMenuOpen}
         onClose={() => setIsMobileMenuOpen(false)}
         navItems={navItems}
-        onOpenTutorial={() => setIsTutorialOpen(true)}
+        onOpenTutorial={openGuide}
       />
       <div className="flex min-h-screen bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 font-sans selection:bg-stone-200 dark:selection:bg-stone-800 transition-colors duration-300">
-        <Sidebar onOpenTutorial={() => setIsTutorialOpen(true)} />
+        <Sidebar onOpenTutorial={openGuide} />
         <main className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0">
           <div className="sticky top-0 z-40 md:hidden border-b border-stone-200/80 dark:border-stone-800/80 bg-stone-50/95 dark:bg-stone-950/95 backdrop-blur px-3 py-2">
             <div className="flex items-center justify-between gap-3">
