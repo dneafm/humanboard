@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useAppStore } from '../store';
-import { FolderKanban, Plus, FlaskConical, ArrowRight, Sparkles, Sprout, CircleDashed } from 'lucide-react';
+import { FolderKanban, Plus, FlaskConical, ArrowRight, Sparkles, Sprout, CircleDashed, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '../lib/utils';
+import { motion, AnimatePresence } from 'motion/react';
 
 const ACTIVATION_THRESHOLD = 80;
 
@@ -109,12 +111,70 @@ function ProjectCard({ project, sourceIdea }: { project: any; sourceIdea?: any }
 }
 
 export default function ProjectsPage() {
-  const { projects, ideas } = useAppStore();
+  const { projects, ideas, addProject, addIdea } = useAppStore();
 
   const linkedIdeaIds = new Set(projects.map((project) => project.sourceIdeaId));
   const projectIdeas = ideas.filter((idea) => idea.type === 'Project');
   const incubationIdeas = projectIdeas.filter((idea) => !linkedIdeaIds.has(idea.id) && idea.maturity < ACTIVATION_THRESHOLD);
   const activationIdeas = projectIdeas.filter((idea) => !linkedIdeaIds.has(idea.id) && idea.maturity >= ACTIVATION_THRESHOLD);
+  const unlinkedProjectIdeas = projectIdeas.filter((idea) => !linkedIdeaIds.has(idea.id));
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedIdeaId, setSelectedIdeaId] = useState<string>('__new__');
+  const [newTitle, setNewTitle] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+
+  const selectedExistingIdea = selectedIdeaId !== '__new__' ? ideas.find((i) => i.id === selectedIdeaId) : undefined;
+
+  const handleOpenModal = () => {
+    setSelectedIdeaId(unlinkedProjectIdeas.length > 0 ? unlinkedProjectIdeas[0].id : '__new__');
+    setNewTitle('');
+    setNewDesc('');
+    setIsModalOpen(true);
+  };
+
+  const handleSubmitProject = () => {
+    if (selectedIdeaId === '__new__') {
+      const title = newTitle.trim();
+      if (!title) return;
+      // Create a new idea of type Project first
+      addIdea({
+        title,
+        summary: newDesc.trim() || title,
+        content: newDesc.trim() || title,
+        type: 'Project',
+        stage: 'Seed',
+        confidence: 7,
+        maturity: 50,
+        linkedNoteIds: [],
+        relatedIdeaIds: [],
+      });
+      // The new idea is prepended to the store's ideas array
+      // We need to read it after the synchronous set
+      const currentIdeas = useAppStore.getState().ideas;
+      const newIdea = currentIdeas[0];
+      if (newIdea) {
+        addProject({
+          title: newIdea.title,
+          description: newIdea.summary,
+          sourceIdeaId: newIdea.id,
+          status: 'Active',
+          experiments: [],
+        });
+      }
+    } else {
+      const existingIdea = ideas.find((i) => i.id === selectedIdeaId);
+      if (!existingIdea) return;
+      addProject({
+        title: existingIdea.title,
+        description: existingIdea.summary || existingIdea.content.slice(0, 200),
+        sourceIdeaId: existingIdea.id,
+        status: 'Active',
+        experiments: [],
+      });
+    }
+    setIsModalOpen(false);
+  };
 
   return (
     <div className="max-w-6xl mx-auto w-full p-8 flex flex-col h-full">
@@ -123,7 +183,10 @@ export default function ProjectsPage() {
           <h1 className="text-3xl font-semibold tracking-tight text-stone-900">Projects</h1>
           <p className="text-stone-500 mt-1">Active builds stay separate from incubating dreams, and activation starts around 80% readiness.</p>
         </div>
-        <button className="flex items-center gap-2 bg-stone-900 text-white px-4 py-2 rounded-md hover:bg-stone-800 transition-colors text-sm font-medium">
+        <button
+          onClick={handleOpenModal}
+          className="flex items-center gap-2 bg-stone-900 text-white px-4 py-2 rounded-md hover:bg-stone-800 transition-colors text-sm font-medium"
+        >
           <Plus className="w-4 h-4" />
           New Project
         </button>
@@ -230,6 +293,104 @@ export default function ProjectsPage() {
           </div>
         )}
       </section>
+
+      {/* New Project Modal */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-stone-900/40 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setIsModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-stone-900 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-stone-200 dark:border-stone-800"
+            >
+              <div className="p-6 border-b border-stone-100 dark:border-stone-800 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-stone-900 dark:text-stone-100">New Project</h3>
+                  <p className="text-sm text-stone-500 dark:text-stone-400 mt-0.5">Activate a project idea or create one from scratch.</p>
+                </div>
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="p-2 text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="p-6 space-y-5">
+                <div>
+                  <label className="block text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-2">Source Idea</label>
+                  <select
+                    value={selectedIdeaId}
+                    onChange={(e) => setSelectedIdeaId(e.target.value)}
+                    className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-400 dark:focus:border-stone-700"
+                  >
+                    {unlinkedProjectIdeas.map((idea) => (
+                      <option key={idea.id} value={idea.id}>
+                        {idea.title} ({idea.maturity}% maturity)
+                      </option>
+                    ))}
+                    <option value="__new__">+ Create new project idea</option>
+                  </select>
+                </div>
+
+                {selectedIdeaId === '__new__' ? (
+                  <>
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-2">Project Title</label>
+                      <input
+                        autoFocus
+                        type="text"
+                        placeholder="e.g., AI-Powered Expense Categorizer"
+                        value={newTitle}
+                        onChange={(e) => setNewTitle(e.target.value)}
+                        className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-400 dark:focus:border-stone-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-2">Description</label>
+                      <textarea
+                        placeholder="What is this project about?"
+                        value={newDesc}
+                        onChange={(e) => setNewDesc(e.target.value)}
+                        rows={3}
+                        className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-400 dark:focus:border-stone-700 resize-none"
+                      />
+                    </div>
+                  </>
+                ) : selectedExistingIdea ? (
+                  <div className="rounded-xl bg-stone-50 dark:bg-stone-950 border border-stone-100 dark:border-stone-800 p-4">
+                    <div className="text-sm font-medium text-stone-900 dark:text-stone-100">{selectedExistingIdea.title}</div>
+                    <p className="text-xs text-stone-500 dark:text-stone-400 mt-1 line-clamp-2">{selectedExistingIdea.summary}</p>
+                    <div className="mt-3 text-[10px] font-bold uppercase tracking-widest text-stone-400">Maturity: {selectedExistingIdea.maturity}%</div>
+                  </div>
+                ) : null}
+              </div>
+              <div className="p-6 border-t border-stone-100 dark:border-stone-800 flex justify-end gap-3">
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitProject}
+                  disabled={selectedIdeaId === '__new__' && !newTitle.trim()}
+                  className="px-5 py-2 bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 rounded-xl text-sm font-semibold hover:bg-stone-800 dark:hover:bg-stone-200 disabled:opacity-40 transition-colors"
+                >
+                  Activate Project
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

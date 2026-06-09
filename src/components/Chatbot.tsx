@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Bot, X, Send, Maximize2, Minimize2, BookmarkPlus, Check, ImagePlus, Loader2 } from 'lucide-react';
+import { Bot, X, Send, Maximize2, Minimize2, BookmarkPlus, Check, ImagePlus, Loader2, Trash2 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { askGemma, buildMemoryShapedSystemInstruction, getGemmaRuntimeStatus } from '../lib/ai';
 import { useAppStore } from '../store';
+import { useAuthStore } from '../stores/authStore';
 import { createNoteFromImage, getClipboardImage } from '../lib/imageNote';
 
 type Message = {
@@ -26,16 +27,45 @@ export default function Chatbot() {
   const addIdea = useAppStore((state) => state.addIdea);
   const addNote = useAppStore((state) => state.addNote);
   const updateIdea = useAppStore((state) => state.updateIdea);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
+  const addSection = useAppStore((state) => state.addSection);
+  const addGoal = useAppStore((state) => state.addGoal);
+  const updateGoal = useAppStore((state) => state.updateGoal);
+  const addProject = useAppStore((state) => state.addProject);
+  const userId = useAuthStore((state) => state.userId);
+
+  const chatStorageKey = `hb-chat-${userId ?? 'anon'}`;
+  const savedIdsStorageKey = `hb-chat-saved-${userId ?? 'anon'}`;
+
+  const defaultMessages: Message[] = [
     { id: '1', role: 'model', content: "Hi. I'm your HumanBoard assistant. I can help refine ideas, suggest experiments, summarize notes, and connect thoughts across the app. What are we working on?" }
-  ]);
+  ];
+
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    try {
+      const stored = localStorage.getItem(chatStorageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch { /* ignore corrupted data */ }
+    return defaultMessages;
+  });
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
-  const [savedMessageIds, setSavedMessageIds] = useState<string[]>([]);
+  const [savedMessageIds, setSavedMessageIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem(savedIdsStorageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch { /* ignore */ }
+    return [];
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -45,6 +75,20 @@ export default function Chatbot() {
   useEffect(() => () => {
     if (pendingImagePreview) URL.revokeObjectURL(pendingImagePreview);
   }, [pendingImagePreview]);
+
+  // Persist messages to localStorage on change
+  useEffect(() => {
+    try { localStorage.setItem(chatStorageKey, JSON.stringify(messages)); } catch { /* quota exceeded */ }
+  }, [messages, chatStorageKey]);
+
+  useEffect(() => {
+    try { localStorage.setItem(savedIdsStorageKey, JSON.stringify(savedMessageIds)); } catch { /* quota exceeded */ }
+  }, [savedMessageIds, savedIdsStorageKey]);
+
+  const handleClearChat = () => {
+    setMessages(defaultMessages);
+    setSavedMessageIds([]);
+  };
 
   const clearPendingImage = () => {
     setPendingImage(null);
@@ -78,6 +122,43 @@ export default function Chatbot() {
     const normalized = normalizeText(value);
     if (!normalized) return undefined;
     return ideas.find((idea) => normalizeText(idea.id) === normalized || normalizeText(idea.title) === normalized);
+  };
+
+  const findGoalByReference = (value?: string) => {
+    const normalized = normalizeText(value);
+    if (!normalized) return undefined;
+    return goals.find((goal) => normalizeText(goal.id) === normalized || normalizeText(goal.title) === normalized);
+  };
+
+  const findProjectByReference = (value?: string) => {
+    const normalized = normalizeText(value);
+    if (!normalized) return undefined;
+    return projects.find((project) => normalizeText(project.id) === normalized || normalizeText(project.title) === normalized);
+  };
+
+  const performBoardSearch = (query: string) => {
+    const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+    if (terms.length === 0) return '';
+    const matches = (text: string) => {
+      const hay = text.toLowerCase();
+      return terms.some(term => hay.includes(term));
+    };
+    const results: string[] = [];
+    notes.filter(n => matches(n.content)).slice(0, 8).forEach(n => {
+      results.push(`[Note] ${n.content.replace(/\s+/g, ' ').slice(0, 200)}`);
+    });
+    ideas.filter(i => matches(`${i.title} ${i.summary} ${i.content} ${i.nextAction ?? ''}`)).slice(0, 8).forEach(i => {
+      const sec = sections.find(s => s.id === i.sectionId);
+      results.push(`[Idea: ${i.type}] ${i.title} | section=${sec?.name ?? 'Unsorted'} | stage=${i.stage} | maturity=${i.maturity}% — ${i.summary}`);
+    });
+    goals.filter(g => matches(`${g.title} ${g.description}`)).slice(0, 4).forEach(g => {
+      results.push(`[Goal] ${g.title} | status=${g.status} — ${g.description}`);
+    });
+    projects.filter(p => matches(`${p.title} ${p.description}`)).slice(0, 4).forEach(p => {
+      results.push(`[Project] ${p.title} | status=${p.status} — ${p.description}`);
+    });
+    if (results.length === 0) return `No results found for "${query}".`;
+    return `Search results for "${query}" (${results.length} matches):\n${results.join('\n')}`;
   };
 
   const findRelatedIdeaIds = (values?: string[]) => {
@@ -392,7 +473,7 @@ Tool 2: Create a knowledge Idea node. Use this when the user wants a new idea no
 }
 </toolcall_create_idea>
 
-Tool 3: Update an existing Idea node. Use this to manage an existing map node by changing its title, summary, content, type, stage, next action, section, confidence, maturity, or related ideas.
+Tool 3: Update an existing Idea node. Use this to manage an existing map node by changing its title, summary, content, type, stage, next action, section, confidence, maturity, or related ideas. To MOVE an idea to a different section/field on the map, set the "section" field to the target section name.
 <toolcall_update_idea>
 {
   "target": "existing idea title or id",
@@ -402,7 +483,7 @@ Tool 3: Update an existing Idea node. Use this to manage an existing map node by
   "type": "Concept|Principle|Reference|Project|Question|Action",
   "stage": "Seed|Sprouting|Evergreen|Archived",
   "nextAction": "optional string",
-  "section": "optional section name or id",
+  "section": "optional section name or id — use this to move the idea between fields",
   "confidence": 8,
   "maturity": 65,
   "relatedIdeas": ["optional existing idea title or id"]
@@ -416,7 +497,50 @@ Tool 4: Update your Persona. If you learn something new about the user's prefere
 }
 </toolcall_update_persona>
 
+Tool 5: Create a new field (section) on the Idea Map. Use this when the user wants to organize ideas under a new category or group.
+<toolcall_create_section>
+{
+  "name": "Field Name"
+}
+</toolcall_create_section>
+
+Tool 6: Create a Goal. Use this when the user wants to define a new goal.
+<toolcall_create_goal>
+{
+  "title": "Goal title",
+  "description": "Goal description",
+  "status": "Active|Paused|Completed"
+}
+</toolcall_create_goal>
+
+Tool 7: Update an existing Goal. Use this to change a goal's title, description, or status.
+<toolcall_update_goal>
+{
+  "target": "existing goal title or id",
+  "title": "optional new title",
+  "description": "optional new description",
+  "status": "Active|Paused|Completed"
+}
+</toolcall_update_goal>
+
+Tool 8: Create a Project from an existing idea. Use this to activate an idea as an active project.
+<toolcall_create_project>
+{
+  "sourceIdea": "existing idea title or id",
+  "title": "project title",
+  "description": "project description"
+}
+</toolcall_create_project>
+
+Tool 9: Search the board. Use this when the user asks to find, search, query, or look up notes, ideas, goals, or projects. The system will return matching results.
+<toolcall_search>
+{
+  "query": "search terms"
+}
+</toolcall_search>
+
 When the user asks to create or manage a map idea node, prefer toolcall_create_idea or toolcall_update_idea instead of only describing what to do.
+To move an idea between sections, use toolcall_update_idea with the "section" field set to the target section name.
 Include the toolcall anywhere in your response. You can use multiple toolcalls if needed.`);
 
       const responseText = await askGemma(
@@ -536,14 +660,129 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       }
       cleanText = cleanText.replace(personaRegex, '').trim();
 
+      // Extract Create Section tool calls
+      const sectionRegex = /<toolcall_create_section>([\s\S]*?)<\/toolcall_create_section>/gi;
+      let sectionMatch;
+      let matchedSection = false;
+      while ((sectionMatch = sectionRegex.exec(responseText)) !== null) {
+        try {
+          const jsonStr = sectionMatch[1].trim();
+          const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+          const data = JSON.parse(cleanJsonStr);
+          if (data.name && typeof data.name === 'string' && data.name.trim()) {
+            matchedSection = true;
+            addSection({ name: data.name.trim(), color: '#78716c' });
+          }
+        } catch (err) {
+          console.error("Failed to parse create_section toolcall JSON:", err);
+        }
+      }
+      cleanText = cleanText.replace(sectionRegex, '').trim();
+
+      // Extract Create Goal tool calls
+      const createGoalRegex = /<toolcall_create_goal>([\s\S]*?)<\/toolcall_create_goal>/gi;
+      let createGoalMatch;
+      let matchedGoalCreate = false;
+      while ((createGoalMatch = createGoalRegex.exec(responseText)) !== null) {
+        try {
+          const jsonStr = createGoalMatch[1].trim();
+          const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+          const data = JSON.parse(cleanJsonStr);
+          if (data.title && data.title.trim()) {
+            matchedGoalCreate = true;
+            addGoal({
+              title: data.title.trim(),
+              description: (data.description || '').trim(),
+              status: (['Active', 'Paused', 'Completed'].includes(data.status) ? data.status : 'Active') as 'Active' | 'Paused' | 'Completed',
+            });
+          }
+        } catch (err) {
+          console.error("Failed to parse create_goal toolcall JSON:", err);
+        }
+      }
+      cleanText = cleanText.replace(createGoalRegex, '').trim();
+
+      // Extract Update Goal tool calls
+      const updateGoalRegex = /<toolcall_update_goal>([\s\S]*?)<\/toolcall_update_goal>/gi;
+      let updateGoalMatch;
+      let matchedGoalUpdate = false;
+      while ((updateGoalMatch = updateGoalRegex.exec(responseText)) !== null) {
+        try {
+          const jsonStr = updateGoalMatch[1].trim();
+          const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+          const data = JSON.parse(cleanJsonStr);
+          const targetGoal = findGoalByReference(data.target);
+          if (!targetGoal) continue;
+          matchedGoalUpdate = true;
+          const updates: Record<string, any> = {};
+          if (data.title) updates.title = data.title.trim();
+          if (data.description) updates.description = data.description.trim();
+          if (['Active', 'Paused', 'Completed'].includes(data.status)) updates.status = data.status;
+          updateGoal(targetGoal.id, updates);
+        } catch (err) {
+          console.error("Failed to parse update_goal toolcall JSON:", err);
+        }
+      }
+      cleanText = cleanText.replace(updateGoalRegex, '').trim();
+
+      // Extract Create Project tool calls
+      const createProjectRegex = /<toolcall_create_project>([\s\S]*?)<\/toolcall_create_project>/gi;
+      let createProjectMatch;
+      let matchedProjectCreate = false;
+      while ((createProjectMatch = createProjectRegex.exec(responseText)) !== null) {
+        try {
+          const jsonStr = createProjectMatch[1].trim();
+          const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+          const data = JSON.parse(cleanJsonStr);
+          const sourceIdea = findIdeaByReference(data.sourceIdea);
+          if (!sourceIdea) continue;
+          matchedProjectCreate = true;
+          addProject({
+            title: (data.title || sourceIdea.title).trim(),
+            description: (data.description || sourceIdea.summary || sourceIdea.content.slice(0, 200)).trim(),
+            sourceIdeaId: sourceIdea.id,
+            status: 'Active',
+            experiments: [],
+          });
+        } catch (err) {
+          console.error("Failed to parse create_project toolcall JSON:", err);
+        }
+      }
+      cleanText = cleanText.replace(createProjectRegex, '').trim();
+
+      // Extract Search tool calls
+      const searchRegex = /<toolcall_search>([\s\S]*?)<\/toolcall_search>/gi;
+      let searchMatch;
+      let searchResults = '';
+      while ((searchMatch = searchRegex.exec(responseText)) !== null) {
+        try {
+          const jsonStr = searchMatch[1].trim();
+          const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+          const data = JSON.parse(cleanJsonStr);
+          if (data.query && typeof data.query === 'string' && data.query.trim()) {
+            searchResults += (searchResults ? '\n\n' : '') + performBoardSearch(data.query.trim());
+          }
+        } catch (err) {
+          console.error("Failed to parse search toolcall JSON:", err);
+        }
+      }
+      cleanText = cleanText.replace(searchRegex, '').trim();
+      if (searchResults) {
+        cleanText += '\n\n---\n' + searchResults;
+      }
+
       let actionMessage = '';
-      if (matchedNote || matchedIdea || matchedIdeaUpdate || matchedPersona) {
+      if (matchedNote || matchedIdea || matchedIdeaUpdate || matchedPersona || matchedSection || matchedGoalCreate || matchedGoalUpdate || matchedProjectCreate) {
         actionMessage = "\n\n*(AI: ";
         const acts = [];
         if (matchedNote) acts.push("added to Inbox");
         if (matchedIdea) acts.push("created Idea node");
         if (matchedIdeaUpdate) acts.push("updated Idea node");
         if (matchedPersona) acts.push("updated System Persona");
+        if (matchedSection) acts.push("created new field on Map");
+        if (matchedGoalCreate) acts.push("created Goal");
+        if (matchedGoalUpdate) acts.push("updated Goal");
+        if (matchedProjectCreate) acts.push("created Project");
         actionMessage += acts.join(", ") + ")*";
       }
 
@@ -596,6 +835,9 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
           </div>
         </div>
         <div className="flex items-center gap-1 text-stone-400 dark:text-stone-500">
+          <button onClick={handleClearChat} className="p-1.5 hover:bg-stone-200 dark:hover:bg-stone-800 rounded-md transition-colors" title="Clear chat history">
+            <Trash2 className="w-4 h-4" />
+          </button>
           <button onClick={() => setIsExpanded(!isExpanded)} className="p-1.5 hover:bg-stone-200 dark:hover:bg-stone-800 rounded-md transition-colors">
             {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
@@ -605,11 +847,11 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6 select-text">
         {messages.map((msg) => (
           <div key={msg.id} className={cn("flex", msg.role === 'user' ? "justify-end" : "justify-start")}>
             <div className={cn(
-              "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
+              "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed select-text",
               msg.role === 'user' 
                 ? "bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 rounded-br-sm font-medium" 
                 : "bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-200 rounded-bl-sm prose prose-sm prose-stone dark:prose-invert"
