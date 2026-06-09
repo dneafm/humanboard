@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
-import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogOut, HelpCircle, X, LayoutDashboard, Menu, ArrowRight, Check, MessageSquareText, ShieldCheck, Sparkles, Image, Bell, GitBranch, WandSparkles } from 'lucide-react';
+import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogOut, HelpCircle, X, LayoutDashboard, Menu, ArrowRight, Check, MessageSquareText, ShieldCheck, Sparkles, Image, Bell, GitBranch, WandSparkles, ChevronDown } from 'lucide-react';
 import { cn } from './lib/utils';
 import InboxPage from './pages/Inbox';
 import IdeasPage from './pages/Ideas';
@@ -264,7 +264,7 @@ function AuthScreen() {
         </button>
       </header>
 
-      <main className="mx-auto grid w-full max-w-[1440px] gap-10 px-5 pb-16 pt-5 sm:px-8 lg:min-h-[calc(100dvh-73px)] lg:grid-cols-[minmax(0,0.9fr)_minmax(560px,1.1fr)] lg:items-center lg:gap-14 lg:px-12 lg:pb-20 lg:pt-8">
+      <main className="mx-auto grid w-full max-w-[1440px] gap-10 px-5 pb-12 pt-5 sm:px-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(560px,1.1fr)] lg:items-center lg:gap-14 lg:px-12 lg:pb-14 lg:pt-10">
         <section className="max-w-xl">
           <div className="mb-6 inline-flex items-center gap-2 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300">
             <Sparkles className="h-3.5 w-3.5" />
@@ -306,6 +306,14 @@ function AuthScreen() {
               </div>
             ))}
           </div>
+
+          <a
+            href="#flagship-overview"
+            className="mt-7 inline-flex items-center gap-2 text-xs font-semibold uppercase text-stone-500 transition-colors hover:text-emerald-700 dark:text-stone-400 dark:hover:text-emerald-400"
+          >
+            Explore flagship functions
+            <ChevronDown className="h-4 w-4" />
+          </a>
         </section>
 
         <section aria-label="HumanBoard preview" className="relative min-w-0">
@@ -401,7 +409,7 @@ function AuthScreen() {
         </section>
       </main>
 
-      <section className="border-y border-stone-300 bg-white dark:border-stone-800 dark:bg-stone-950">
+      <section id="flagship-overview" className="scroll-mt-4 border-y border-stone-300 bg-white dark:border-stone-800 dark:bg-stone-950">
         <div className="mx-auto grid w-full max-w-[1440px] gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[0.75fr_1.25fr] lg:px-12 lg:py-24">
           <div>
             <div className="text-xs font-semibold uppercase text-emerald-700 dark:text-emerald-400">One continuous loop</div>
