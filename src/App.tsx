@@ -110,12 +110,24 @@ function SpotlightTour({
   if (!open || !step) return null;
 
   const padding = 10;
+  const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 390;
+  const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 844;
+  const isMobileViewport = viewportWidth < 640;
   const top = rect ? Math.max(rect.top - padding, 0) : 0;
   const left = rect ? Math.max(rect.left - padding, 0) : 0;
   const width = rect ? rect.width + padding * 2 : 0;
   const height = rect ? rect.height + padding * 2 : 0;
-  const cardTop = rect ? Math.min(top + height + 16, window.innerHeight - 220) : window.innerHeight / 2 - 100;
-  const cardLeft = rect ? Math.min(Math.max(left, 16), window.innerWidth - 380) : 16;
+  const cardWidth = Math.min(isMobileViewport ? viewportWidth - 24 : 360, viewportWidth - 32);
+  const cardTop = rect
+    ? isMobileViewport
+      ? Math.min(viewportHeight - 220, Math.max(16, top + height + 12))
+      : Math.min(top + height + 16, viewportHeight - 220)
+    : viewportHeight / 2 - 100;
+  const cardLeft = rect
+    ? isMobileViewport
+      ? Math.max((viewportWidth - cardWidth) / 2, 12)
+      : Math.min(Math.max(left, 16), viewportWidth - cardWidth - 16)
+    : 16;
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[120]">
@@ -133,8 +145,8 @@ function SpotlightTour({
         </>
       )}
       <div
-        className="pointer-events-auto absolute w-[min(360px,calc(100vw-32px))] rounded-xl border border-stone-700 bg-stone-950/96 p-4 text-stone-100 shadow-2xl"
-        style={{ top: cardTop, left: cardLeft }}
+        className="pointer-events-auto absolute rounded-xl border border-stone-700 bg-stone-950/96 p-4 text-stone-100 shadow-2xl"
+        style={{ top: cardTop, left: cardLeft, width: cardWidth }}
       >
         <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-stone-400">Interactive guide</div>
         <h3 className="mt-2 text-base font-semibold">{step.title}</h3>
@@ -144,25 +156,27 @@ function SpotlightTour({
             <div key={index} className={cn('h-1.5 flex-1 rounded-full', index === stepIndex ? 'bg-white' : 'bg-stone-700')} />
           ))}
         </div>
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={onPrev}
-            disabled={stepIndex === 0}
-            className="rounded-md border border-stone-700 px-3 py-2 text-sm text-stone-200 disabled:opacity-40"
-          >
-            Previous
-          </button>
-          <div className="text-xs text-stone-400">{stepIndex + 1} / {uiTourSteps.length}</div>
-          {stepIndex === uiTourSteps.length - 1 ? (
-            <button type="button" onClick={onClose} className="rounded-md bg-white px-3 py-2 text-sm font-medium text-stone-950">
-              Finish
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-xs text-stone-400 sm:order-2">{stepIndex + 1} / {uiTourSteps.length}</div>
+          <div className="flex items-center justify-between gap-3 sm:order-1 sm:flex-1">
+            <button
+              type="button"
+              onClick={onPrev}
+              disabled={stepIndex === 0}
+              className="rounded-md border border-stone-700 px-3 py-2 text-sm text-stone-200 disabled:opacity-40"
+            >
+              Previous
             </button>
-          ) : (
-            <button type="button" onClick={onNext} className="rounded-md bg-white px-3 py-2 text-sm font-medium text-stone-950">
-              Next
-            </button>
-          )}
+            {stepIndex === uiTourSteps.length - 1 ? (
+              <button type="button" onClick={onClose} className="rounded-md bg-white px-3 py-2 text-sm font-medium text-stone-950">
+                Finish
+              </button>
+            ) : (
+              <button type="button" onClick={onNext} className="rounded-md bg-white px-3 py-2 text-sm font-medium text-stone-950">
+                Next
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -284,33 +298,37 @@ function TutorialModal({ open, onClose }: { open: boolean; onClose: () => void }
             Best first move: capture one real thought in Inbox, then decide whether it should stay raw, become an Idea, connect to a Goal, or turn into a longer-horizon bet.
           </div>
 
-          <div className="mt-5 flex items-center justify-between gap-3 border-t border-stone-200 pt-4 dark:border-stone-800">
-            <button
-              type="button"
-              onClick={() => setCurrentStep((step) => Math.max(0, step - 1))}
-              disabled={currentStep === 0}
-              className="rounded-md border border-stone-200 px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-900"
-            >
-              Previous
-            </button>
-            <div className="text-xs text-stone-500 dark:text-stone-400">{tutorialSteps[currentStep].title}</div>
-            {currentStep === tutorialSteps.length - 1 ? (
-              <button
-                type="button"
-                onClick={handleClose}
-                className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200"
-              >
-                Finish
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setCurrentStep((step) => Math.min(tutorialSteps.length - 1, step + 1))}
-                className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200"
-              >
-                Next
-              </button>
-            )}
+          <div className="mt-5 border-t border-stone-200 pt-4 dark:border-stone-800">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-xs text-stone-500 dark:text-stone-400 sm:order-2">{tutorialSteps[currentStep].title}</div>
+              <div className="flex items-center justify-between gap-3 sm:order-1 sm:flex-1">
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep((step) => Math.max(0, step - 1))}
+                  disabled={currentStep === 0}
+                  className="rounded-md border border-stone-200 px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-900"
+                >
+                  Previous
+                </button>
+                {currentStep === tutorialSteps.length - 1 ? (
+                  <button
+                    type="button"
+                    onClick={handleClose}
+                    className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200"
+                  >
+                    Finish
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep((step) => Math.min(tutorialSteps.length - 1, step + 1))}
+                    className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200"
+                  >
+                    Next
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1058,7 +1076,7 @@ export default function App() {
     <BrowserRouter>
       {enableAiEraKbBridge && <AiEraKbAutoBridge />}
       <NotificationEngine />
-      <TutorialModal open={isTutorialOpen} onClose={closeGuide} />
+      <TutorialModal open={isTutorialOpen && !isSpotlightTourOpen} onClose={closeGuide} />
       <SpotlightTour
         open={isSpotlightTourOpen}
         stepIndex={spotlightStepIndex}
