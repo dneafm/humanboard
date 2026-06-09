@@ -14,7 +14,7 @@ function readEnv(key: string, fallback = '') {
 }
 
 function getRuntimeConfig(): RuntimeConfig {
-  const baseUrl = readEnv('AI_BASE_URL', readEnv('GEMMA_BASE_URL', '/api/ai/v1')).replace(/\/+$/, '');
+  const baseUrl = readEnv('AI_BASE_URL', readEnv('GEMMA_BASE_URL', '/api/gemma')).replace(/\/+$/, '');
   const model = readEnv('AI_MODEL', readEnv('GEMMA_MODEL', 'gemma4:latest'));
   const apiKey = readEnv('GEMMA_API_KEY', 'not-required');
   return { baseUrl, model, apiKey };
