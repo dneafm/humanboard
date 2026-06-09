@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
-import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogOut, HelpCircle, X, LayoutDashboard, Menu, ArrowRight, Check, MessageSquareText, ShieldCheck, Sparkles } from 'lucide-react';
+import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogOut, HelpCircle, X, LayoutDashboard, Menu, ArrowRight, Check, MessageSquareText, ShieldCheck, Sparkles, Image, Bell, GitBranch, WandSparkles } from 'lucide-react';
 import { cn } from './lib/utils';
 import InboxPage from './pages/Inbox';
 import IdeasPage from './pages/Ideas';
@@ -263,7 +263,7 @@ function AuthScreen() {
         </button>
       </header>
 
-      <main className="mx-auto grid w-full max-w-[1440px] gap-10 px-5 pb-10 pt-5 sm:px-8 lg:min-h-[calc(100dvh-73px)] lg:grid-cols-[minmax(0,0.9fr)_minmax(560px,1.1fr)] lg:items-center lg:gap-14 lg:px-12 lg:pb-16 lg:pt-8">
+      <main className="mx-auto grid w-full max-w-[1440px] gap-10 px-5 pb-16 pt-5 sm:px-8 lg:min-h-[calc(100dvh-73px)] lg:grid-cols-[minmax(0,0.9fr)_minmax(560px,1.1fr)] lg:items-center lg:gap-14 lg:px-12 lg:pb-20 lg:pt-8">
         <section className="max-w-xl">
           <div className="mb-6 inline-flex items-center gap-2 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300">
             <Sparkles className="h-3.5 w-3.5" />
@@ -399,6 +399,198 @@ function AuthScreen() {
           </div>
         </section>
       </main>
+
+      <section className="border-y border-stone-300 bg-white dark:border-stone-800 dark:bg-stone-950">
+        <div className="mx-auto grid w-full max-w-[1440px] gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[0.75fr_1.25fr] lg:px-12 lg:py-24">
+          <div>
+            <div className="text-xs font-semibold uppercase text-emerald-700 dark:text-emerald-400">One continuous loop</div>
+            <h2 className="mt-3 max-w-md text-3xl font-semibold leading-tight sm:text-4xl">From loose capture to useful action.</h2>
+            <p className="mt-5 max-w-md text-base leading-7 text-stone-600 dark:text-stone-400">
+              HumanBoard keeps the early mess without letting it become a permanent pile. Every part of the system helps useful thoughts mature.
+            </p>
+          </div>
+          <div className="divide-y divide-stone-200 border-y border-stone-200 dark:divide-stone-800 dark:border-stone-800">
+            {[
+              ['01', 'Capture without friction', 'Paste text, links, and images into Inbox before the thought disappears.'],
+              ['02', 'Distill what matters', 'Let the assistant selectively turn durable meaning into clean notes and developed ideas.'],
+              ['03', 'Connect the knowledge', 'Link ideas to goals, projects, capability bets, and related context across the board.'],
+              ['04', 'Resurface at the right time', 'Receive quiet, evidence-backed prompts when an old thought becomes relevant again.'],
+            ].map(([number, title, body]) => (
+              <div key={number} className="grid gap-2 py-5 sm:grid-cols-[48px_0.8fr_1.2fr] sm:items-start sm:gap-5">
+                <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">{number}</div>
+                <h3 className="text-sm font-semibold">{title}</h3>
+                <p className="text-sm leading-6 text-stone-500 dark:text-stone-400">{body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto w-full max-w-[1440px] px-5 py-16 sm:px-8 lg:px-12 lg:py-24">
+        <div className="mb-14 max-w-2xl">
+          <div className="text-xs font-semibold uppercase text-stone-500">Flagship functions</div>
+          <h2 className="mt-3 text-3xl font-semibold leading-tight sm:text-4xl">A second workspace for the thoughts your first brain drops.</h2>
+        </div>
+
+        <div className="space-y-20 lg:space-y-28">
+          <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+            <div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-emerald-100 dark:bg-emerald-950">
+                <Image className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
+              </div>
+              <div className="mt-6 text-xs font-semibold uppercase text-emerald-700 dark:text-emerald-400">Loose capture inbox</div>
+              <h3 className="mt-3 text-3xl font-semibold leading-tight">Capture the thought before organizing it.</h3>
+              <p className="mt-5 max-w-lg text-base leading-7 text-stone-600 dark:text-stone-400">
+                Inbox accepts unfinished thoughts, pasted images, links, and quick observations. Add context when you have it; keep moving when you do not.
+              </p>
+              <div className="mt-6 space-y-3 text-sm text-stone-700 dark:text-stone-300">
+                {['Paste images directly from the clipboard', 'Keep raw notes separate from developed ideas', 'Review and compile when attention is available'].map((item) => (
+                  <div key={item} className="flex items-center gap-3">
+                    <Check className="h-4 w-4 text-emerald-600" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="border-y border-stone-300 py-5 dark:border-stone-800">
+              <div className="rounded-lg border border-stone-300 bg-white p-4 shadow-sm dark:border-stone-800 dark:bg-stone-950">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-semibold">New inbox note</div>
+                  <div className="text-[10px] text-stone-400">Now</div>
+                </div>
+                <div className="mt-4 grid grid-cols-[76px_1fr] gap-4">
+                  <div className="aspect-square rounded-md border border-stone-200 bg-stone-100 p-2 dark:border-stone-800 dark:bg-stone-900">
+                    <div className="h-full rounded-sm border border-dashed border-stone-300 bg-white dark:border-stone-700 dark:bg-stone-950" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium leading-6">A product should help people notice their own patterns, not create more noise.</p>
+                    <div className="mt-4 flex gap-2">
+                      <span className="rounded-sm bg-amber-100 px-2 py-1 text-[10px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">raw thought</span>
+                      <span className="rounded-sm bg-stone-100 px-2 py-1 text-[10px] font-medium text-stone-500 dark:bg-stone-900">image context</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center gap-3 px-2 text-xs text-stone-500">
+                <MessageSquareText className="h-4 w-4" />
+                Add text later, then press Enter to capture.
+              </div>
+            </div>
+          </div>
+
+          <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+            <div className="order-2 lg:order-1">
+              <div className="rounded-lg border border-stone-300 bg-white dark:border-stone-800 dark:bg-stone-950">
+                <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3 dark:border-stone-800">
+                  <div className="flex items-center gap-2 text-xs font-semibold"><Sparkles className="h-4 w-4 text-emerald-600" /> HumanBoard Assistant</div>
+                  <div className="flex items-center gap-2 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                    <div className="h-3.5 w-6 rounded-full bg-emerald-500 p-0.5"><div className="ml-auto h-2.5 w-2.5 rounded-full bg-white" /></div>
+                    Auto-distill on
+                  </div>
+                </div>
+                <div className="space-y-4 p-4">
+                  <div className="ml-auto max-w-[80%] rounded-md bg-stone-950 px-3 py-2 text-xs leading-5 text-white dark:bg-stone-100 dark:text-stone-950">
+                    I keep returning to products that become more valuable as they learn my context.
+                  </div>
+                  <div className="max-w-[88%] rounded-md bg-stone-100 px-3 py-3 text-xs leading-5 dark:bg-stone-900">
+                    That suggests a durable product principle: <strong>context compounding creates switching value</strong>. I saved the principle and linked it to your HumanBoard positioning goal.
+                  </div>
+                  <div className="flex items-center gap-2 border-t border-stone-200 pt-3 text-[10px] text-stone-500 dark:border-stone-800">
+                    <Check className="h-3.5 w-3.5 text-emerald-600" />
+                    Saved one distilled idea, not the raw conversation
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="order-1 lg:order-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-amber-100 dark:bg-amber-950">
+                <WandSparkles className="h-5 w-5 text-amber-700 dark:text-amber-400" />
+              </div>
+              <div className="mt-6 text-xs font-semibold uppercase text-amber-700 dark:text-amber-400">Selective Auto-distill</div>
+              <h3 className="mt-3 text-3xl font-semibold leading-tight">Keep the meaning, not the transcript.</h3>
+              <p className="mt-5 max-w-lg text-base leading-7 text-stone-600 dark:text-stone-400">
+                The assistant can identify durable information during conversation and save at most one cleaned note or developed idea. Temporary details, generic advice, and raw chat stay out.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+            <div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-sky-100 dark:bg-sky-950">
+                <GitBranch className="h-5 w-5 text-sky-700 dark:text-sky-400" />
+              </div>
+              <div className="mt-6 text-xs font-semibold uppercase text-sky-700 dark:text-sky-400">Goals and knowledge map</div>
+              <h3 className="mt-3 text-3xl font-semibold leading-tight">Turn ideas into a roadmap you can edit.</h3>
+              <p className="mt-5 max-w-lg text-base leading-7 text-stone-600 dark:text-stone-400">
+                Ask the assistant to create a goal, develop its strategic ideas, identify needed knowledge, and break the path into actionable steps. Then edit or regenerate any panel as your understanding changes.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                ['Needed knowledge', 'Understand retention loops and context compounding.', Lightbulb, 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'],
+                ['Strategic idea', 'Make accumulated context visibly improve each interaction.', Sparkles, 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-400'],
+                ['Actionable step', 'Interview five users about moments they rediscovered old notes.', Check, 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'],
+                ['Connected signal', 'Users value resurfacing when it arrives with evidence.', Network, 'bg-stone-200 text-stone-700 dark:bg-stone-800 dark:text-stone-300'],
+              ].map(([label, body, Icon, color]) => (
+                <div key={String(label)} className="rounded-md border border-stone-300 bg-white p-4 dark:border-stone-800 dark:bg-stone-950">
+                  <div className={cn('flex h-8 w-8 items-center justify-center rounded-sm', String(color))}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="mt-5 text-[10px] font-semibold uppercase text-stone-500">{String(label)}</div>
+                  <p className="mt-2 text-sm font-medium leading-6">{String(body)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+            <div className="order-2 border-y border-stone-300 py-4 dark:border-stone-800 lg:order-1">
+              <div className="space-y-3">
+                <div className="rounded-md border border-emerald-300 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/50">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-[10px] font-semibold uppercase text-emerald-700 dark:text-emerald-400">Pattern detected · 86%</div>
+                    <Bell className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
+                  </div>
+                  <h4 className="mt-3 text-sm font-semibold">Your strongest product ideas share one theme.</h4>
+                  <p className="mt-2 text-xs leading-5 text-stone-600 dark:text-stone-400">Three recent ideas emphasize reducing cognitive overhead. This may be the clearest positioning thread for HumanBoard.</p>
+                </div>
+                <div className="rounded-md border border-stone-300 bg-white p-4 dark:border-stone-800 dark:bg-stone-950">
+                  <div className="text-[10px] font-semibold uppercase text-stone-500">Relevant memory</div>
+                  <p className="mt-2 text-sm font-medium">You wrote about “quiet software” 47 days ago. It directly supports this decision.</p>
+                </div>
+              </div>
+            </div>
+            <div className="order-1 lg:order-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-violet-100 dark:bg-violet-950">
+                <Bell className="h-5 w-5 text-violet-700 dark:text-violet-400" />
+              </div>
+              <div className="mt-6 text-xs font-semibold uppercase text-violet-700 dark:text-violet-400">Second-subconscious insights</div>
+              <h3 className="mt-3 text-3xl font-semibold leading-tight">Let old knowledge return with a reason.</h3>
+              <p className="mt-5 max-w-lg text-base leading-7 text-stone-600 dark:text-stone-400">
+                HumanBoard stays quiet until it finds enough evidence for a useful intervention: a repeated pattern, a relevant old note, or an unfinished loop worth revisiting.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-stone-300 bg-stone-950 text-white dark:border-stone-800">
+        <div className="mx-auto grid w-full max-w-[1440px] gap-8 px-5 py-16 sm:px-8 lg:grid-cols-[1fr_auto] lg:items-end lg:px-12 lg:py-20">
+          <div>
+            <div className="text-xs font-semibold uppercase text-emerald-400">Build a board that learns with you</div>
+            <h2 className="mt-3 max-w-2xl text-3xl font-semibold leading-tight sm:text-4xl">Start with one thought worth keeping.</h2>
+            <p className="mt-4 max-w-xl text-sm leading-6 text-stone-400">Your Google account opens a private HumanBoard workspace and keeps each tester's synced data isolated.</p>
+          </div>
+          <button
+            onClick={() => void handleSignIn()}
+            disabled={!isAuthReady}
+            className="group flex min-w-64 items-center justify-between rounded-md bg-white px-4 py-3.5 text-sm font-semibold text-stone-950 transition-colors hover:bg-emerald-400 disabled:cursor-wait disabled:bg-stone-600 disabled:text-stone-300"
+          >
+            <span>{isAuthReady ? 'Continue with Google' : 'Checking session...'}</span>
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </button>
+        </div>
+      </section>
     </div>
   );
 }
