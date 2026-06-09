@@ -150,8 +150,9 @@ function UpdateButton() {
 function Sidebar({ onOpenTutorial }: { onOpenTutorial: () => void }) {
   const { isDarkMode, toggleDarkMode } = useAppStore();
   const { user, signOutUser } = useAuthStore();
+  const isLocalCommandCenter = window.location.port === '3010';
   const navItems = [
-    { to: '/command-center', icon: LayoutDashboard, label: 'Command Center' },
+    ...(isLocalCommandCenter ? [{ to: '/command-center', icon: LayoutDashboard, label: 'Command Center' }] : []),
     { to: '/', icon: Inbox, label: 'Inbox' },
     { to: '/ideas', icon: Lightbulb, label: 'Ideas' },
     { to: '/goals', icon: Target, label: 'Goals' },
@@ -740,7 +741,7 @@ export default function App() {
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navItems = [
-    { to: '/command-center', icon: LayoutDashboard, label: 'Command Center' },
+    ...(isLocalCommandCenter ? [{ to: '/command-center', icon: LayoutDashboard, label: 'Command Center' }] : []),
     { to: '/', icon: Inbox, label: 'Inbox' },
     { to: '/ideas', icon: Lightbulb, label: 'Ideas' },
     { to: '/goals', icon: Target, label: 'Goals' },
@@ -832,7 +833,7 @@ export default function App() {
             </div>
           </div>
           <Routes>
-            <Route path="/command-center" element={<CommandCenterPage />} />
+            {isLocalCommandCenter && <Route path="/command-center" element={<CommandCenterPage />} />}
             <Route path="/" element={<InboxPage />} />
             <Route path="/ideas" element={<IdeasPage />} />
             <Route path="/ideas/:id" element={<IdeaDetailPage />} />
