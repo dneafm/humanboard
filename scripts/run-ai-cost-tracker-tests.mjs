@@ -4,6 +4,8 @@ import {
   extractUsageTokens,
   applyAiCostRecord,
   calculateAiCost,
+  getDailyRequestUsage,
+  incrementDailyRequestUsage,
 } from '../server/aiCostTracker.mjs';
 
 function test(name, fn) {
@@ -59,6 +61,7 @@ test('calculateAiCost returns rounded token and usd totals', () => {
 
 test('applyAiCostRecord accumulates totals, by-model values, and recent records', () => {
   const tracking = createEmptyAiCostState();
+  incrementDailyRequestUsage(tracking, '2026-06-09T12:00:00.000Z');
 
   const updated = applyAiCostRecord(tracking, {
     requestId: 'req-1',
@@ -80,6 +83,15 @@ test('applyAiCostRecord accumulates totals, by-model values, and recent records'
   assert.equal(updated.byModel['test-model'].estimatedUsd, 0.12345679);
   assert.equal(updated.recent.length, 1);
   assert.equal(updated.recent[0].requestId, 'req-1');
+  assert.deepEqual(updated.dailyRequests, { day: '2026-06-09', count: 1 });
+});
+
+test('daily request usage increments and resets on a new UTC day', () => {
+  const tracking = createEmptyAiCostState();
+  incrementDailyRequestUsage(tracking, '2026-06-09T23:59:00.000Z');
+  incrementDailyRequestUsage(tracking, '2026-06-09T23:59:30.000Z');
+  assert.deepEqual(getDailyRequestUsage(tracking, '2026-06-09T23:59:59.000Z'), { day: '2026-06-09', count: 2 });
+  assert.deepEqual(getDailyRequestUsage(tracking, '2026-06-10T00:00:00.000Z'), { day: '2026-06-10', count: 0 });
 });
 
 console.log('All ai cost tracker tests passed.');

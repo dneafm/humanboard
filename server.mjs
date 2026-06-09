@@ -5,7 +5,7 @@ import fs from 'fs/promises';
 import { copyFileSync, existsSync, mkdirSync } from 'fs';
 import { execFileSync, spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import { applyAiCostRecord, calculateAiCost, createEmptyAiCostState, roundUsd, toFiniteNumber } from './server/aiCostTracker.mjs';
+import { applyAiCostRecord, calculateAiCost, createEmptyAiCostState, getDailyRequestUsage, incrementDailyRequestUsage, roundUsd, toFiniteNumber } from './server/aiCostTracker.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,6 +19,7 @@ const USER_DATA_DIR = path.resolve(process.env.HUMANBOARD_USER_DATA_DIR || path.
 const AI_ERA_DB_PATH = process.env.AI_ERA_KB_PATH || 'F:/backtest/ai-era-kb/ai_era_kb.sqlite3';
 const AI_BASE_URL = String(process.env.AI_BASE_URL || process.env.GEMMA_BASE_URL || 'http://127.0.0.1:11434/v1').replace(/\/+$/, '');
 const AI_API_KEY = String(process.env.AI_API_KEY || process.env.GEMMA_API_KEY || '').trim();
+const AI_DAILY_REQUEST_LIMIT = Math.max(1, Number(process.env.AI_DAILY_REQUEST_LIMIT || 1000));
 
 const DEFAULT_SECTIONS = [
   {
@@ -168,6 +169,10 @@ function normalizeSnapshot(raw = {}) {
           ? snapshot.aiCostTracking.byModel
           : {},
         recent: Array.isArray(snapshot.aiCostTracking?.recent) ? snapshot.aiCostTracking.recent.slice(0, 100) : [],
+        dailyRequests: {
+          day: String(snapshot.aiCostTracking?.dailyRequests?.day || ''),
+          count: toFiniteNumber(snapshot.aiCostTracking?.dailyRequests?.count, 0),
+        },
       }
     : createEmptyAiCostState();
 
@@ -203,6 +208,27 @@ async function getAiModelPricingMap() {
   return models;
 }
 
+const userSnapshotLocks = new Map();
+
+async function withUserSnapshotLock(userId, operation) {
+  const previous = userSnapshotLocks.get(userId) || Promise.resolve();
+  let release;
+  const current = new Promise((resolve) => {
+    release = resolve;
+  });
+  const tail = previous.then(() => current);
+  userSnapshotLocks.set(userId, tail);
+  await previous;
+  try {
+    return await operation();
+  } finally {
+    release();
+    if (userSnapshotLocks.get(userId) === tail) {
+      userSnapshotLocks.delete(userId);
+    }
+  }
+}
+
 async function recordAiChatCost(userId, requestMeta, responsePayload) {
   const modelId = String(responsePayload?.model || requestMeta?.model || '').trim();
   const usage = responsePayload?.usage;
@@ -214,20 +240,39 @@ async function recordAiChatCost(userId, requestMeta, responsePayload) {
 
   const { promptTokens, completionTokens, totalTokens, estimatedUsd } = calculateAiCost(pricing, usage);
 
-  const snapshot = await loadSnapshotSafe(userId);
-  snapshot.aiCostTracking = applyAiCostRecord(snapshot.aiCostTracking || createEmptyAiCostState(), {
-    at: new Date().toISOString(),
-    requestId: requestMeta.requestId,
-    path: requestMeta.path,
-    modelId,
-    promptTokens,
-    completionTokens,
-    totalTokens,
-    estimatedUsd,
+  await withUserSnapshotLock(userId, async () => {
+    const snapshot = await loadSnapshotSafe(userId);
+    snapshot.aiCostTracking = applyAiCostRecord(snapshot.aiCostTracking || createEmptyAiCostState(), {
+      at: new Date().toISOString(),
+      requestId: requestMeta.requestId,
+      path: requestMeta.path,
+      modelId,
+      promptTokens,
+      completionTokens,
+      totalTokens,
+      estimatedUsd,
+    });
+    await saveSnapshot(userId, snapshot);
   });
-  await saveSnapshot(userId, snapshot);
 
   return { modelId, promptTokens, completionTokens, totalTokens, estimatedUsd };
+}
+
+function nextUtcDayIso(now = new Date()) {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)).toISOString();
+}
+
+async function consumeAiDailyRequest(userId, now = new Date()) {
+  return withUserSnapshotLock(userId, async () => {
+    const snapshot = await loadSnapshotSafe(userId);
+    const usage = getDailyRequestUsage(snapshot.aiCostTracking, now);
+    if (usage.count >= AI_DAILY_REQUEST_LIMIT) {
+      return { allowed: false, limit: AI_DAILY_REQUEST_LIMIT, used: usage.count, resetAt: nextUtcDayIso(now) };
+    }
+    snapshot.aiCostTracking = incrementDailyRequestUsage(snapshot.aiCostTracking, now);
+    await saveSnapshot(userId, snapshot);
+    return { allowed: true, limit: AI_DAILY_REQUEST_LIMIT, used: usage.count + 1, resetAt: nextUtcDayIso(now) };
+  });
 }
 
 function validateSnapshotCandidate(candidate) {
@@ -576,7 +621,12 @@ app.post('/api/snapshot/reset', async (req, res) => {
   if (!userId) return;
 
   try {
-    const snapshot = await saveSnapshot(userId, cloneDefaultSnapshot());
+    const snapshot = await withUserSnapshotLock(userId, async () => {
+      const current = await loadSnapshotSafe(userId);
+      const reset = cloneDefaultSnapshot();
+      reset.aiCostTracking = current.aiCostTracking;
+      return saveSnapshot(userId, reset);
+    });
     res.json({ success: true, snapshot });
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to reset snapshot' });
@@ -600,8 +650,12 @@ app.post('/api/snapshot', express.json({ limit: '25mb' }), async (req, res) => {
   if (!userId) return;
 
   try {
-    const snapshot = validateSnapshotCandidate(req.body);
-    await saveSnapshot(userId, snapshot);
+    await withUserSnapshotLock(userId, async () => {
+      const current = await loadSnapshotSafe(userId);
+      const snapshot = validateSnapshotCandidate(req.body);
+      snapshot.aiCostTracking = current.aiCostTracking;
+      await saveSnapshot(userId, snapshot);
+    });
     res.json({ success: true, snapshotPath: getUserSnapshotPaths(userId).snapshotPath });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -631,9 +685,26 @@ app.get('/api/ai-era-kb', (req, res) => {
 app.all(['/api/ai/*', '/api/gemma/*'], express.raw({ type: '*/*', limit: '25mb' }), async (req, res) => {
   const startedAt = Date.now();
   const requestId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-  const isGemmaChat = req.originalUrl.startsWith('/api/gemma/chat/completions');
+  const isGemmaChat = /^\/api\/(?:ai|gemma)\/chat\/completions(?:\?|$)/.test(req.originalUrl);
   const userId = getRequestUserId(req);
   try {
+    if (isGemmaChat) {
+      if (!userId) {
+        res.status(400).json({ error: 'Missing Header: X-User-ID' });
+        return;
+      }
+      const quota = await consumeAiDailyRequest(userId);
+      res.setHeader('x-humanboard-ai-daily-limit', String(quota.limit));
+      res.setHeader('x-humanboard-ai-daily-used', String(quota.used));
+      res.setHeader('x-humanboard-ai-daily-reset', quota.resetAt);
+      if (!quota.allowed) {
+        const message = `Daily AI request limit reached (${quota.limit}).`;
+        pushRuntimeEvent('warn', 'ai_quota_blocked', message, { userId, limit: quota.limit, used: quota.used, resetAt: quota.resetAt });
+        res.status(429).json({ error: message, code: 'AI_DAILY_REQUEST_LIMIT', ...quota });
+        return;
+      }
+    }
+
     const suffix = req.originalUrl.replace(/^\/api\/(ai|gemma)/, '');
     const targetUrl = `${AI_BASE_URL}${suffix}`;
     const headers = new Headers({

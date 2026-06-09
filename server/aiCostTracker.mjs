@@ -18,7 +18,35 @@ export function createEmptyAiCostState() {
     },
     byModel: {},
     recent: [],
+    dailyRequests: {
+      day: '',
+      count: 0,
+    },
   };
+}
+
+export function utcDayKey(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+}
+
+export function getDailyRequestUsage(trackingState, value = new Date()) {
+  const day = utcDayKey(value);
+  const storedDay = String(trackingState?.dailyRequests?.day || '');
+  return {
+    day,
+    count: storedDay === day ? toFiniteNumber(trackingState?.dailyRequests?.count, 0) : 0,
+  };
+}
+
+export function incrementDailyRequestUsage(trackingState, value = new Date()) {
+  const tracking = trackingState && typeof trackingState === 'object' ? trackingState : createEmptyAiCostState();
+  const usage = getDailyRequestUsage(tracking, value);
+  tracking.dailyRequests = {
+    day: usage.day,
+    count: usage.count + 1,
+  };
+  return tracking;
 }
 
 export function extractUsageTokens(usage = {}) {
@@ -69,6 +97,10 @@ export function applyAiCostRecord(trackingState, record) {
         },
         byModel: trackingState?.byModel && typeof trackingState.byModel === 'object' ? { ...trackingState.byModel } : {},
         recent: Array.isArray(trackingState?.recent) ? [...trackingState.recent] : [],
+        dailyRequests: {
+          day: String(trackingState?.dailyRequests?.day || ''),
+          count: toFiniteNumber(trackingState?.dailyRequests?.count, 0),
+        },
       }
     : createEmptyAiCostState();
 
