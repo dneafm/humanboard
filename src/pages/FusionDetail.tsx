@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, FileText, Link2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, FileText, Link2, Minus, Plus } from 'lucide-react';
 import { useAppStore, type FusionAudience, type FusionStatus, type FusionType } from '../store';
 
 const fusionTypes: FusionType[] = ['Post', 'Writing', 'Thesis', 'Report'];
@@ -13,14 +13,34 @@ export default function FusionDetailPage() {
   const { fusionItems, notes, ideas, goals, projects, updateFusionItem } = useAppStore();
   const item = fusionItems.find((fusion) => fusion.id === id);
 
+  const [noteQuery, setNoteQuery] = useState('');
+  const [ideaQuery, setIdeaQuery] = useState('');
+  const [goalQuery, setGoalQuery] = useState('');
+  const [projectQuery, setProjectQuery] = useState('');
+  const [showNotePicker, setShowNotePicker] = useState(false);
+  const [showIdeaPicker, setShowIdeaPicker] = useState(false);
+  const [showGoalPicker, setShowGoalPicker] = useState(false);
+  const [showProjectPicker, setShowProjectPicker] = useState(false);
+
   const linkedNotes = useMemo(() => notes.filter((note) => item?.linkedNoteIds.includes(note.id)), [item?.linkedNoteIds, notes]);
   const linkedIdeas = useMemo(() => ideas.filter((idea) => item?.linkedIdeaIds.includes(idea.id)), [ideas, item?.linkedIdeaIds]);
   const linkedGoals = useMemo(() => goals.filter((goal) => item?.linkedGoalIds.includes(goal.id)), [goals, item?.linkedGoalIds]);
   const linkedProjects = useMemo(() => projects.filter((project) => item?.linkedProjectIds.includes(project.id)), [item?.linkedProjectIds, projects]);
 
+  const availableNotes = useMemo(() => notes.filter((note) => !(item?.linkedNoteIds ?? []).includes(note.id) && note.content.toLowerCase().includes(noteQuery.trim().toLowerCase())), [item?.linkedNoteIds, noteQuery, notes]);
+  const availableIdeas = useMemo(() => ideas.filter((idea) => !(item?.linkedIdeaIds ?? []).includes(idea.id) && idea.title.toLowerCase().includes(ideaQuery.trim().toLowerCase())), [ideaQuery, ideas, item?.linkedIdeaIds]);
+  const availableGoals = useMemo(() => goals.filter((goal) => !(item?.linkedGoalIds ?? []).includes(goal.id) && goal.title.toLowerCase().includes(goalQuery.trim().toLowerCase())), [goalQuery, goals, item?.linkedGoalIds]);
+  const availableProjects = useMemo(() => projects.filter((project) => !(item?.linkedProjectIds ?? []).includes(project.id) && project.title.toLowerCase().includes(projectQuery.trim().toLowerCase())), [item?.linkedProjectIds, projectQuery, projects]);
+
   if (!item) {
     return <div className="p-8 text-stone-500">Fusion item not found.</div>;
   }
+
+  const toggleLinkedId = (field: 'linkedNoteIds' | 'linkedIdeaIds' | 'linkedGoalIds' | 'linkedProjectIds', value: string) => {
+    const current = item[field] ?? [];
+    const next = current.includes(value) ? current.filter((id) => id !== value) : [...current, value];
+    updateFusionItem(item.id, { [field]: next });
+  };
 
   return (
     <div className="max-w-7xl mx-auto w-full p-8">
@@ -69,10 +89,54 @@ export default function FusionDetailPage() {
 
         <div className="space-y-6">
           <EditorCard title="Source material" icon={Link2}>
-            <LinkedSection label="Notes" items={linkedNotes.map((note) => note.content)} empty="No linked notes" />
-            <LinkedSection label="Ideas" items={linkedIdeas.map((idea) => idea.title)} empty="No linked ideas" />
-            <LinkedSection label="Goals" items={linkedGoals.map((goal) => goal.title)} empty="No linked goals" />
-            <LinkedSection label="Projects" items={linkedProjects.map((project) => project.title)} empty="No linked projects" />
+            <LinkManager
+              label="Notes"
+              linkedItems={linkedNotes.map((note) => ({ id: note.id, label: note.content.slice(0, 80) }))}
+              availableItems={availableNotes.map((note) => ({ id: note.id, label: note.content.slice(0, 80) }))}
+              query={noteQuery}
+              setQuery={setNoteQuery}
+              showPicker={showNotePicker}
+              setShowPicker={setShowNotePicker}
+              emptyLinked="No linked notes"
+              emptyAvailable="No matching notes"
+              onToggle={(value) => toggleLinkedId('linkedNoteIds', value)}
+            />
+            <LinkManager
+              label="Ideas"
+              linkedItems={linkedIdeas.map((idea) => ({ id: idea.id, label: idea.title }))}
+              availableItems={availableIdeas.map((idea) => ({ id: idea.id, label: idea.title }))}
+              query={ideaQuery}
+              setQuery={setIdeaQuery}
+              showPicker={showIdeaPicker}
+              setShowPicker={setShowIdeaPicker}
+              emptyLinked="No linked ideas"
+              emptyAvailable="No matching ideas"
+              onToggle={(value) => toggleLinkedId('linkedIdeaIds', value)}
+            />
+            <LinkManager
+              label="Goals"
+              linkedItems={linkedGoals.map((goal) => ({ id: goal.id, label: goal.title }))}
+              availableItems={availableGoals.map((goal) => ({ id: goal.id, label: goal.title }))}
+              query={goalQuery}
+              setQuery={setGoalQuery}
+              showPicker={showGoalPicker}
+              setShowPicker={setShowGoalPicker}
+              emptyLinked="No linked goals"
+              emptyAvailable="No matching goals"
+              onToggle={(value) => toggleLinkedId('linkedGoalIds', value)}
+            />
+            <LinkManager
+              label="Projects"
+              linkedItems={linkedProjects.map((project) => ({ id: project.id, label: project.title }))}
+              availableItems={availableProjects.map((project) => ({ id: project.id, label: project.title }))}
+              query={projectQuery}
+              setQuery={setProjectQuery}
+              showPicker={showProjectPicker}
+              setShowPicker={setShowProjectPicker}
+              emptyLinked="No linked projects"
+              emptyAvailable="No matching projects"
+              onToggle={(value) => toggleLinkedId('linkedProjectIds', value)}
+            />
           </EditorCard>
 
           <EditorCard title="Share readiness" icon={CheckCircle2}>
@@ -108,16 +172,71 @@ function EditorCard({ title, icon: Icon, children }: { title: string; icon: any;
   );
 }
 
-function LinkedSection({ label, items, empty }: { label: string; items: string[]; empty: string }) {
+function LinkManager({
+  label,
+  linkedItems,
+  availableItems,
+  query,
+  setQuery,
+  showPicker,
+  setShowPicker,
+  emptyLinked,
+  emptyAvailable,
+  onToggle,
+}: {
+  label: string;
+  linkedItems: Array<{ id: string; label: string }>;
+  availableItems: Array<{ id: string; label: string }>;
+  query: string;
+  setQuery: (value: string) => void;
+  showPicker: boolean;
+  setShowPicker: (value: boolean) => void;
+  emptyLinked: string;
+  emptyAvailable: string;
+  onToggle: (value: string) => void;
+}) {
   return (
-    <div className="mb-4 last:mb-0">
-      <div className="mb-2 text-xs font-semibold uppercase tracking-widest text-stone-400">{label}</div>
-      {items.length ? (
+    <div className="mb-5 last:mb-0">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="text-xs font-semibold uppercase tracking-widest text-stone-400">{label}</div>
+        <button
+          type="button"
+          onClick={() => setShowPicker(!showPicker)}
+          className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-medium text-stone-700 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-300"
+        >
+          {showPicker ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+          {showPicker ? 'Hide' : 'Add'}
+        </button>
+      </div>
+
+      {linkedItems.length ? (
         <div className="flex flex-wrap gap-2">
-          {items.map((item) => <span key={`${label}-${item}`} className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs text-stone-700 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-300">{item}</span>)}
+          {linkedItems.map((item) => (
+            <button key={item.id} type="button" onClick={() => onToggle(item.id)} className="rounded-full border border-stone-900 bg-stone-900 px-3 py-1 text-xs text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-950">
+              {item.label}
+            </button>
+          ))}
         </div>
       ) : (
-        <div className="text-sm text-stone-400">{empty}</div>
+        <div className="text-sm text-stone-400">{emptyLinked}</div>
+      )}
+
+      {showPicker && (
+        <>
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={`Search ${label.toLowerCase()}`}
+            className="mt-3 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-100 dark:focus:border-stone-700 dark:focus:ring-stone-900"
+          />
+          <div className="mt-2 flex flex-wrap gap-2">
+            {availableItems.length ? availableItems.map((item) => (
+              <button key={item.id} type="button" onClick={() => onToggle(item.id)} className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs text-stone-700 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-300">
+                {item.label}
+              </button>
+            )) : <div className="text-sm text-stone-400">{emptyAvailable}</div>}
+          </div>
+        </>
       )}
     </div>
   );
