@@ -296,6 +296,72 @@ export async function askGemma(prompt: string, systemInstruction?: string) {
   );
 }
 
+export async function generateFusionArtifact(input: {
+  title: string;
+  type: 'Post' | 'Writing' | 'Thesis' | 'Report';
+  notes: string[];
+  ideas: Array<{ title: string; summary?: string; content?: string }>;
+  existingSummary?: string;
+  existingConclusion?: string;
+  existingBody?: string;
+  mode: 'summary' | 'conclusion' | 'full';
+}) {
+  const notesBlock = input.notes.length
+    ? input.notes.map((note, index) => `${index + 1}. ${note}`).join('\n')
+    : 'No linked notes.';
+
+  const ideasBlock = input.ideas.length
+    ? input.ideas.map((idea, index) => `${index + 1}. ${idea.title}\nSummary: ${idea.summary || 'None'}\nContent: ${idea.content || 'None'}`).join('\n\n')
+    : 'No linked ideas.';
+
+  const modeInstruction = input.mode === 'summary'
+    ? 'Return JSON with one key: summary.'
+    : input.mode === 'conclusion'
+      ? 'Return JSON with one key: centralConclusion.'
+      : 'Return JSON with keys: summary, centralConclusion, body.';
+
+  const prompt = `You are generating a Fusion artifact for HumanBoard.
+
+Artifact title: ${input.title}
+Artifact type: ${input.type}
+
+Linked notes:
+${notesBlock}
+
+Linked ideas:
+${ideasBlock}
+
+Existing summary:
+${input.existingSummary || 'None'}
+
+Existing conclusion:
+${input.existingConclusion || 'None'}
+
+Existing body:
+${input.existingBody || 'None'}
+
+Instructions:
+- Synthesize only from the linked notes and linked ideas.
+- Be concrete and readable.
+- Do not invent external facts.
+- Make the conclusion clear and shareable.
+- For full mode, produce a strong first draft.
+- ${modeInstruction}
+- Return valid JSON only.`;
+
+  const raw = await callGemma(
+    prompt,
+    'You are the HumanBoard Fusion writing assistant. Turn linked source material into clear, grounded synthesis. Return JSON only.'
+  );
+
+  const parsed = JSON.parse(extractJsonObject(raw));
+  return {
+    summary: typeof parsed.summary === 'string' ? parsed.summary.trim() : '',
+    centralConclusion: typeof parsed.centralConclusion === 'string' ? parsed.centralConclusion.trim() : '',
+    body: typeof parsed.body === 'string' ? parsed.body.trim() : '',
+  };
+}
+
 export async function extractWebContent(url: string) {
   const response = await apiFetch('/api/extract-web', {
     method: 'POST',

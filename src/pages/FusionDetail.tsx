@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, FileText, Link2, Minus, Plus } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, FileText, Link2, Minus, Plus, Sparkles } from 'lucide-react';
+import { generateFusionArtifact } from '../lib/ai';
 import { useAppStore, type FusionAudience, type FusionStatus, type FusionType } from '../store';
 
 const fusionTypes: FusionType[] = ['Post', 'Writing', 'Thesis', 'Report'];
@@ -21,6 +22,8 @@ export default function FusionDetailPage() {
   const [showIdeaPicker, setShowIdeaPicker] = useState(false);
   const [showGoalPicker, setShowGoalPicker] = useState(false);
   const [showProjectPicker, setShowProjectPicker] = useState(false);
+  const [isGenerating, setIsGenerating] = useState<'summary' | 'conclusion' | 'full' | null>(null);
+  const [uiError, setUiError] = useState<string | null>(null);
 
   const linkedNotes = useMemo(() => notes.filter((note) => item?.linkedNoteIds.includes(note.id)), [item?.linkedNoteIds, notes]);
   const linkedIdeas = useMemo(() => ideas.filter((idea) => item?.linkedIdeaIds.includes(idea.id)), [ideas, item?.linkedIdeaIds]);
@@ -36,10 +39,48 @@ export default function FusionDetailPage() {
     return <div className="p-8 text-stone-500">Fusion item not found.</div>;
   }
 
+  const canGenerate = linkedNotes.length > 0 || linkedIdeas.length > 0;
+
   const toggleLinkedId = (field: 'linkedNoteIds' | 'linkedIdeaIds' | 'linkedGoalIds' | 'linkedProjectIds', value: string) => {
     const current = item[field] ?? [];
     const next = current.includes(value) ? current.filter((id) => id !== value) : [...current, value];
     updateFusionItem(item.id, { [field]: next });
+  };
+
+  const handleGenerate = async (mode: 'summary' | 'conclusion' | 'full') => {
+    if (!canGenerate) return;
+    setUiError(null);
+    setIsGenerating(mode);
+    try {
+      const generated = await generateFusionArtifact({
+        title: item.title,
+        type: item.type,
+        notes: linkedNotes.map((note) => note.content),
+        ideas: linkedIdeas.map((idea) => ({ title: idea.title, summary: idea.summary, content: idea.content })),
+        existingSummary: item.summary,
+        existingConclusion: item.centralConclusion,
+        existingBody: item.body,
+        mode,
+      });
+
+      if (mode === 'summary') {
+        updateFusionItem(item.id, { summary: generated.summary || item.summary });
+      } else if (mode === 'conclusion') {
+        updateFusionItem(item.id, { centralConclusion: generated.centralConclusion || item.centralConclusion });
+      } else {
+        updateFusionItem(item.id, {
+          summary: generated.summary || item.summary,
+          centralConclusion: generated.centralConclusion || item.centralConclusion,
+          body: generated.body || item.body,
+        });
+      }
+    } catch (error) {
+      console.error('Fusion generation failed:', error);
+      const detail = error instanceof Error ? error.message : 'AI generation failed.';
+      setUiError(`Fusion AI generation failed. ${detail}`);
+    } finally {
+      setIsGenerating(null);
+    }
   };
 
   return (
@@ -72,17 +113,53 @@ export default function FusionDetailPage() {
         </div>
       </div>
 
+      {uiError && (
+        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+          {uiError}
+        </div>
+      )}
+
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_360px]">
         <div className="space-y-6">
           <EditorCard title="Summary" icon={FileText}>
+            <div className="mb-3 flex justify-end">
+              <button
+                type="button"
+                disabled={!canGenerate || isGenerating !== null}
+                onClick={() => handleGenerate('summary')}
+                className="inline-flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-xs font-medium text-stone-700 disabled:opacity-40 dark:border-stone-700 dark:text-stone-200"
+              >
+                <Sparkles className="h-3.5 w-3.5" /> {isGenerating === 'summary' ? 'Generating...' : 'AI Generate summary'}
+              </button>
+            </div>
             <textarea value={item.summary} onChange={(event) => updateFusionItem(item.id, { summary: event.target.value })} placeholder="Short abstract or summary..." rows={4} className="w-full resize-none rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-100 dark:focus:border-stone-700 dark:focus:ring-stone-900" />
           </EditorCard>
 
           <EditorCard title="Final conclusion" icon={CheckCircle2}>
+            <div className="mb-3 flex justify-end">
+              <button
+                type="button"
+                disabled={!canGenerate || isGenerating !== null}
+                onClick={() => handleGenerate('conclusion')}
+                className="inline-flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-xs font-medium text-stone-700 disabled:opacity-40 dark:border-stone-700 dark:text-stone-200"
+              >
+                <Sparkles className="h-3.5 w-3.5" /> {isGenerating === 'conclusion' ? 'Generating...' : 'AI Generate conclusion'}
+              </button>
+            </div>
             <textarea value={item.centralConclusion} onChange={(event) => updateFusionItem(item.id, { centralConclusion: event.target.value })} placeholder="What is the conclusion worth sharing?" rows={4} className="w-full resize-none rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-100 dark:focus:border-stone-700 dark:focus:ring-stone-900" />
           </EditorCard>
 
           <EditorCard title="Body" icon={FileText}>
+            <div className="mb-3 flex justify-end">
+              <button
+                type="button"
+                disabled={!canGenerate || isGenerating !== null}
+                onClick={() => handleGenerate('full')}
+                className="inline-flex items-center gap-2 rounded-lg bg-stone-900 px-3 py-2 text-xs font-medium text-white disabled:opacity-40 dark:bg-stone-100 dark:text-stone-950"
+              >
+                <Sparkles className="h-3.5 w-3.5" /> {isGenerating === 'full' ? 'Generating...' : 'AI Generate draft'}
+              </button>
+            </div>
             <textarea value={item.body} onChange={(event) => updateFusionItem(item.id, { body: event.target.value })} placeholder="Write the full post, writing, thesis, or report..." rows={18} className="w-full resize-y rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-100 dark:focus:border-stone-700 dark:focus:ring-stone-900" />
           </EditorCard>
         </div>
