@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAppStore } from '../store';
-import { FolderKanban, Plus, FlaskConical, ArrowRight, Sparkles, Sprout, CircleDashed, X } from 'lucide-react';
+import { FolderKanban, Plus, FlaskConical, ArrowRight, Sparkles, Sprout, CircleDashed, X, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '../lib/utils';
 
@@ -48,10 +48,10 @@ function ReadinessBar({ maturity }: { maturity: number }) {
   );
 }
 
-function ProjectCard({ project, sourceIdea }: { project: any; sourceIdea?: any }) {
+function ProjectCard({ project, sourceIdea, onDelete }: { project: any; sourceIdea?: any; onDelete: (projectId: string) => void }) {
   return (
     <div className="rounded-xl border border-stone-200 bg-white p-6 shadow-sm transition-all hover:border-stone-300 dark:border-stone-800 dark:bg-stone-900">
-      <div className="flex items-start justify-between mb-4">
+      <div className="mb-4 flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300">
             <FolderKanban className="w-5 h-5" />
@@ -68,6 +68,15 @@ function ProjectCard({ project, sourceIdea }: { project: any; sourceIdea?: any }
             </span>
           </div>
         </div>
+        <button
+          type="button"
+          onClick={() => onDelete(project.id)}
+          className="rounded-lg p-2 text-stone-400 transition hover:bg-red-50 hover:text-red-600 dark:text-stone-500 dark:hover:bg-red-950/40 dark:hover:text-red-300"
+          aria-label={`Delete project ${project.title}`}
+          title="Delete project"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
       </div>
 
       <p className="mb-6 text-sm text-stone-700 dark:text-stone-300">{project.description}</p>
@@ -110,7 +119,7 @@ function ProjectCard({ project, sourceIdea }: { project: any; sourceIdea?: any }
 }
 
 export default function ProjectsPage() {
-  const { projects, ideas, addProject } = useAppStore();
+  const { projects, ideas, addProject, deleteProject } = useAppStore();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
   const [draftDescription, setDraftDescription] = useState('');
@@ -142,6 +151,14 @@ export default function ProjectsPage() {
     setIsCreateOpen(false);
     setDraftTitle('');
     setDraftDescription('');
+  };
+
+  const handleDeleteProject = (projectId: string) => {
+    const target = projects.find((project) => project.id === projectId);
+    if (!target) return;
+    const confirmed = window.confirm(`Delete project "${target.title}"?`);
+    if (!confirmed) return;
+    deleteProject(projectId);
   };
 
   return (
@@ -282,7 +299,7 @@ export default function ProjectsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {projects.map(project => {
               const sourceIdea = ideas.find(i => i.id === project.sourceIdeaId);
-              return <ProjectCard key={project.id} project={project} sourceIdea={sourceIdea} />;
+              return <ProjectCard key={project.id} project={project} sourceIdea={sourceIdea} onDelete={handleDeleteProject} />;
             })}
           </div>
         ) : (

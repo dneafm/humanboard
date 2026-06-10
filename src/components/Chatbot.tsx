@@ -31,6 +31,7 @@ export default function Chatbot() {
   const addGoal = useAppStore((state) => state.addGoal);
   const updateIdea = useAppStore((state) => state.updateIdea);
   const updateGoal = useAppStore((state) => state.updateGoal);
+  const deleteProject = useAppStore((state) => state.deleteProject);
   const userId = useAuthStore((state) => state.userId);
   const [isExpanded, setIsExpanded] = useState(false);
   const [autoDistill, setAutoDistill] = useState(false);
@@ -134,6 +135,12 @@ export default function Chatbot() {
     const normalized = normalizeText(value);
     if (!normalized) return undefined;
     return goals.find((goal) => normalizeText(goal.id) === normalized || normalizeText(goal.title) === normalized);
+  };
+
+  const findProjectByReference = (value?: string) => {
+    const normalized = normalizeText(value);
+    if (!normalized) return undefined;
+    return projects.find((project) => normalizeText(project.id) === normalized || normalizeText(project.title) === normalized);
   };
 
   const findRelatedIdeaIds = (values?: string[]) => {
@@ -511,8 +518,16 @@ Tool 6: Update an existing Goal or its roadmap panel. Use this when the user ask
 }
 </toolcall_update_goal>
 
+Tool 7: Delete an existing Project. Use this when the user explicitly asks to delete, remove, archive, or get rid of a project.
+<toolcall_delete_project>
+{
+  "target": "existing project title or id"
+}
+</toolcall_delete_project>
+
 When the user asks to create or manage a map idea node, prefer toolcall_create_idea or toolcall_update_idea instead of only describing what to do.
 When the user asks to create or edit a goal or roadmap panel, use toolcall_create_goal or toolcall_update_goal instead of only describing what to do.
+When the user explicitly asks to remove a project, use toolcall_delete_project instead of only describing what to do.
 Include the toolcall anywhere in your response. You can use multiple toolcalls if needed.`);
 
       const userPrompt = imageAnalysisResult
@@ -530,6 +545,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       let matchedIdeaUpdate = false;
       let matchedGoal = false;
       let matchedGoalUpdate = false;
+      let matchedProjectDelete = false;
       const allowNoteIdeaWrites = autoDistill || explicitBoardWrite;
       let blockedInferredWrite = false;
 
@@ -695,8 +711,25 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       }
       cleanText = cleanText.replace(updateGoalRegex, '').trim();
 
+      const deleteProjectRegex = /<toolcall_delete_project>([\s\S]*?)<\/toolcall_delete_project>/gi;
+      let deleteProjectMatch;
+      while ((deleteProjectMatch = deleteProjectRegex.exec(responseText)) !== null) {
+        try {
+          const cleanJsonStr = deleteProjectMatch[1].trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+          const data = JSON.parse(cleanJsonStr);
+          if (!explicitBoardWrite) continue;
+          const targetProject = findProjectByReference(data.target);
+          if (!targetProject) continue;
+          matchedProjectDelete = true;
+          deleteProject(targetProject.id);
+        } catch (err) {
+          console.error("Failed to parse delete_project toolcall JSON:", err);
+        }
+      }
+      cleanText = cleanText.replace(deleteProjectRegex, '').trim();
+
       let actionMessage = '';
-      if (matchedNote || matchedIdea || matchedIdeaUpdate || matchedPersona || matchedGoal || matchedGoalUpdate) {
+      if (matchedNote || matchedIdea || matchedIdeaUpdate || matchedPersona || matchedGoal || matchedGoalUpdate || matchedProjectDelete) {
         actionMessage = "\n\n*(AI: ";
         const acts = [];
         if (matchedNote) acts.push("added to Inbox");
@@ -705,6 +738,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
         if (matchedPersona) acts.push("updated System Persona");
         if (matchedGoal) acts.push("created Goal");
         if (matchedGoalUpdate) acts.push("updated Goal panel");
+        if (matchedProjectDelete) acts.push("deleted Project");
         actionMessage += acts.join(", ") + ")*";
       }
 
