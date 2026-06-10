@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { type Project, type ProjectUpdateEntry, useAppStore } from '../store';
-import { FolderKanban, Plus, FlaskConical, ArrowRight, Sparkles, Sprout, CircleDashed, X, Trash2, Pencil, CheckCircle2, PauseCircle, PlayCircle, NotebookPen, Target } from 'lucide-react';
+import { type Project, type ProjectTask, type ProjectUpdateEntry, useAppStore } from '../store';
+import { FolderKanban, Plus, FlaskConical, ArrowRight, Sparkles, Sprout, CircleDashed, X, Trash2, Pencil, CheckCircle2, PauseCircle, PlayCircle, NotebookPen, Target, AlertCircle, CalendarDays, Link2, ListTodo } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '../lib/utils';
 
@@ -51,23 +51,42 @@ function ReadinessBar({ maturity }: { maturity: number }) {
 function ProjectCard({
   project,
   sourceIdea,
+  linkedGoalTitles,
+  linkedIdeaTitles,
+  linkedNotePreviews,
   onDelete,
   onEdit,
   onStatusChange,
   onSaveNextAction,
+  onSaveDefinitionOfDone,
+  onSaveDueDate,
   onAddUpdate,
+  onAddTask,
+  onToggleTask,
 }: {
   project: Project;
   sourceIdea?: any;
+  linkedGoalTitles: string[];
+  linkedIdeaTitles: string[];
+  linkedNotePreviews: string[];
   onDelete: (projectId: string) => void;
   onEdit: (project: Project) => void;
   onStatusChange: (projectId: string, status: Project['status']) => void;
   onSaveNextAction: (projectId: string, nextAction: string) => void;
+  onSaveDefinitionOfDone: (projectId: string, definitionOfDone: string) => void;
+  onSaveDueDate: (projectId: string, dueDate: string) => void;
   onAddUpdate: (projectId: string, content: string) => void;
+  onAddTask: (projectId: string, content: string) => void;
+  onToggleTask: (projectId: string, taskId: string) => void;
 }) {
   const [nextActionDraft, setNextActionDraft] = useState(project.nextAction || '');
+  const [definitionOfDoneDraft, setDefinitionOfDoneDraft] = useState(project.definitionOfDone || '');
+  const [dueDateDraft, setDueDateDraft] = useState(project.dueDate ? project.dueDate.slice(0, 10) : '');
   const [updateDraft, setUpdateDraft] = useState('');
+  const [taskDraft, setTaskDraft] = useState('');
   const recentUpdates = useMemo(() => project.updates.slice(0, 3), [project.updates]);
+  const openTasks = useMemo(() => project.tasks.filter((task) => !task.completed), [project.tasks]);
+  const completedTasks = useMemo(() => project.tasks.filter((task) => task.completed), [project.tasks]);
 
   return (
     <div className="rounded-xl border border-stone-200 bg-white p-6 shadow-sm transition-all hover:border-stone-300 dark:border-stone-800 dark:bg-stone-900">
@@ -81,6 +100,7 @@ function ProjectCard({
             <span className={cn(
               'text-xs font-medium px-2 py-0.5 rounded-full mt-1 inline-block',
               project.status === 'Active' ? 'bg-blue-50 text-blue-700' :
+              project.status === 'Blocked' ? 'bg-red-50 text-red-700' :
               project.status === 'Completed' ? 'bg-green-50 text-green-700' :
               'bg-stone-100 text-stone-600'
             )}>
@@ -123,29 +143,131 @@ function ProjectCard({
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => onStatusChange(project.id, 'Active')} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-xs font-medium text-stone-700 hover:bg-stone-50 dark:border-stone-700 dark:text-stone-200 dark:hover:bg-stone-950"><PlayCircle className="h-4 w-4" />Active</button>
           <button type="button" onClick={() => onStatusChange(project.id, 'Paused')} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-xs font-medium text-stone-700 hover:bg-stone-50 dark:border-stone-700 dark:text-stone-200 dark:hover:bg-stone-950"><PauseCircle className="h-4 w-4" />Pause</button>
+          <button type="button" onClick={() => onStatusChange(project.id, 'Blocked')} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-xs font-medium text-stone-700 hover:bg-stone-50 dark:border-stone-700 dark:text-stone-200 dark:hover:bg-stone-950"><AlertCircle className="h-4 w-4" />Blocked</button>
           <button type="button" onClick={() => onStatusChange(project.id, 'Completed')} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-xs font-medium text-stone-700 hover:bg-stone-50 dark:border-stone-700 dark:text-stone-200 dark:hover:bg-stone-950"><CheckCircle2 className="h-4 w-4" />Done</button>
+        </div>
+      </div>
+
+      <div className="mb-6 grid gap-4 lg:grid-cols-2">
+        <div className="rounded-lg border border-stone-100 bg-stone-50 p-3 dark:border-stone-800 dark:bg-stone-950">
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+            <Target className="h-3 w-3" /> Next action
+          </div>
+          <textarea
+            value={nextActionDraft}
+            onChange={(event) => setNextActionDraft(event.target.value)}
+            placeholder="What is the next concrete move?"
+            rows={2}
+            className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:focus:border-stone-500 dark:focus:ring-stone-800"
+          />
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={() => onSaveNextAction(project.id, nextActionDraft)}
+              className="rounded-lg bg-stone-900 px-3 py-2 text-xs font-medium text-white hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200"
+            >
+              Save next action
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-stone-100 bg-stone-50 p-3 dark:border-stone-800 dark:bg-stone-950">
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+            <CalendarDays className="h-3 w-3" /> Timeline
+          </div>
+          <label className="block text-xs text-stone-500 dark:text-stone-400">Due date</label>
+          <input
+            type="date"
+            value={dueDateDraft}
+            onChange={(event) => setDueDateDraft(event.target.value)}
+            className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:focus:border-stone-500 dark:focus:ring-stone-800"
+          />
+          <div className="mt-2 flex justify-between text-[11px] text-stone-400">
+            <span>Created {new Date(project.createdAt).toLocaleDateString()}</span>
+            <span>Updated {new Date(project.lastUpdatedAt).toLocaleDateString()}</span>
+          </div>
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={() => onSaveDueDate(project.id, dueDateDraft)}
+              className="rounded-lg bg-stone-900 px-3 py-2 text-xs font-medium text-white hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200"
+            >
+              Save due date
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="mb-6 rounded-lg border border-stone-100 bg-stone-50 p-3 dark:border-stone-800 dark:bg-stone-950">
         <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
-          <Target className="h-3 w-3" /> Next action
+          <CheckCircle2 className="h-3 w-3" /> Definition of done
         </div>
         <textarea
-          value={nextActionDraft}
-          onChange={(event) => setNextActionDraft(event.target.value)}
-          placeholder="What is the next concrete move?"
-          rows={2}
+          value={definitionOfDoneDraft}
+          onChange={(event) => setDefinitionOfDoneDraft(event.target.value)}
+          placeholder="What does success look like for this project?"
+          rows={3}
           className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:focus:border-stone-500 dark:focus:ring-stone-800"
         />
         <div className="mt-2 flex justify-end">
           <button
             type="button"
-            onClick={() => onSaveNextAction(project.id, nextActionDraft)}
+            onClick={() => onSaveDefinitionOfDone(project.id, definitionOfDoneDraft)}
             className="rounded-lg bg-stone-900 px-3 py-2 text-xs font-medium text-white hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200"
           >
-            Save next action
+            Save done definition
           </button>
+        </div>
+      </div>
+
+      <div className="mb-6 rounded-lg border border-stone-100 bg-stone-50 p-3 dark:border-stone-800 dark:bg-stone-950">
+        <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+          <ListTodo className="h-3 w-3" /> Task checklist
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={taskDraft}
+            onChange={(event) => setTaskDraft(event.target.value)}
+            placeholder="Add a task"
+            className="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:focus:border-stone-500 dark:focus:ring-stone-800"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              onAddTask(project.id, taskDraft);
+              setTaskDraft('');
+            }}
+            disabled={!taskDraft.trim()}
+            className="rounded-lg bg-stone-900 px-3 py-2 text-xs font-medium text-white hover:bg-stone-800 disabled:opacity-40 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200"
+          >
+            Add task
+          </button>
+        </div>
+        <div className="mt-3 space-y-2">
+          {openTasks.map((task: ProjectTask) => (
+            <label key={task.id} className="flex items-center gap-3 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200">
+              <input type="checkbox" checked={task.completed} onChange={() => onToggleTask(project.id, task.id)} />
+              <span>{task.content}</span>
+            </label>
+          ))}
+          {completedTasks.map((task: ProjectTask) => (
+            <label key={task.id} className="flex items-center gap-3 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-400 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-500">
+              <input type="checkbox" checked={task.completed} onChange={() => onToggleTask(project.id, task.id)} />
+              <span className="line-through">{task.content}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-6 rounded-lg border border-stone-100 bg-stone-50 p-3 dark:border-stone-800 dark:bg-stone-950">
+        <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+          <Link2 className="h-3 w-3" /> Linked context
+        </div>
+        <div className="space-y-2 text-sm text-stone-700 dark:text-stone-300">
+          <div><span className="font-medium">Goals:</span> {linkedGoalTitles.length ? linkedGoalTitles.join(', ') : 'None linked yet'}</div>
+          <div><span className="font-medium">Ideas:</span> {linkedIdeaTitles.length ? linkedIdeaTitles.join(', ') : 'None linked yet'}</div>
+          <div><span className="font-medium">Notes:</span> {linkedNotePreviews.length ? linkedNotePreviews.join(' • ') : 'None linked yet'}</div>
         </div>
       </div>
 
@@ -213,7 +335,7 @@ function ProjectCard({
 }
 
 export default function ProjectsPage() {
-  const { projects, ideas, addProject, updateProject, deleteProject } = useAppStore();
+  const { projects, ideas, notes, goals, addProject, updateProject, deleteProject } = useAppStore();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState('');
@@ -253,8 +375,17 @@ export default function ProjectsPage() {
         title,
         description: description || 'Define the first concrete build, experiment, or execution step for this project.',
         sourceIdeaId: '',
+        goalId: '',
         status: 'Active',
         nextAction: '',
+        definitionOfDone: '',
+        dueDate: '',
+        createdAt: new Date().toISOString(),
+        lastUpdatedAt: new Date().toISOString(),
+        linkedNoteIds: [],
+        linkedIdeaIds: [],
+        linkedGoalIds: [],
+        tasks: [],
         updates: [],
         experiments: [],
       });
@@ -280,6 +411,34 @@ export default function ProjectsPage() {
 
   const handleProjectNextActionSave = (projectId: string, nextAction: string) => {
     updateProject(projectId, { nextAction: nextAction.trim() });
+  };
+
+  const handleProjectDefinitionOfDoneSave = (projectId: string, definitionOfDone: string) => {
+    updateProject(projectId, { definitionOfDone: definitionOfDone.trim() });
+  };
+
+  const handleProjectDueDateSave = (projectId: string, dueDate: string) => {
+    updateProject(projectId, { dueDate: dueDate ? new Date(`${dueDate}T00:00:00`).toISOString() : '' });
+  };
+
+  const handleProjectAddTask = (projectId: string, content: string) => {
+    const target = projects.find((project) => project.id === projectId);
+    const value = content.trim();
+    if (!target || !value) return;
+    const nextTask: ProjectTask = {
+      id: `${projectId}-task-${Date.now()}`,
+      content: value,
+      completed: false,
+    };
+    updateProject(projectId, { tasks: [...(target.tasks ?? []), nextTask] });
+  };
+
+  const handleProjectToggleTask = (projectId: string, taskId: string) => {
+    const target = projects.find((project) => project.id === projectId);
+    if (!target) return;
+    updateProject(projectId, {
+      tasks: (target.tasks ?? []).map((task) => task.id === taskId ? { ...task, completed: !task.completed } : task),
+    });
   };
 
   const handleProjectAddUpdate = (projectId: string, content: string) => {
@@ -438,16 +597,26 @@ export default function ProjectsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {projects.map(project => {
               const sourceIdea = ideas.find(i => i.id === project.sourceIdeaId);
+              const linkedGoalTitles = goals.filter((goal) => (project.linkedGoalIds ?? []).includes(goal.id)).map((goal) => goal.title);
+              const linkedIdeaTitles = ideas.filter((idea) => (project.linkedIdeaIds ?? []).includes(idea.id)).map((idea) => idea.title);
+              const linkedNotePreviews = notes.filter((note) => (project.linkedNoteIds ?? []).includes(note.id)).map((note) => note.content.slice(0, 80));
               return (
                 <ProjectCard
                   key={project.id}
                   project={project}
                   sourceIdea={sourceIdea}
+                  linkedGoalTitles={linkedGoalTitles}
+                  linkedIdeaTitles={linkedIdeaTitles}
+                  linkedNotePreviews={linkedNotePreviews}
                   onDelete={handleDeleteProject}
                   onEdit={handleEditProject}
                   onStatusChange={handleProjectStatusChange}
                   onSaveNextAction={handleProjectNextActionSave}
+                  onSaveDefinitionOfDone={handleProjectDefinitionOfDoneSave}
+                  onSaveDueDate={handleProjectDueDateSave}
                   onAddUpdate={handleProjectAddUpdate}
+                  onAddTask={handleProjectAddTask}
+                  onToggleTask={handleProjectToggleTask}
                 />
               );
             })}

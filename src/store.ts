@@ -159,13 +159,28 @@ export type ProjectUpdateEntry = {
   createdAt: string;
 };
 
+export type ProjectTask = {
+  id: string;
+  content: string;
+  completed: boolean;
+};
+
 export type Project = {
   id: string;
   title: string;
   description: string;
   sourceIdeaId: string;
-  status: 'Active' | 'Paused' | 'Completed';
+  goalId?: string;
+  status: 'Active' | 'Paused' | 'Blocked' | 'Completed';
   nextAction?: string;
+  definitionOfDone?: string;
+  dueDate?: string;
+  createdAt: string;
+  lastUpdatedAt: string;
+  linkedNoteIds: string[];
+  linkedIdeaIds: string[];
+  linkedGoalIds: string[];
+  tasks: ProjectTask[];
   updates: ProjectUpdateEntry[];
   experiments: Experiment[];
 };
@@ -930,9 +945,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     return { ideas: next.ideas };
   }),
   addProject: (project) => set((state) => {
+    const now = new Date().toISOString();
     const next = {
       ...state,
-      projects: [{ ...project, id: randomId(), updates: project.updates ?? [], nextAction: project.nextAction ?? '' }, ...state.projects],
+      projects: [{
+        ...project,
+        id: randomId(),
+        goalId: project.goalId ?? '',
+        nextAction: project.nextAction ?? '',
+        definitionOfDone: project.definitionOfDone ?? '',
+        dueDate: project.dueDate ?? '',
+        createdAt: project.createdAt ?? now,
+        lastUpdatedAt: project.lastUpdatedAt ?? now,
+        linkedNoteIds: project.linkedNoteIds ?? [],
+        linkedIdeaIds: project.linkedIdeaIds ?? [],
+        linkedGoalIds: project.linkedGoalIds ?? [],
+        tasks: project.tasks ?? [],
+        updates: project.updates ?? [],
+      }, ...state.projects],
     };
     persistSnapshot(next);
     return { projects: next.projects };
@@ -940,7 +970,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   updateProject: (id, updates) => set((state) => {
     const next = {
       ...state,
-      projects: state.projects.map((project) => project.id === id ? { ...project, ...updates } : project),
+      projects: state.projects.map((project) => project.id === id ? { ...project, ...updates, lastUpdatedAt: new Date().toISOString() } : project),
     };
     persistSnapshot(next);
     return { projects: next.projects };
