@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { type Project, type ProjectTask, type ProjectUpdateEntry, useAppStore } from '../store';
-import { FolderKanban, Plus, FlaskConical, ArrowRight, Sparkles, Sprout, CircleDashed, X, Trash2, Pencil, CheckCircle2, PauseCircle, PlayCircle, NotebookPen, Target, AlertCircle, CalendarDays, Link2, ListTodo } from 'lucide-react';
+import { FolderKanban, Plus, FlaskConical, ArrowRight, Sparkles, Sprout, CircleDashed, X, Trash2, Pencil, CheckCircle2, PauseCircle, PlayCircle, NotebookPen, Target, AlertCircle, CalendarDays, Link2, ListTodo, Minus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '../lib/utils';
 
@@ -99,14 +99,17 @@ function ProjectCard({
   const [goalQuery, setGoalQuery] = useState('');
   const [ideaQuery, setIdeaQuery] = useState('');
   const [noteQuery, setNoteQuery] = useState('');
+  const [showGoalPicker, setShowGoalPicker] = useState(false);
+  const [showIdeaPicker, setShowIdeaPicker] = useState(false);
+  const [showNotePicker, setShowNotePicker] = useState(false);
   const projectUpdates = project.updates ?? [];
   const projectTasks = project.tasks ?? [];
   const recentUpdates = useMemo(() => projectUpdates.slice(0, 3), [projectUpdates]);
   const openTasks = useMemo(() => projectTasks.filter((task) => !task.completed), [projectTasks]);
   const completedTasks = useMemo(() => projectTasks.filter((task) => task.completed), [projectTasks]);
-  const filteredGoals = useMemo(() => availableGoals.filter((goal) => goal.title.toLowerCase().includes(goalQuery.trim().toLowerCase())), [availableGoals, goalQuery]);
-  const filteredIdeas = useMemo(() => availableIdeas.filter((idea) => idea.title.toLowerCase().includes(ideaQuery.trim().toLowerCase())), [availableIdeas, ideaQuery]);
-  const filteredNotes = useMemo(() => availableNotes.filter((note) => note.content.toLowerCase().includes(noteQuery.trim().toLowerCase())), [availableNotes, noteQuery]);
+  const filteredGoals = useMemo(() => availableGoals.filter((goal) => !(project.linkedGoalIds ?? []).includes(goal.id) && goal.title.toLowerCase().includes(goalQuery.trim().toLowerCase())), [availableGoals, goalQuery, project.linkedGoalIds]);
+  const filteredIdeas = useMemo(() => availableIdeas.filter((idea) => !(project.linkedIdeaIds ?? []).includes(idea.id) && idea.title.toLowerCase().includes(ideaQuery.trim().toLowerCase())), [availableIdeas, ideaQuery, project.linkedIdeaIds]);
+  const filteredNotes = useMemo(() => availableNotes.filter((note) => !(project.linkedNoteIds ?? []).includes(note.id) && note.content.toLowerCase().includes(noteQuery.trim().toLowerCase())), [availableNotes, noteQuery, project.linkedNoteIds]);
 
   return (
     <div className="rounded-xl border border-stone-200 bg-white p-6 shadow-sm transition-all hover:border-stone-300 dark:border-stone-800 dark:bg-stone-900">
@@ -286,79 +289,148 @@ function ProjectCard({
         </div>
         <div className="space-y-3 text-sm text-stone-700 dark:text-stone-300">
           <div>
-            <div><span className="font-medium">Goals:</span> {linkedGoalTitles.length ? linkedGoalTitles.join(', ') : 'None linked yet'}</div>
-            <input
-              type="text"
-              value={goalQuery}
-              onChange={(event) => setGoalQuery(event.target.value)}
-              placeholder="Search goals"
-              className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:focus:border-stone-500 dark:focus:ring-stone-800"
-            />
-            <div className="mt-2 flex flex-wrap gap-2">
-              {filteredGoals.map((goal) => {
-                const linked = (project.linkedGoalIds ?? []).includes(goal.id);
-                return (
-                  <button
-                    key={goal.id}
-                    type="button"
-                    onClick={() => onToggleGoalLink(project.id, goal.id)}
-                    className={cn('rounded-full border px-3 py-1 text-xs', linked ? 'border-stone-900 bg-stone-900 text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-950' : 'border-stone-200 bg-white text-stone-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300')}
-                  >
-                    {goal.title}
-                  </button>
-                );
-              })}
+            <div className="flex items-center justify-between gap-3">
+              <div><span className="font-medium">Goals:</span> {linkedGoalTitles.length ? linkedGoalTitles.join(', ') : 'None linked yet'}</div>
+              <button
+                type="button"
+                onClick={() => setShowGoalPicker((value) => !value)}
+                className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-medium text-stone-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300"
+              >
+                {showGoalPicker ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                {showGoalPicker ? 'Hide' : 'Add'}
+              </button>
             </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {(project.linkedGoalIds ?? []).length ? availableGoals.filter((goal) => (project.linkedGoalIds ?? []).includes(goal.id)).map((goal) => (
+                <button
+                  key={goal.id}
+                  type="button"
+                  onClick={() => onToggleGoalLink(project.id, goal.id)}
+                  className="rounded-full border border-stone-900 bg-stone-900 px-3 py-1 text-xs text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-950"
+                >
+                  {goal.title}
+                </button>
+              )) : <span className="text-xs text-stone-400">No linked goals</span>}
+            </div>
+            {showGoalPicker && (
+              <>
+                <input
+                  type="text"
+                  value={goalQuery}
+                  onChange={(event) => setGoalQuery(event.target.value)}
+                  placeholder="Search goals"
+                  className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:focus:border-stone-500 dark:focus:ring-stone-800"
+                />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {filteredGoals.map((goal) => (
+                    <button
+                      key={goal.id}
+                      type="button"
+                      onClick={() => onToggleGoalLink(project.id, goal.id)}
+                      className="rounded-full border border-stone-200 bg-white px-3 py-1 text-xs text-stone-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300"
+                    >
+                      {goal.title}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
           <div>
-            <div><span className="font-medium">Ideas:</span> {linkedIdeaTitles.length ? linkedIdeaTitles.join(', ') : 'None linked yet'}</div>
-            <input
-              type="text"
-              value={ideaQuery}
-              onChange={(event) => setIdeaQuery(event.target.value)}
-              placeholder="Search ideas"
-              className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:focus:border-stone-500 dark:focus:ring-stone-800"
-            />
-            <div className="mt-2 flex flex-wrap gap-2">
-              {filteredIdeas.map((idea) => {
-                const linked = (project.linkedIdeaIds ?? []).includes(idea.id);
-                return (
-                  <button
-                    key={idea.id}
-                    type="button"
-                    onClick={() => onToggleIdeaLink(project.id, idea.id)}
-                    className={cn('rounded-full border px-3 py-1 text-xs', linked ? 'border-stone-900 bg-stone-900 text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-950' : 'border-stone-200 bg-white text-stone-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300')}
-                  >
-                    {idea.title}
-                  </button>
-                );
-              })}
+            <div className="flex items-center justify-between gap-3">
+              <div><span className="font-medium">Ideas:</span> {linkedIdeaTitles.length ? linkedIdeaTitles.join(', ') : 'None linked yet'}</div>
+              <button
+                type="button"
+                onClick={() => setShowIdeaPicker((value) => !value)}
+                className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-medium text-stone-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300"
+              >
+                {showIdeaPicker ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                {showIdeaPicker ? 'Hide' : 'Add'}
+              </button>
             </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {(project.linkedIdeaIds ?? []).length ? availableIdeas.filter((idea) => (project.linkedIdeaIds ?? []).includes(idea.id)).map((idea) => (
+                <button
+                  key={idea.id}
+                  type="button"
+                  onClick={() => onToggleIdeaLink(project.id, idea.id)}
+                  className="rounded-full border border-stone-900 bg-stone-900 px-3 py-1 text-xs text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-950"
+                >
+                  {idea.title}
+                </button>
+              )) : <span className="text-xs text-stone-400">No linked ideas</span>}
+            </div>
+            {showIdeaPicker && (
+              <>
+                <input
+                  type="text"
+                  value={ideaQuery}
+                  onChange={(event) => setIdeaQuery(event.target.value)}
+                  placeholder="Search ideas"
+                  className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:focus:border-stone-500 dark:focus:ring-stone-800"
+                />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {filteredIdeas.map((idea) => (
+                    <button
+                      key={idea.id}
+                      type="button"
+                      onClick={() => onToggleIdeaLink(project.id, idea.id)}
+                      className="rounded-full border border-stone-200 bg-white px-3 py-1 text-xs text-stone-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300"
+                    >
+                      {idea.title}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
           <div>
-            <div><span className="font-medium">Notes:</span> {linkedNotePreviews.length ? linkedNotePreviews.join(' • ') : 'None linked yet'}</div>
-            <input
-              type="text"
-              value={noteQuery}
-              onChange={(event) => setNoteQuery(event.target.value)}
-              placeholder="Search notes"
-              className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:focus:border-stone-500 dark:focus:ring-stone-800"
-            />
-            <div className="mt-2 flex flex-wrap gap-2">
-              {filteredNotes.map((note) => {
-                const linked = (project.linkedNoteIds ?? []).includes(note.id);
-                return (
-                  <button
-                    key={note.id}
-                    type="button"
-                    onClick={() => onToggleNoteLink(project.id, note.id)}
-                    className={cn('rounded-full border px-3 py-1 text-xs', linked ? 'border-stone-900 bg-stone-900 text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-950' : 'border-stone-200 bg-white text-stone-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300')}
-                  >
-                    {note.content.slice(0, 48)}
-                  </button>
-                );
-              })}
+            <div className="flex items-center justify-between gap-3">
+              <div><span className="font-medium">Notes:</span> {linkedNotePreviews.length ? linkedNotePreviews.join(' • ') : 'None linked yet'}</div>
+              <button
+                type="button"
+                onClick={() => setShowNotePicker((value) => !value)}
+                className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-medium text-stone-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300"
+              >
+                {showNotePicker ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                {showNotePicker ? 'Hide' : 'Add'}
+              </button>
             </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {(project.linkedNoteIds ?? []).length ? availableNotes.filter((note) => (project.linkedNoteIds ?? []).includes(note.id)).map((note) => (
+                <button
+                  key={note.id}
+                  type="button"
+                  onClick={() => onToggleNoteLink(project.id, note.id)}
+                  className="rounded-full border border-stone-900 bg-stone-900 px-3 py-1 text-xs text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-950"
+                >
+                  {note.content.slice(0, 48)}
+                </button>
+              )) : <span className="text-xs text-stone-400">No linked notes</span>}
+            </div>
+            {showNotePicker && (
+              <>
+                <input
+                  type="text"
+                  value={noteQuery}
+                  onChange={(event) => setNoteQuery(event.target.value)}
+                  placeholder="Search notes"
+                  className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:focus:border-stone-500 dark:focus:ring-stone-800"
+                />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {filteredNotes.map((note) => (
+                    <button
+                      key={note.id}
+                      type="button"
+                      onClick={() => onToggleNoteLink(project.id, note.id)}
+                      className="rounded-full border border-stone-200 bg-white px-3 py-1 text-xs text-stone-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300"
+                    >
+                      {note.content.slice(0, 48)}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
