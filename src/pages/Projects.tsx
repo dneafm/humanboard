@@ -96,9 +96,15 @@ function ProjectCard({
   const [dueDateDraft, setDueDateDraft] = useState(project.dueDate ? project.dueDate.slice(0, 10) : '');
   const [updateDraft, setUpdateDraft] = useState('');
   const [taskDraft, setTaskDraft] = useState('');
+  const [goalQuery, setGoalQuery] = useState('');
+  const [ideaQuery, setIdeaQuery] = useState('');
+  const [noteQuery, setNoteQuery] = useState('');
   const recentUpdates = useMemo(() => project.updates.slice(0, 3), [project.updates]);
   const openTasks = useMemo(() => project.tasks.filter((task) => !task.completed), [project.tasks]);
   const completedTasks = useMemo(() => project.tasks.filter((task) => task.completed), [project.tasks]);
+  const filteredGoals = useMemo(() => availableGoals.filter((goal) => goal.title.toLowerCase().includes(goalQuery.trim().toLowerCase())), [availableGoals, goalQuery]);
+  const filteredIdeas = useMemo(() => availableIdeas.filter((idea) => idea.title.toLowerCase().includes(ideaQuery.trim().toLowerCase())), [availableIdeas, ideaQuery]);
+  const filteredNotes = useMemo(() => availableNotes.filter((note) => note.content.toLowerCase().includes(noteQuery.trim().toLowerCase())), [availableNotes, noteQuery]);
 
   return (
     <div className="rounded-xl border border-stone-200 bg-white p-6 shadow-sm transition-all hover:border-stone-300 dark:border-stone-800 dark:bg-stone-900">
@@ -279,8 +285,15 @@ function ProjectCard({
         <div className="space-y-3 text-sm text-stone-700 dark:text-stone-300">
           <div>
             <div><span className="font-medium">Goals:</span> {linkedGoalTitles.length ? linkedGoalTitles.join(', ') : 'None linked yet'}</div>
+            <input
+              type="text"
+              value={goalQuery}
+              onChange={(event) => setGoalQuery(event.target.value)}
+              placeholder="Search goals"
+              className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:focus:border-stone-500 dark:focus:ring-stone-800"
+            />
             <div className="mt-2 flex flex-wrap gap-2">
-              {availableGoals.map((goal) => {
+              {filteredGoals.map((goal) => {
                 const linked = (project.linkedGoalIds ?? []).includes(goal.id);
                 return (
                   <button
@@ -297,8 +310,15 @@ function ProjectCard({
           </div>
           <div>
             <div><span className="font-medium">Ideas:</span> {linkedIdeaTitles.length ? linkedIdeaTitles.join(', ') : 'None linked yet'}</div>
+            <input
+              type="text"
+              value={ideaQuery}
+              onChange={(event) => setIdeaQuery(event.target.value)}
+              placeholder="Search ideas"
+              className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:focus:border-stone-500 dark:focus:ring-stone-800"
+            />
             <div className="mt-2 flex flex-wrap gap-2">
-              {availableIdeas.map((idea) => {
+              {filteredIdeas.map((idea) => {
                 const linked = (project.linkedIdeaIds ?? []).includes(idea.id);
                 return (
                   <button
@@ -315,8 +335,15 @@ function ProjectCard({
           </div>
           <div>
             <div><span className="font-medium">Notes:</span> {linkedNotePreviews.length ? linkedNotePreviews.join(' • ') : 'None linked yet'}</div>
+            <input
+              type="text"
+              value={noteQuery}
+              onChange={(event) => setNoteQuery(event.target.value)}
+              placeholder="Search notes"
+              className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:focus:border-stone-500 dark:focus:ring-stone-800"
+            />
             <div className="mt-2 flex flex-wrap gap-2">
-              {availableNotes.map((note) => {
+              {filteredNotes.map((note) => {
                 const linked = (project.linkedNoteIds ?? []).includes(note.id);
                 return (
                   <button
