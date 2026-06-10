@@ -9,6 +9,20 @@ import { useAppStore } from '../store';
 import { useAuthStore } from '../stores/authStore';
 import type { ChatMessage } from '../lib/storage/types';
 
+const AI_HISTORY_MESSAGE_LIMIT = 12;
+const AI_HISTORY_CHARACTER_LIMIT = 12_000;
+
+function buildAiHistoryContext(messages: ChatMessage[]) {
+  const recentMessages = messages.slice(-AI_HISTORY_MESSAGE_LIMIT);
+  const history = recentMessages
+    .map((message) => `${message.role === 'user' ? 'User' : 'Assistant'}: ${message.content}`)
+    .join('\n');
+
+  return history.length > AI_HISTORY_CHARACTER_LIMIT
+    ? history.slice(-AI_HISTORY_CHARACTER_LIMIT)
+    : history;
+}
+
 export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [showCta, setShowCta] = useState(() => {
@@ -425,7 +439,7 @@ export default function Chatbot() {
         setIsAnalyzingImage(false);
       }
 
-      const historyContext = displayedMessages.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n');
+      const historyContext = buildAiHistoryContext(displayedMessages);
 
       const userMessage: ChatMessage = {
         id: Date.now().toString(),
