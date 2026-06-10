@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
-import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogOut, HelpCircle, X, LayoutDashboard, Menu, ArrowRight, Check, MessageSquareText, ShieldCheck, Sparkles, Image, Bell, GitBranch, WandSparkles, ChevronDown, Settings as SettingsIcon } from 'lucide-react';
+import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogOut, HelpCircle, X, LayoutDashboard, Menu, ArrowRight, Check, MessageSquareText, ShieldCheck, Sparkles, Image, Bell, GitBranch, WandSparkles, ChevronDown, Settings as SettingsIcon, FileText } from 'lucide-react';
 import { cn } from './lib/utils';
 import InboxPage from './pages/Inbox';
 import IdeasPage from './pages/Ideas';
@@ -11,6 +11,8 @@ import MapPage from './pages/Map';
 import GoalsPage from './pages/Goals';
 import IncubationPage from './pages/Incubation';
 import CommandCenterPage from './pages/CommandCenter';
+import FusionPage from './pages/Fusion';
+import FusionDetailPage from './pages/FusionDetail';
 import Chatbot from './components/Chatbot';
 import { hydrateAppStoreFromRepository, useAppStore } from './store';
 import { useEffect, useLayoutEffect, useState } from 'react';
@@ -475,6 +477,7 @@ function Sidebar({ onOpenTutorial, onOpenSettings }: { onOpenTutorial: () => voi
     { to: '/map', icon: Network, label: 'Map' },
     { to: '/review', icon: RefreshCw, label: 'Review' },
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
+    { to: '/fusion', icon: FileText, label: 'Fusion' },
     { to: '/search', icon: SearchIcon, label: 'Search' },
   ];
 
@@ -1085,6 +1088,7 @@ export default function App() {
     { to: '/map', icon: Network, label: 'Map' },
     { to: '/review', icon: RefreshCw, label: 'Review' },
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
+    { to: '/fusion', icon: FileText, label: 'Fusion' },
     { to: '/search', icon: SearchIcon, label: 'Search' },
   ];
 
@@ -1210,6 +1214,8 @@ export default function App() {
             <Route path="/map" element={<MapPage />} />
             <Route path="/review" element={<ReviewPage />} />
             <Route path="/projects" element={<ProjectsPage />} />
+            <Route path="/fusion" element={<FusionPage />} />
+            <Route path="/fusion/:id" element={<FusionDetailPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

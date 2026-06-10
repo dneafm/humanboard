@@ -205,6 +205,61 @@ export type Goal = {
   };
 };
 
+export type FusionType = 'Post' | 'Writing' | 'Thesis' | 'Report';
+
+export type FusionStatus = 'Draft' | 'Synthesizing' | 'Ready' | 'Completed';
+
+export type FusionAudience = 'Personal' | 'Team' | 'Public' | 'Client';
+
+export type FusionChecklist = {
+  title: boolean;
+  summary: boolean;
+  centralConclusion: boolean;
+  supportingLinks: boolean;
+  body: boolean;
+  audience: boolean;
+};
+
+export type FusionItem = {
+  id: string;
+  title: string;
+  type: FusionType;
+  status: FusionStatus;
+  summary: string;
+  centralConclusion: string;
+  body: string;
+  audience: FusionAudience;
+  linkedNoteIds: string[];
+  linkedIdeaIds: string[];
+  linkedGoalIds: string[];
+  linkedProjectIds: string[];
+  shareReadiness: number;
+  checklist: FusionChecklist;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+};
+
+export function computeFusionChecklist(item: Partial<FusionItem>): FusionChecklist {
+  return {
+    title: !!item.title?.trim(),
+    summary: !!item.summary?.trim(),
+    centralConclusion: !!item.centralConclusion?.trim(),
+    supportingLinks:
+      !!item.linkedNoteIds?.length ||
+      !!item.linkedIdeaIds?.length ||
+      !!item.linkedGoalIds?.length ||
+      !!item.linkedProjectIds?.length,
+    body: !!item.body?.trim(),
+    audience: !!item.audience,
+  };
+}
+
+export function computeFusionReadiness(checklist: FusionChecklist): number {
+  const values = Object.values(checklist);
+  return Math.round((values.filter(Boolean).length / values.length) * 100);
+}
+
 export type ReflectionFeedback = 'useful' | 'not-useful';
 
 export type Reflection = {
@@ -310,6 +365,7 @@ interface AppState {
   notes: Note[];
   ideas: Idea[];
   projects: Project[];
+  fusionItems: FusionItem[];
   sections: Section[];
   goals: Goal[];
   reflections: Reflection[];
@@ -327,6 +383,9 @@ interface AppState {
   addProject: (project: Omit<Project, 'id'>) => void;
   updateProject: (id: string, updates: Partial<Project>) => void;
   deleteProject: (id: string) => void;
+  addFusionItem: (item: Omit<FusionItem, 'id' | 'createdAt' | 'updatedAt' | 'shareReadiness' | 'checklist'>) => void;
+  updateFusionItem: (id: string, updates: Partial<FusionItem>) => void;
+  deleteFusionItem: (id: string) => void;
   addSection: (section: Omit<Section, 'id'>) => string;
   addGoal: (goal: Omit<Goal, 'id' | 'createdAt'>) => void;
   updateGoal: (id: string, updates: Partial<Goal>) => void;
@@ -513,6 +572,8 @@ const initialIdeas = [
 const hydratedInitialIdeas: Idea[] = initialIdeas.map((idea) => ({ ...idea, layer: 'knowledge' as const }));
 
 const initialProjects: Project[] = [];
+
+const initialFusionItems: FusionItem[] = [];
 
 const capabilitySeededAt = new Date().toISOString();
 
@@ -847,6 +908,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   notes: initialNotes,
   ideas: hydratedInitialIdeas,
   projects: initialProjects,
+  fusionItems: initialFusionItems,
   sections: initialSections,
   goals: [],
   reflections: [],
@@ -982,6 +1044,57 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     persistSnapshot(next);
     return { projects: next.projects };
+  }),
+  addFusionItem: (item) => set((state) => {
+    const now = new Date().toISOString();
+    const draft: FusionItem = {
+      ...item,
+      id: randomId(),
+      createdAt: now,
+      updatedAt: now,
+      completedAt: item.status === 'Completed' ? now : undefined,
+      linkedNoteIds: item.linkedNoteIds ?? [],
+      linkedIdeaIds: item.linkedIdeaIds ?? [],
+      linkedGoalIds: item.linkedGoalIds ?? [],
+      linkedProjectIds: item.linkedProjectIds ?? [],
+      summary: item.summary ?? '',
+      centralConclusion: item.centralConclusion ?? '',
+      body: item.body ?? '',
+    };
+    const checklist = computeFusionChecklist(draft);
+    const nextItem = { ...draft, checklist, shareReadiness: computeFusionReadiness(checklist) };
+    const next = {
+      ...state,
+      fusionItems: [nextItem, ...state.fusionItems],
+    };
+    persistSnapshot(next);
+    return { fusionItems: next.fusionItems };
+  }),
+  updateFusionItem: (id, updates) => set((state) => {
+    const next = {
+      ...state,
+      fusionItems: state.fusionItems.map((item) => {
+        if (item.id !== id) return item;
+        const merged = {
+          ...item,
+          ...updates,
+          updatedAt: new Date().toISOString(),
+          completedAt: (updates.status ?? item.status) === 'Completed' ? (item.completedAt ?? new Date().toISOString()) : item.completedAt,
+        };
+        const checklist = computeFusionChecklist(merged);
+        return { ...merged, checklist, shareReadiness: computeFusionReadiness(checklist) };
+      }),
+    };
+    persistSnapshot(next);
+    return { fusionItems: next.fusionItems };
+  }),
+  deleteFusionItem: (id) => set((state) => {
+    const next = {
+      ...state,
+      fusionItems: state.fusionItems.filter((item) => item.id !== id),
+    };
+    persistSnapshot(next);
+    return { fusionItems: next.fusionItems };
   }),
   addSection: (section) => {
     const id = randomId();
