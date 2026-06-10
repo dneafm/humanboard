@@ -109,12 +109,22 @@ function ProjectCard({ project, sourceIdea }: { project: any; sourceIdea?: any }
 }
 
 export default function ProjectsPage() {
-  const { projects, ideas } = useAppStore();
+  const { projects, ideas, addProject } = useAppStore();
 
   const linkedIdeaIds = new Set(projects.map((project) => project.sourceIdeaId));
   const projectIdeas = ideas.filter((idea) => idea.type === 'Project');
   const incubationIdeas = projectIdeas.filter((idea) => !linkedIdeaIds.has(idea.id) && idea.maturity < ACTIVATION_THRESHOLD);
   const activationIdeas = projectIdeas.filter((idea) => !linkedIdeaIds.has(idea.id) && idea.maturity >= ACTIVATION_THRESHOLD);
+
+  const handleNewProject = () => {
+    addProject({
+      title: 'Untitled Project',
+      description: 'Define the first concrete build, experiment, or execution step for this project.',
+      sourceIdeaId: '',
+      status: 'Active',
+      experiments: [],
+    });
+  };
 
   return (
     <div className="max-w-6xl mx-auto w-full p-8 flex flex-col h-full">
@@ -123,7 +133,11 @@ export default function ProjectsPage() {
           <h1 className="text-3xl font-semibold tracking-tight text-stone-900">Projects</h1>
           <p className="text-stone-500 mt-1">Active builds stay separate from incubating dreams, and activation starts around 80% readiness.</p>
         </div>
-        <button className="flex items-center gap-2 bg-stone-900 text-white px-4 py-2 rounded-md hover:bg-stone-800 transition-colors text-sm font-medium">
+        <button
+          type="button"
+          onClick={handleNewProject}
+          className="flex items-center gap-2 bg-stone-900 text-white px-4 py-2 rounded-md hover:bg-stone-800 transition-colors text-sm font-medium"
+        >
           <Plus className="w-4 h-4" />
           New Project
         </button>
