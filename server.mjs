@@ -19,6 +19,7 @@ const USER_DATA_DIR = path.resolve(process.env.HUMANBOARD_USER_DATA_DIR || path.
 const AI_ERA_DB_PATH = process.env.AI_ERA_KB_PATH || 'F:/backtest/ai-era-kb/ai_era_kb.sqlite3';
 const AI_BASE_URL = String(process.env.AI_BASE_URL || process.env.GEMMA_BASE_URL || 'http://127.0.0.1:11434/v1').replace(/\/+$/, '');
 const AI_API_KEY = String(process.env.AI_API_KEY || process.env.GEMMA_API_KEY || '').trim();
+const AI_FALLBACK_MODEL = String(process.env.AI_FALLBACK_MODEL || '').trim();
 const AI_DAILY_REQUEST_LIMIT = Math.max(1, Number(process.env.AI_DAILY_REQUEST_LIMIT || 1000));
 
 const DEFAULT_SECTIONS = [
@@ -727,12 +728,34 @@ app.all(['/api/ai/*', '/api/gemma/*'], express.raw({ type: '*/*', limit: '25mb' 
       headers.set('authorization', `Bearer ${AI_API_KEY}`);
     }
 
-    const upstream = await fetch(targetUrl, {
+    let upstream = await fetch(targetUrl, {
       method: req.method,
       headers,
       body: req.method === 'GET' || req.method === 'HEAD' ? undefined : req.body,
       duplex: req.method === 'GET' || req.method === 'HEAD' ? undefined : 'half',
     });
+
+    if (isGemmaChat && upstream.status >= 500 && AI_FALLBACK_MODEL) {
+      try {
+        const fallbackPayload = JSON.parse(Buffer.from(req.body || []).toString('utf-8'));
+        const primaryModel = String(fallbackPayload?.model || '').trim();
+        if (primaryModel && primaryModel !== AI_FALLBACK_MODEL) {
+          const fallbackMessage = `[humanboard][ai-proxy][fallback] id=${requestId} primary=${primaryModel} status=${upstream.status} fallback=${AI_FALLBACK_MODEL}`;
+          console.warn(fallbackMessage);
+          pushRuntimeEvent('warn', 'ai_proxy_fallback', fallbackMessage, { requestId, primaryModel, primaryStatus: upstream.status, fallbackModel: AI_FALLBACK_MODEL, userId });
+          fallbackPayload.model = AI_FALLBACK_MODEL;
+          upstream = await fetch(targetUrl, {
+            method: req.method,
+            headers,
+            body: Buffer.from(JSON.stringify(fallbackPayload)),
+            duplex: 'half',
+          });
+          res.setHeader('x-humanboard-ai-fallback-model', AI_FALLBACK_MODEL);
+        }
+      } catch (fallbackError) {
+        console.warn(`[humanboard][ai-proxy][fallback-error] id=${requestId} message=${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`);
+      }
+    }
 
     res.status(upstream.status);
     upstream.headers.forEach((value, key) => {
