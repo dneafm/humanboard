@@ -3,7 +3,7 @@ import { Bot, X, Send, Maximize2, Minimize2, BookmarkPlus, Check, Image as Image
 import { useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
-import { askGemma, buildMemoryShapedSystemInstruction, getGemmaRuntimeStatus, analyzeImageToNote } from '../lib/ai';
+import { askGemma, buildMemoryShapedSystemInstruction, getGemmaRuntimeStatus, analyzeImageToNote, extractWebContent } from '../lib/ai';
 import { getClipboardImage } from '../lib/imageNote';
 import { getStoredAutoDistillLevel, autoDistillInstructionForLevel } from '../lib/autoDistill';
 import { colorForNewSection, findSectionByName, normalizeSectionName } from '../lib/sections';
@@ -13,6 +13,7 @@ import type { ChatMessage } from '../lib/storage/types';
 
 const AI_HISTORY_MESSAGE_LIMIT = 12;
 const AI_HISTORY_CHARACTER_LIMIT = 12_000;
+const URL_REGEX = /https?:\/\/[^\s)]+/gi;
 
 function buildAiHistoryContext(messages: ChatMessage[]) {
   const recentMessages = messages.slice(-AI_HISTORY_MESSAGE_LIMIT);
@@ -74,6 +75,7 @@ export default function Chatbot() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [savedMessageIds, setSavedMessageIds] = useState<string[]>([]);
+  const [webReadingStatus, setWebReadingStatus] = useState<string | null>(null);
 
   // Staging image state
   const [pendingImage, setPendingImage] = useState<File | null>(null);
@@ -227,6 +229,8 @@ export default function Chatbot() {
     || /\b(note|idea)\b[\s\S]{0,40}\b(save|store|remember|capture|record|add|create|compile|update)\b/i.test(raw)
     || /\b(save|store|remember|capture|record)\s+(this|that|it)\b/i.test(raw)
   );
+
+  const extractUrls = (raw: string) => Array.from(new Set((raw.match(URL_REGEX) || []).map((url) => url.trim()))).slice(0, 2);
 
   const handleSaveMessage = (message: ChatMessage) => {
     if (savedMessageIds.includes(message.id)) return;
@@ -455,6 +459,21 @@ export default function Chatbot() {
       }
 
       const historyContext = buildAiHistoryContext(displayedMessages);
+      const urls = extractUrls(userMsg);
+      let webContext = '';
+      if (urls.length) {
+        setWebReadingStatus(`Reading ${urls.length === 1 ? 'link' : 'links'}...`);
+        const extractedPages = await Promise.all(urls.map(async (url) => {
+          const page = await extractWebContent(url);
+          return [
+            `URL: ${page.url}`,
+            page.title ? `Title: ${page.title}` : '',
+            page.description ? `Description: ${page.description}` : '',
+            `Content:\n${page.content}`,
+          ].filter(Boolean).join('\n');
+        }));
+        webContext = `\n\nWeb content extracted from URLs:\n---\n${extractedPages.join('\n\n---\n\n')}\n---`;
+      }
 
       const userMessage: ChatMessage = {
         id: Date.now().toString(),
@@ -565,7 +584,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
         : `User: ${userMsg}`;
 
       const responseText = await askGemma(
-        `HumanBoard knowledge context:\n${relatedContext}\n\nPrevious conversation:\n${historyContext}\n\n${userPrompt}`,
+        `HumanBoard knowledge context:\n${relatedContext}\n\nPrevious conversation:\n${historyContext}${webContext}\n\n${userPrompt}`,
         systemInstruction
       );
 
@@ -790,6 +809,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
         createdAt: new Date().toISOString()
       }]);
     } finally {
+      setWebReadingStatus(null);
       setIsLoading(false);
     }
   };
@@ -973,6 +993,12 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
             </button>
           </div>
         )}
+        {webReadingStatus && (
+          <div className="mb-3 px-3 py-2 border border-stone-200 bg-stone-50 text-xs text-stone-600 rounded-xl flex items-center gap-2">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <span>{webReadingStatus}</span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="relative flex items-center gap-2">
           <label className="cursor-pointer p-2 rounded-full hover:bg-stone-100 text-stone-500 hover:text-stone-850 transition-colors flex-shrink-0">
@@ -997,7 +1023,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
                   stageImage(image);
                 }
               }}
-              placeholder="Ask anything or paste image..."
+              placeholder="Ask anything, paste a URL, or paste image..."
               autoCapitalize="sentences"
               autoCorrect="on"
               spellCheck

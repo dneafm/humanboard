@@ -1,5 +1,5 @@
 import type { CapabilityBet, EvidencePolarity, Idea } from '../store';
-import { apiUrl, buildApiHeaders } from './apiClient';
+import { apiFetch, apiUrl, buildApiHeaders } from './apiClient';
 
 type RuntimeConfig = {
   baseUrl: string;
@@ -294,6 +294,27 @@ export async function askGemma(prompt: string, systemInstruction?: string) {
     prompt,
     systemInstruction || buildMemoryShapedSystemInstruction()
   );
+}
+
+export async function extractWebContent(url: string) {
+  const response = await apiFetch('/api/extract-web', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(String(payload?.error || `Failed to extract web content (HTTP ${response.status})`));
+  }
+
+  return {
+    url: String(payload?.url || url),
+    title: String(payload?.title || ''),
+    description: String(payload?.description || ''),
+    content: String(payload?.content || ''),
+    contentType: String(payload?.contentType || ''),
+  };
 }
 
 export async function analyzeImageToNote(imageDataUrl: string, fileName: string, userContext = '') {

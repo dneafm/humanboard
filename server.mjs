@@ -328,6 +328,51 @@ function requireUserId(req, res) {
   return userId;
 }
 
+function decodeHtmlEntities(value = '') {
+  return String(value)
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16)));
+}
+
+function stripHtmlToText(html = '') {
+  return decodeHtmlEntities(
+    String(html)
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, ' ')
+      .replace(/<(br|\/p|\/div|\/li|\/h\d|\/article|\/section|\/tr)>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim(),
+  );
+}
+
+function extractPageTitle(html = '') {
+  const match = String(html).match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  return stripHtmlToText(match?.[1] || '').slice(0, 200);
+}
+
+function extractMetaDescription(html = '') {
+  const match = String(html).match(/<meta[^>]+name=["']description["'][^>]+content=["']([\s\S]*?)["'][^>]*>/i)
+    || String(html).match(/<meta[^>]+content=["']([\s\S]*?)["'][^>]+name=["']description["'][^>]*>/i)
+    || String(html).match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([\s\S]*?)["'][^>]*>/i);
+  return decodeHtmlEntities((match?.[1] || '').trim()).slice(0, 400);
+}
+
+function extractReadableTextFromHtml(html = '') {
+  const articleMatch = String(html).match(/<article\b[^>]*>([\s\S]*?)<\/article>/i);
+  const mainMatch = String(html).match(/<main\b[^>]*>([\s\S]*?)<\/main>/i);
+  const content = articleMatch?.[1] || mainMatch?.[1] || html;
+  return stripHtmlToText(content).slice(0, 20000);
+}
+
 async function archiveCorruptSnapshot(paths, reason) {
   if (!existsSync(paths.snapshotPath)) {
     return null;
@@ -685,6 +730,67 @@ app.get('/api/ai-era-kb', (req, res) => {
     res.json(runAiEraBridge());
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'AI Era KB bridge failed' });
+  }
+});
+
+app.post('/api/extract-web', express.json({ limit: '1mb' }), async (req, res) => {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+
+  const rawUrl = String(req.body?.url || '').trim();
+  if (!rawUrl) {
+    res.status(400).json({ error: 'Missing url' });
+    return;
+  }
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(rawUrl);
+  } catch {
+    res.status(400).json({ error: 'Invalid URL' });
+    return;
+  }
+
+  if (!/^https?:$/.test(parsedUrl.protocol)) {
+    res.status(400).json({ error: 'Only http/https URLs are supported' });
+    return;
+  }
+
+  try {
+    const response = await fetch(parsedUrl.toString(), {
+      redirect: 'follow',
+      headers: {
+        'user-agent': 'Mozilla/5.0 (compatible; HumanBoardBot/1.0; +https://humanboardapp.xyz)',
+        accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.5',
+      },
+    });
+
+    if (!response.ok) {
+      res.status(502).json({ error: `Failed to fetch URL (HTTP ${response.status})` });
+      return;
+    }
+
+    const contentType = String(response.headers.get('content-type') || '');
+    const rawBody = await response.text();
+    const isHtml = /text\/html|application\/xhtml\+xml/i.test(contentType) || /<html|<body|<article|<main/i.test(rawBody);
+    const title = isHtml ? extractPageTitle(rawBody) : parsedUrl.hostname;
+    const description = isHtml ? extractMetaDescription(rawBody) : '';
+    const content = isHtml ? extractReadableTextFromHtml(rawBody) : rawBody.trim().slice(0, 20000);
+
+    if (!content.trim()) {
+      res.status(422).json({ error: 'Could not extract readable content from URL' });
+      return;
+    }
+
+    res.json({
+      url: parsedUrl.toString(),
+      title,
+      description,
+      content,
+      contentType,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to extract web content' });
   }
 });
 
