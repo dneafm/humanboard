@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
-import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogOut, HelpCircle, X, LayoutDashboard, Menu, ArrowRight, Check, MessageSquareText, ShieldCheck, Sparkles, Image, Bell, GitBranch, WandSparkles, ChevronDown } from 'lucide-react';
+import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogOut, HelpCircle, X, LayoutDashboard, Menu, ArrowRight, Check, MessageSquareText, ShieldCheck, Sparkles, Image, Bell, GitBranch, WandSparkles, ChevronDown, Settings as SettingsIcon } from 'lucide-react';
 import { cn } from './lib/utils';
 import InboxPage from './pages/Inbox';
 import IdeasPage from './pages/Ideas';
@@ -362,6 +362,66 @@ function GuideButton({ onClick }: { onClick: () => void }) {
   );
 }
 
+function SettingsButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center justify-center gap-2 rounded-md border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 hover:text-stone-950 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
+    >
+      <SettingsIcon className="h-4 w-4" />
+      <span>Settings</span>
+    </button>
+  );
+}
+
+function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [autoDistillLevel, setAutoDistillLevel] = useState<AutoDistillLevel>(() => getStoredAutoDistillLevel());
+
+  useEffect(() => {
+    if (open) setAutoDistillLevel(getStoredAutoDistillLevel());
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <button type="button" aria-label="Close settings" className="absolute inset-0 bg-stone-950/60" onClick={onClose} />
+      <div className="relative z-[101] w-full max-w-md rounded-2xl border border-stone-200 bg-white p-5 shadow-2xl dark:border-stone-800 dark:bg-stone-950">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <div className="text-lg font-semibold text-stone-900 dark:text-stone-100">Settings</div>
+            <div className="text-sm text-stone-500 dark:text-stone-400">More preferences can live here later.</div>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-md p-2 text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-900">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <label className="block rounded-xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-900">
+          <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 dark:text-stone-400">Auto-distill</div>
+          <select
+            value={autoDistillLevel}
+            onChange={(event) => {
+              const next = event.target.value as AutoDistillLevel;
+              setAutoDistillLevel(next);
+              setStoredAutoDistillLevel(next);
+            }}
+            className="mt-3 w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 focus:outline-none dark:border-stone-700 dark:bg-stone-950 dark:text-stone-200"
+          >
+            {AUTO_DISTILL_LEVELS.map((level) => (
+              <option key={level.value} value={level.value}>{level.label}</option>
+            ))}
+          </select>
+          <div className="mt-2 text-[11px] text-stone-500 dark:text-stone-500">
+            {AUTO_DISTILL_LEVELS.find((level) => level.value === autoDistillLevel)?.description}
+          </div>
+        </label>
+      </div>
+    </div>
+  );
+}
+
 function UpdateButton() {
   const [hasUpdate, setHasUpdate] = useState(false);
 
@@ -402,10 +462,9 @@ function UpdateButton() {
   );
 }
 
-function Sidebar({ onOpenTutorial }: { onOpenTutorial: () => void }) {
+function Sidebar({ onOpenTutorial, onOpenSettings }: { onOpenTutorial: () => void; onOpenSettings: () => void }) {
   const { isDarkMode, toggleDarkMode } = useAppStore();
   const { user, signOutUser } = useAuthStore();
-  const [autoDistillLevel, setAutoDistillLevel] = useState<AutoDistillLevel>(() => getStoredAutoDistillLevel());
   const isLocalCommandCenter = window.location.port === '3010';
   const navItems = [
     ...(isLocalCommandCenter ? [{ to: '/command-center', icon: LayoutDashboard, label: 'Command Center' }] : []),
@@ -453,30 +512,10 @@ function Sidebar({ onOpenTutorial }: { onOpenTutorial: () => void }) {
         <UpdateButton />
         <NotificationCenter />
         <GuideButton onClick={onOpenTutorial} />
-        <div className="px-3 py-2 rounded-md bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 space-y-3">
-          <div>
-            <div className="text-xs font-medium text-stone-700 dark:text-stone-200 truncate">{user?.displayName ?? 'Signed in'}</div>
-            <div className="text-[11px] text-stone-500 dark:text-stone-500 truncate">{user?.email}</div>
-          </div>
-          <label className="block">
-            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 dark:text-stone-400">Auto-distill</div>
-            <select
-              value={autoDistillLevel}
-              onChange={(event) => {
-                const next = event.target.value as AutoDistillLevel;
-                setAutoDistillLevel(next);
-                setStoredAutoDistillLevel(next);
-              }}
-              className="mt-2 w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 focus:outline-none dark:border-stone-700 dark:bg-stone-950 dark:text-stone-200"
-            >
-              {AUTO_DISTILL_LEVELS.map((level) => (
-                <option key={level.value} value={level.value}>{level.label}</option>
-              ))}
-            </select>
-            <div className="mt-1 text-[11px] text-stone-500 dark:text-stone-500">
-              {AUTO_DISTILL_LEVELS.find((level) => level.value === autoDistillLevel)?.description}
-            </div>
-          </label>
+        <SettingsButton onClick={onOpenSettings} />
+        <div className="px-3 py-2 rounded-md bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800">
+          <div className="text-xs font-medium text-stone-700 dark:text-stone-200 truncate">{user?.displayName ?? 'Signed in'}</div>
+          <div className="text-[11px] text-stone-500 dark:text-stone-500 truncate">{user?.email}</div>
         </div>
         <button
           onClick={() => void signOutUser()}
@@ -917,18 +956,19 @@ function LoadingScreen() {
 
 function MobileMenu({
   open,
-  onClose,
   navItems,
+  onClose,
   onOpenTutorial,
+  onOpenSettings,
 }: {
   open: boolean;
-  onClose: () => void;
   navItems: Array<{ to: string; icon: typeof Inbox; label: string }>;
+  onClose: () => void;
   onOpenTutorial: () => void;
+  onOpenSettings: () => void;
 }) {
   const { user, signOutUser } = useAuthStore();
   const { isDarkMode, toggleDarkMode } = useAppStore();
-  const [autoDistillLevel, setAutoDistillLevel] = useState<AutoDistillLevel>(() => getStoredAutoDistillLevel());
 
   if (!open) return null;
 
@@ -956,30 +996,9 @@ function MobileMenu({
           </button>
         </div>
 
-        <div className="mb-3 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 dark:border-stone-800 dark:bg-stone-900 space-y-3">
-          <div>
-            <div className="text-xs font-medium text-stone-700 dark:text-stone-200 truncate">{user?.displayName ?? 'Signed in'}</div>
-            <div className="text-[11px] text-stone-500 dark:text-stone-500 truncate">{user?.email}</div>
-          </div>
-          <label className="block">
-            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 dark:text-stone-400">Auto-distill</div>
-            <select
-              value={autoDistillLevel}
-              onChange={(event) => {
-                const next = event.target.value as AutoDistillLevel;
-                setAutoDistillLevel(next);
-                setStoredAutoDistillLevel(next);
-              }}
-              className="mt-2 w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 focus:outline-none dark:border-stone-700 dark:bg-stone-950 dark:text-stone-200"
-            >
-              {AUTO_DISTILL_LEVELS.map((level) => (
-                <option key={level.value} value={level.value}>{level.label}</option>
-              ))}
-            </select>
-            <div className="mt-1 text-[11px] text-stone-500 dark:text-stone-500">
-              {AUTO_DISTILL_LEVELS.find((level) => level.value === autoDistillLevel)?.description}
-            </div>
-          </label>
+        <div className="mb-3 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 dark:border-stone-800 dark:bg-stone-900">
+          <div className="text-xs font-medium text-stone-700 dark:text-stone-200 truncate">{user?.displayName ?? 'Signed in'}</div>
+          <div className="text-[11px] text-stone-500 dark:text-stone-500 truncate">{user?.email}</div>
         </div>
 
         <div className="space-y-1">
@@ -1011,6 +1030,12 @@ function MobileMenu({
             onClick={() => {
               onClose();
               onOpenTutorial();
+            }}
+          />
+          <SettingsButton
+            onClick={() => {
+              onClose();
+              onOpenSettings();
             }}
           />
           <button
@@ -1050,6 +1075,7 @@ export default function App() {
   const [isSpotlightTourOpen, setIsSpotlightTourOpen] = useState(false);
   const [spotlightStepIndex, setSpotlightStepIndex] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const navItems = [
     ...(isLocalCommandCenter ? [{ to: '/command-center', icon: LayoutDashboard, label: 'Command Center' }] : []),
     { to: '/', icon: Inbox, label: 'Inbox' },
@@ -1134,6 +1160,7 @@ export default function App() {
     <BrowserRouter>
       {enableAiEraKbBridge && <AiEraKbAutoBridge />}
       <NotificationEngine />
+      <SettingsModal open={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
       <TutorialModal open={isTutorialOpen && !isSpotlightTourOpen} onClose={closeGuide} />
       <SpotlightTour
         open={isSpotlightTourOpen}
@@ -1147,9 +1174,10 @@ export default function App() {
         onClose={() => setIsMobileMenuOpen(false)}
         navItems={navItems}
         onOpenTutorial={openGuide}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
       <div className="flex min-h-screen bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 font-sans selection:bg-stone-200 dark:selection:bg-stone-800 transition-colors duration-300">
-        <Sidebar onOpenTutorial={openGuide} />
+        <Sidebar onOpenTutorial={openGuide} onOpenSettings={() => setIsSettingsOpen(true)} />
         <main className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0">
           <div className="sticky top-0 z-40 md:hidden border-b border-stone-200/80 dark:border-stone-800/80 bg-stone-50/95 dark:bg-stone-950/95 backdrop-blur px-3 py-2">
             <div className="flex items-center justify-between gap-3">
