@@ -54,6 +54,9 @@ function ProjectCard({
   linkedGoalTitles,
   linkedIdeaTitles,
   linkedNotePreviews,
+  availableGoals,
+  availableIdeas,
+  availableNotes,
   onDelete,
   onEdit,
   onStatusChange,
@@ -63,12 +66,18 @@ function ProjectCard({
   onAddUpdate,
   onAddTask,
   onToggleTask,
+  onToggleGoalLink,
+  onToggleIdeaLink,
+  onToggleNoteLink,
 }: {
   project: Project;
   sourceIdea?: any;
   linkedGoalTitles: string[];
   linkedIdeaTitles: string[];
   linkedNotePreviews: string[];
+  availableGoals: Array<{ id: string; title: string }>;
+  availableIdeas: Array<{ id: string; title: string }>;
+  availableNotes: Array<{ id: string; content: string }>;
   onDelete: (projectId: string) => void;
   onEdit: (project: Project) => void;
   onStatusChange: (projectId: string, status: Project['status']) => void;
@@ -78,6 +87,9 @@ function ProjectCard({
   onAddUpdate: (projectId: string, content: string) => void;
   onAddTask: (projectId: string, content: string) => void;
   onToggleTask: (projectId: string, taskId: string) => void;
+  onToggleGoalLink: (projectId: string, goalId: string) => void;
+  onToggleIdeaLink: (projectId: string, ideaId: string) => void;
+  onToggleNoteLink: (projectId: string, noteId: string) => void;
 }) {
   const [nextActionDraft, setNextActionDraft] = useState(project.nextAction || '');
   const [definitionOfDoneDraft, setDefinitionOfDoneDraft] = useState(project.definitionOfDone || '');
@@ -264,10 +276,61 @@ function ProjectCard({
         <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
           <Link2 className="h-3 w-3" /> Linked context
         </div>
-        <div className="space-y-2 text-sm text-stone-700 dark:text-stone-300">
-          <div><span className="font-medium">Goals:</span> {linkedGoalTitles.length ? linkedGoalTitles.join(', ') : 'None linked yet'}</div>
-          <div><span className="font-medium">Ideas:</span> {linkedIdeaTitles.length ? linkedIdeaTitles.join(', ') : 'None linked yet'}</div>
-          <div><span className="font-medium">Notes:</span> {linkedNotePreviews.length ? linkedNotePreviews.join(' • ') : 'None linked yet'}</div>
+        <div className="space-y-3 text-sm text-stone-700 dark:text-stone-300">
+          <div>
+            <div><span className="font-medium">Goals:</span> {linkedGoalTitles.length ? linkedGoalTitles.join(', ') : 'None linked yet'}</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {availableGoals.map((goal) => {
+                const linked = (project.linkedGoalIds ?? []).includes(goal.id);
+                return (
+                  <button
+                    key={goal.id}
+                    type="button"
+                    onClick={() => onToggleGoalLink(project.id, goal.id)}
+                    className={cn('rounded-full border px-3 py-1 text-xs', linked ? 'border-stone-900 bg-stone-900 text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-950' : 'border-stone-200 bg-white text-stone-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300')}
+                  >
+                    {goal.title}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <div><span className="font-medium">Ideas:</span> {linkedIdeaTitles.length ? linkedIdeaTitles.join(', ') : 'None linked yet'}</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {availableIdeas.map((idea) => {
+                const linked = (project.linkedIdeaIds ?? []).includes(idea.id);
+                return (
+                  <button
+                    key={idea.id}
+                    type="button"
+                    onClick={() => onToggleIdeaLink(project.id, idea.id)}
+                    className={cn('rounded-full border px-3 py-1 text-xs', linked ? 'border-stone-900 bg-stone-900 text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-950' : 'border-stone-200 bg-white text-stone-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300')}
+                  >
+                    {idea.title}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <div><span className="font-medium">Notes:</span> {linkedNotePreviews.length ? linkedNotePreviews.join(' • ') : 'None linked yet'}</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {availableNotes.map((note) => {
+                const linked = (project.linkedNoteIds ?? []).includes(note.id);
+                return (
+                  <button
+                    key={note.id}
+                    type="button"
+                    onClick={() => onToggleNoteLink(project.id, note.id)}
+                    className={cn('rounded-full border px-3 py-1 text-xs', linked ? 'border-stone-900 bg-stone-900 text-white dark:border-stone-100 dark:bg-stone-100 dark:text-stone-950' : 'border-stone-200 bg-white text-stone-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300')}
+                  >
+                    {note.content.slice(0, 48)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -453,6 +516,33 @@ export default function ProjectsPage() {
     updateProject(projectId, { updates: [nextEntry, ...(target.updates ?? [])] });
   };
 
+  const handleToggleGoalLink = (projectId: string, goalId: string) => {
+    const target = projects.find((project) => project.id === projectId);
+    if (!target) return;
+    const current = target.linkedGoalIds ?? [];
+    updateProject(projectId, {
+      linkedGoalIds: current.includes(goalId) ? current.filter((id) => id !== goalId) : [...current, goalId],
+    });
+  };
+
+  const handleToggleIdeaLink = (projectId: string, ideaId: string) => {
+    const target = projects.find((project) => project.id === projectId);
+    if (!target) return;
+    const current = target.linkedIdeaIds ?? [];
+    updateProject(projectId, {
+      linkedIdeaIds: current.includes(ideaId) ? current.filter((id) => id !== ideaId) : [...current, ideaId],
+    });
+  };
+
+  const handleToggleNoteLink = (projectId: string, noteId: string) => {
+    const target = projects.find((project) => project.id === projectId);
+    if (!target) return;
+    const current = target.linkedNoteIds ?? [];
+    updateProject(projectId, {
+      linkedNoteIds: current.includes(noteId) ? current.filter((id) => id !== noteId) : [...current, noteId],
+    });
+  };
+
   return (
     <>
       {isCreateOpen && (
@@ -608,6 +698,9 @@ export default function ProjectsPage() {
                   linkedGoalTitles={linkedGoalTitles}
                   linkedIdeaTitles={linkedIdeaTitles}
                   linkedNotePreviews={linkedNotePreviews}
+                  availableGoals={goals.slice(0, 12).map((goal) => ({ id: goal.id, title: goal.title }))}
+                  availableIdeas={ideas.slice(0, 12).map((idea) => ({ id: idea.id, title: idea.title }))}
+                  availableNotes={notes.slice(0, 12).map((note) => ({ id: note.id, content: note.content }))}
                   onDelete={handleDeleteProject}
                   onEdit={handleEditProject}
                   onStatusChange={handleProjectStatusChange}
@@ -617,6 +710,9 @@ export default function ProjectsPage() {
                   onAddUpdate={handleProjectAddUpdate}
                   onAddTask={handleProjectAddTask}
                   onToggleTask={handleProjectToggleTask}
+                  onToggleGoalLink={handleToggleGoalLink}
+                  onToggleIdeaLink={handleToggleIdeaLink}
+                  onToggleNoteLink={handleToggleNoteLink}
                 />
               );
             })}
