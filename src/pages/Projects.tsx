@@ -99,9 +99,11 @@ function ProjectCard({
   const [goalQuery, setGoalQuery] = useState('');
   const [ideaQuery, setIdeaQuery] = useState('');
   const [noteQuery, setNoteQuery] = useState('');
-  const recentUpdates = useMemo(() => project.updates.slice(0, 3), [project.updates]);
-  const openTasks = useMemo(() => project.tasks.filter((task) => !task.completed), [project.tasks]);
-  const completedTasks = useMemo(() => project.tasks.filter((task) => task.completed), [project.tasks]);
+  const projectUpdates = project.updates ?? [];
+  const projectTasks = project.tasks ?? [];
+  const recentUpdates = useMemo(() => projectUpdates.slice(0, 3), [projectUpdates]);
+  const openTasks = useMemo(() => projectTasks.filter((task) => !task.completed), [projectTasks]);
+  const completedTasks = useMemo(() => projectTasks.filter((task) => task.completed), [projectTasks]);
   const filteredGoals = useMemo(() => availableGoals.filter((goal) => goal.title.toLowerCase().includes(goalQuery.trim().toLowerCase())), [availableGoals, goalQuery]);
   const filteredIdeas = useMemo(() => availableIdeas.filter((idea) => idea.title.toLowerCase().includes(ideaQuery.trim().toLowerCase())), [availableIdeas, ideaQuery]);
   const filteredNotes = useMemo(() => availableNotes.filter((note) => note.content.toLowerCase().includes(noteQuery.trim().toLowerCase())), [availableNotes, noteQuery]);
