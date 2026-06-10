@@ -94,7 +94,7 @@ export default function NotificationCenter() {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[90] bg-stone-950/45 p-3 md:p-6" onClick={() => setOpen(false)}>
+        <div className="fixed inset-0 z-[200] bg-stone-950/45 p-3 md:p-6" onClick={() => setOpen(false)}>
           <section
             className="ml-auto flex h-full w-full max-w-md flex-col overflow-hidden rounded-lg border border-stone-200 bg-white shadow-2xl dark:border-stone-800 dark:bg-stone-950"
             onClick={(event) => event.stopPropagation()}
