@@ -8,6 +8,7 @@ import ExtractionReviewPanel from '../components/capability/ExtractionReviewPane
 import { createNoteFromImage, getClipboardImage } from '../lib/imageNote';
 import AdaptiveDashboard from '../components/AdaptiveDashboard';
 import DailySynthesisCard from '../components/DailySynthesisCard';
+import { colorForNewSection } from '../lib/sections';
 
 type CompileDraft = {
   noteId: string;
@@ -313,6 +314,7 @@ function SignalLinkEditor({ note, onToggleBaseSkill, onToggleUmbrellaGoal, onTog
 export default function InboxPage() {
   const [newNote, setNewNote] = useState('');
   const [selectedSectionId, setSelectedSectionId] = useState<string>('');
+  const [newSectionName, setNewSectionName] = useState('');
   const [compilingNoteId, setCompilingNoteId] = useState<string | null>(null);
   const [compileError, setCompileError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -325,7 +327,7 @@ export default function InboxPage() {
   const [compileDraft, setCompileDraft] = useState<CompileDraft | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const focusNoteId = searchParams.get('note');
-  const { notes, ideas, addNote, updateNote, deleteNote, addIdea, sections, capabilityBets, projects, goals } = useAppStore();
+  const { notes, ideas, addNote, updateNote, deleteNote, addIdea, addSection, sections, capabilityBets, projects, goals } = useAppStore();
   const activeCapabilityBets = useMemo(() => capabilityBets.filter((bet) => !bet.archivedAt), [capabilityBets]);
 
   const [selectedTensionModeId, setSelectedTensionModeId] = useState<string | null>(null);
@@ -456,6 +458,24 @@ export default function InboxPage() {
   const clearPendingImage = () => {
     setPendingImage(null);
     setPendingImagePreview(null);
+  };
+
+  const createSectionFromDraft = () => {
+    const name = newSectionName.trim().replace(/\s+/g, ' ');
+    if (!name) return null;
+    const existing = sections.find((section) => section.name.trim().toLowerCase() === name.toLowerCase());
+    if (existing) {
+      setSelectedSectionId(existing.id);
+      setNewSectionName('');
+      return existing.id;
+    }
+    const id = addSection({
+      name,
+      color: colorForNewSection(sections),
+    });
+    setSelectedSectionId(id);
+    setNewSectionName('');
+    return id;
   };
 
   const stageImage = (file?: File) => {
@@ -1074,19 +1094,37 @@ export default function InboxPage() {
                   ))}
                 </select>
               </label>
-              <label className="block">
-                <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 dark:text-stone-400">Suggested area</span>
-                <select
-                  value={selectedSectionId}
-                  onChange={(e) => setSelectedSectionId(e.target.value)}
-                  className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 focus:outline-none focus:ring-4 focus:ring-emerald-900/5 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
-                >
-                  <option value="">No Area</option>
-                  {sections.map((section) => (
-                    <option key={section.id} value={section.id}>{section.name}</option>
-                  ))}
-                </select>
-              </label>
+              <div className="grid gap-3">
+                <label className="block">
+                  <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 dark:text-stone-400">Suggested area</span>
+                  <select
+                    value={selectedSectionId}
+                    onChange={(e) => setSelectedSectionId(e.target.value)}
+                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 focus:outline-none focus:ring-4 focus:ring-emerald-900/5 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
+                  >
+                    <option value="">No Area</option>
+                    {sections.map((section) => (
+                      <option key={section.id} value={section.id}>{section.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newSectionName}
+                    onChange={(e) => setNewSectionName(e.target.value)}
+                    placeholder="Create new area"
+                    className="flex-1 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 focus:outline-none focus:ring-4 focus:ring-emerald-900/5 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={createSectionFromDraft}
+                    className="rounded-xl border border-emerald-200 px-4 py-3 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-emerald-900/60 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
+                  >
+                    Add area
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 mb-4">
@@ -1205,7 +1243,7 @@ export default function InboxPage() {
 
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-[10px] font-bold text-stone-400 dark:text-stone-600 uppercase tracking-[0.2em]">Recent Notes</h2>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-[10px] font-bold text-stone-400 dark:text-stone-600 uppercase tracking-widest">Classify to:</span>
             <select 
               value={selectedSectionId}
@@ -1217,6 +1255,20 @@ export default function InboxPage() {
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
+            <input
+              type="text"
+              value={newSectionName}
+              onChange={(e) => setNewSectionName(e.target.value)}
+              placeholder="New area"
+              className="min-w-[8rem] rounded-lg border border-stone-200 bg-white px-3 py-1 text-[10px] font-medium text-stone-700 focus:outline-none dark:border-stone-800 dark:bg-stone-900 dark:text-stone-200"
+            />
+            <button
+              type="button"
+              onClick={createSectionFromDraft}
+              className="rounded-lg border border-emerald-200 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-emerald-900/60 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
+            >
+              Add area
+            </button>
           </div>
         </div>
         <div className="space-y-6">

@@ -5,6 +5,8 @@ import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { askGemma, buildMemoryShapedSystemInstruction, getGemmaRuntimeStatus, analyzeImageToNote } from '../lib/ai';
 import { getClipboardImage } from '../lib/imageNote';
+import { getStoredAutoDistillLevel, autoDistillInstructionForLevel } from '../lib/autoDistill';
+import { colorForNewSection, findSectionByName, normalizeSectionName } from '../lib/sections';
 import { useAppStore } from '../store';
 import { useAuthStore } from '../stores/authStore';
 import type { ChatMessage } from '../lib/storage/types';
@@ -43,12 +45,14 @@ export default function Chatbot() {
   const addIdea = useAppStore((state) => state.addIdea);
   const addNote = useAppStore((state) => state.addNote);
   const addGoal = useAppStore((state) => state.addGoal);
+  const addSection = useAppStore((state) => state.addSection);
   const updateIdea = useAppStore((state) => state.updateIdea);
   const updateGoal = useAppStore((state) => state.updateGoal);
   const deleteProject = useAppStore((state) => state.deleteProject);
   const userId = useAuthStore((state) => state.userId);
   const [isExpanded, setIsExpanded] = useState(false);
   const [autoDistill, setAutoDistill] = useState(false);
+  const autoDistillLevel = getStoredAutoDistillLevel();
   
   const chatMessages = useAppStore((state) => state.chatMessages);
   const setChatMessages = useAppStore((state) => state.setChatMessages);
@@ -132,12 +136,23 @@ export default function Chatbot() {
 
   const normalizeText = (value?: string | null) => (value || '').trim().toLowerCase();
 
-  const findSectionId = (value?: string) => {
-    const normalized = normalizeText(value);
+  const ensureSectionId = (value?: string) => {
+    const normalized = normalizeSectionName(value);
     if (!normalized) return inferSectionId();
-    const direct = sections.find((section) => normalizeText(section.id) === normalized || normalizeText(section.name) === normalized);
-    return direct?.id || inferSectionId();
+
+    const direct = findSectionByName(sections, value);
+    if (direct) return direct.id;
+
+    const prettyName = String(value || '').trim().replace(/\s+/g, ' ');
+    if (!prettyName) return inferSectionId();
+
+    return addSection({
+      name: prettyName,
+      color: colorForNewSection(sections),
+    });
   };
+
+  const findSectionId = (value?: string) => ensureSectionId(value);
 
   const findIdeaByReference = (value?: string) => {
     const normalized = normalizeText(value);
@@ -455,8 +470,9 @@ export default function Chatbot() {
 
 AUTONOMOUS WRITE CAPABILITY:
 Auto-distill is ${autoDistill ? 'ENABLED' : 'DISABLED'}.
+Auto-distill selectivity is ${autoDistillLevel.toUpperCase()}.
 ${autoDistill
-  ? `Selectively distill only durable, meaningful information from the conversation. Do not save raw chat or a transcript. Save at most one cleaned note or one developed idea per response, only when it will remain useful later. Avoid duplicates, temporary details, generic advice, and operational chatter. Prefer a concise note for an early insight; create an idea only when the insight has a clear title, substance, and next action.`
+  ? autoDistillInstructionForLevel(autoDistillLevel)
   : `Do not create notes or ideas unless the user explicitly asks you to save, capture, remember, add, create, compile, or update one. Continue answering normally without writing inferred information to the board.`}
 Only save content that belongs in the HumanBoard database. Do NOT save operational chatter about patching/debugging the app, UI bug reports, build/restart requests, or implementation instructions unless the user explicitly says to store them as knowledge.
 
@@ -560,7 +576,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       let matchedGoal = false;
       let matchedGoalUpdate = false;
       let matchedProjectDelete = false;
-      const allowNoteIdeaWrites = autoDistill || explicitBoardWrite;
+      const allowNoteIdeaWrites = (autoDistill && autoDistillLevel !== 'off') || explicitBoardWrite;
       let blockedInferredWrite = false;
 
       // Extract Create Note tool calls

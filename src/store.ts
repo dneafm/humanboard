@@ -303,7 +303,7 @@ interface AppState {
   updateIdea: (id: string, updates: Partial<Idea>) => void;
   addProject: (project: Omit<Project, 'id'>) => void;
   deleteProject: (id: string) => void;
-  addSection: (section: Omit<Section, 'id'>) => void;
+  addSection: (section: Omit<Section, 'id'>) => string;
   addGoal: (goal: Omit<Goal, 'id' | 'createdAt'>) => void;
   updateGoal: (id: string, updates: Partial<Goal>) => void;
   deleteGoal: (id: string) => void;
@@ -936,14 +936,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     persistSnapshot(next);
     return { projects: next.projects };
   }),
-  addSection: (section) => set((state) => {
-    const next = {
-      ...state,
-      sections: [...state.sections, { ...section, id: randomId() }],
-    };
-    persistSnapshot(next);
-    return { sections: next.sections };
-  }),
+  addSection: (section) => {
+    const id = randomId();
+    set((state) => {
+      const next = {
+        ...state,
+        sections: [...state.sections, { ...section, id }],
+      };
+      persistSnapshot(next);
+      return { sections: next.sections };
+    });
+    return id;
+  },
   addGoal: (goal) => set((state) => {
     const next = {
       ...state,

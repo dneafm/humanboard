@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as d3 from 'd3';
 import { useAppStore } from '../store';
+import { colorForNewSection } from '../lib/sections';
 import { Network } from 'lucide-react';
 
 type Node = d3.SimulationNodeDatum & {
@@ -23,8 +24,25 @@ type Link = d3.SimulationLinkDatum<Node> & {
 export default function MapPage() {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { ideas, sections, isDarkMode } = useAppStore();
+  const [newSectionName, setNewSectionName] = useState('');
+  const { ideas, sections, isDarkMode, addSection } = useAppStore();
   const navigate = useNavigate();
+
+  const createSectionFromMap = () => {
+    const name = newSectionName.trim().replace(/\s+/g, ' ');
+    if (!name) return null;
+    const existing = sections.find((section) => section.name.trim().toLowerCase() === name.toLowerCase());
+    if (existing) {
+      setNewSectionName('');
+      return existing.id;
+    }
+    const id = addSection({
+      name,
+      color: colorForNewSection(sections),
+    });
+    setNewSectionName('');
+    return id;
+  };
 
   useEffect(() => {
     if (!svgRef.current || !containerRef.current) return;
@@ -383,11 +401,31 @@ export default function MapPage() {
   return (
     <div className="flex flex-col h-full w-full transition-colors duration-300">
       <header className="p-8 pb-6 border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 z-10">
-        <h1 className="text-4xl font-bold tracking-tight text-stone-900 dark:text-stone-100 flex items-center gap-4">
-          <Network className="w-10 h-10 text-stone-400 dark:text-stone-600" />
-          Idea Map
-        </h1>
-        <p className="text-stone-500 dark:text-stone-400 mt-2 text-lg">Visualize how your ideas connect across sections.</p>
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h1 className="text-4xl font-bold tracking-tight text-stone-900 dark:text-stone-100 flex items-center gap-4">
+              <Network className="w-10 h-10 text-stone-400 dark:text-stone-600" />
+              Idea Map
+            </h1>
+            <p className="text-stone-500 dark:text-stone-400 mt-2 text-lg">Visualize how your ideas connect across sections.</p>
+          </div>
+          <div className="flex w-full max-w-md gap-2 lg:justify-end">
+            <input
+              type="text"
+              value={newSectionName}
+              onChange={(event) => setNewSectionName(event.target.value)}
+              placeholder="Create new field"
+              className="flex-1 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 focus:outline-none focus:ring-4 focus:ring-stone-900/5 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
+            />
+            <button
+              type="button"
+              onClick={createSectionFromMap}
+              className="rounded-xl border border-stone-300 px-4 py-3 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 dark:border-stone-700 dark:text-stone-200 dark:hover:bg-stone-900"
+            >
+              Add field
+            </button>
+          </div>
+        </div>
       </header>
       
       <div className="flex-1 relative bg-stone-50 dark:bg-stone-950 overflow-hidden" ref={containerRef}>

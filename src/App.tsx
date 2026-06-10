@@ -20,6 +20,7 @@ import { apiFetch } from './lib/apiClient';
 import AiEraKbAutoBridge from './components/AiEraKbAutoBridge';
 import NotificationCenter from './components/NotificationCenter';
 import NotificationEngine from './components/NotificationEngine';
+import { AUTO_DISTILL_LEVELS, getStoredAutoDistillLevel, setStoredAutoDistillLevel, type AutoDistillLevel } from './lib/autoDistill';
 import { isFirebaseConfigured, missingFirebaseConfigKeys } from './config/firebase';
 
 declare const __APP_VERSION__: string;
@@ -404,6 +405,7 @@ function UpdateButton() {
 function Sidebar({ onOpenTutorial }: { onOpenTutorial: () => void }) {
   const { isDarkMode, toggleDarkMode } = useAppStore();
   const { user, signOutUser } = useAuthStore();
+  const [autoDistillLevel, setAutoDistillLevel] = useState<AutoDistillLevel>(() => getStoredAutoDistillLevel());
   const isLocalCommandCenter = window.location.port === '3010';
   const navItems = [
     ...(isLocalCommandCenter ? [{ to: '/command-center', icon: LayoutDashboard, label: 'Command Center' }] : []),
@@ -451,9 +453,30 @@ function Sidebar({ onOpenTutorial }: { onOpenTutorial: () => void }) {
         <UpdateButton />
         <NotificationCenter />
         <GuideButton onClick={onOpenTutorial} />
-        <div className="px-3 py-2 rounded-md bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800">
-          <div className="text-xs font-medium text-stone-700 dark:text-stone-200 truncate">{user?.displayName ?? 'Signed in'}</div>
-          <div className="text-[11px] text-stone-500 dark:text-stone-500 truncate">{user?.email}</div>
+        <div className="px-3 py-2 rounded-md bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 space-y-3">
+          <div>
+            <div className="text-xs font-medium text-stone-700 dark:text-stone-200 truncate">{user?.displayName ?? 'Signed in'}</div>
+            <div className="text-[11px] text-stone-500 dark:text-stone-500 truncate">{user?.email}</div>
+          </div>
+          <label className="block">
+            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 dark:text-stone-400">Auto-distill</div>
+            <select
+              value={autoDistillLevel}
+              onChange={(event) => {
+                const next = event.target.value as AutoDistillLevel;
+                setAutoDistillLevel(next);
+                setStoredAutoDistillLevel(next);
+              }}
+              className="mt-2 w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 focus:outline-none dark:border-stone-700 dark:bg-stone-950 dark:text-stone-200"
+            >
+              {AUTO_DISTILL_LEVELS.map((level) => (
+                <option key={level.value} value={level.value}>{level.label}</option>
+              ))}
+            </select>
+            <div className="mt-1 text-[11px] text-stone-500 dark:text-stone-500">
+              {AUTO_DISTILL_LEVELS.find((level) => level.value === autoDistillLevel)?.description}
+            </div>
+          </label>
         </div>
         <button
           onClick={() => void signOutUser()}
@@ -905,6 +928,7 @@ function MobileMenu({
 }) {
   const { user, signOutUser } = useAuthStore();
   const { isDarkMode, toggleDarkMode } = useAppStore();
+  const [autoDistillLevel, setAutoDistillLevel] = useState<AutoDistillLevel>(() => getStoredAutoDistillLevel());
 
   if (!open) return null;
 
@@ -932,9 +956,30 @@ function MobileMenu({
           </button>
         </div>
 
-        <div className="mb-3 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 dark:border-stone-800 dark:bg-stone-900">
-          <div className="text-xs font-medium text-stone-700 dark:text-stone-200 truncate">{user?.displayName ?? 'Signed in'}</div>
-          <div className="text-[11px] text-stone-500 dark:text-stone-500 truncate">{user?.email}</div>
+        <div className="mb-3 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 dark:border-stone-800 dark:bg-stone-900 space-y-3">
+          <div>
+            <div className="text-xs font-medium text-stone-700 dark:text-stone-200 truncate">{user?.displayName ?? 'Signed in'}</div>
+            <div className="text-[11px] text-stone-500 dark:text-stone-500 truncate">{user?.email}</div>
+          </div>
+          <label className="block">
+            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 dark:text-stone-400">Auto-distill</div>
+            <select
+              value={autoDistillLevel}
+              onChange={(event) => {
+                const next = event.target.value as AutoDistillLevel;
+                setAutoDistillLevel(next);
+                setStoredAutoDistillLevel(next);
+              }}
+              className="mt-2 w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 focus:outline-none dark:border-stone-700 dark:bg-stone-950 dark:text-stone-200"
+            >
+              {AUTO_DISTILL_LEVELS.map((level) => (
+                <option key={level.value} value={level.value}>{level.label}</option>
+              ))}
+            </select>
+            <div className="mt-1 text-[11px] text-stone-500 dark:text-stone-500">
+              {AUTO_DISTILL_LEVELS.find((level) => level.value === autoDistillLevel)?.description}
+            </div>
+          </label>
         </div>
 
         <div className="space-y-1">
