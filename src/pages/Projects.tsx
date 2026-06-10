@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { useAppStore } from '../store';
-import { FolderKanban, Plus, FlaskConical, ArrowRight, Sparkles, Sprout, CircleDashed, X, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { type Project, type ProjectUpdateEntry, useAppStore } from '../store';
+import { FolderKanban, Plus, FlaskConical, ArrowRight, Sparkles, Sprout, CircleDashed, X, Trash2, Pencil, CheckCircle2, PauseCircle, PlayCircle, NotebookPen, Target } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '../lib/utils';
 
@@ -48,7 +48,27 @@ function ReadinessBar({ maturity }: { maturity: number }) {
   );
 }
 
-function ProjectCard({ project, sourceIdea, onDelete }: { project: any; sourceIdea?: any; onDelete: (projectId: string) => void }) {
+function ProjectCard({
+  project,
+  sourceIdea,
+  onDelete,
+  onEdit,
+  onStatusChange,
+  onSaveNextAction,
+  onAddUpdate,
+}: {
+  project: Project;
+  sourceIdea?: any;
+  onDelete: (projectId: string) => void;
+  onEdit: (project: Project) => void;
+  onStatusChange: (projectId: string, status: Project['status']) => void;
+  onSaveNextAction: (projectId: string, nextAction: string) => void;
+  onAddUpdate: (projectId: string, content: string) => void;
+}) {
+  const [nextActionDraft, setNextActionDraft] = useState(project.nextAction || '');
+  const [updateDraft, setUpdateDraft] = useState('');
+  const recentUpdates = useMemo(() => project.updates.slice(0, 3), [project.updates]);
+
   return (
     <div className="rounded-xl border border-stone-200 bg-white p-6 shadow-sm transition-all hover:border-stone-300 dark:border-stone-800 dark:bg-stone-900">
       <div className="mb-4 flex items-start justify-between gap-4">
@@ -91,6 +111,80 @@ function ProjectCard({ project, sourceIdea, onDelete }: { project: any; sourceId
         </div>
       )}
 
+      <div className="mb-6 grid gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => onEdit(project)}
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-50 dark:border-stone-700 dark:text-stone-200 dark:hover:bg-stone-950"
+        >
+          <Pencil className="h-4 w-4" />
+          Edit
+        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => onStatusChange(project.id, 'Active')} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-xs font-medium text-stone-700 hover:bg-stone-50 dark:border-stone-700 dark:text-stone-200 dark:hover:bg-stone-950"><PlayCircle className="h-4 w-4" />Active</button>
+          <button type="button" onClick={() => onStatusChange(project.id, 'Paused')} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-xs font-medium text-stone-700 hover:bg-stone-50 dark:border-stone-700 dark:text-stone-200 dark:hover:bg-stone-950"><PauseCircle className="h-4 w-4" />Pause</button>
+          <button type="button" onClick={() => onStatusChange(project.id, 'Completed')} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-xs font-medium text-stone-700 hover:bg-stone-50 dark:border-stone-700 dark:text-stone-200 dark:hover:bg-stone-950"><CheckCircle2 className="h-4 w-4" />Done</button>
+        </div>
+      </div>
+
+      <div className="mb-6 rounded-lg border border-stone-100 bg-stone-50 p-3 dark:border-stone-800 dark:bg-stone-950">
+        <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+          <Target className="h-3 w-3" /> Next action
+        </div>
+        <textarea
+          value={nextActionDraft}
+          onChange={(event) => setNextActionDraft(event.target.value)}
+          placeholder="What is the next concrete move?"
+          rows={2}
+          className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:focus:border-stone-500 dark:focus:ring-stone-800"
+        />
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={() => onSaveNextAction(project.id, nextActionDraft)}
+            className="rounded-lg bg-stone-900 px-3 py-2 text-xs font-medium text-white hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200"
+          >
+            Save next action
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-6 rounded-lg border border-stone-100 bg-stone-50 p-3 dark:border-stone-800 dark:bg-stone-950">
+        <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+          <NotebookPen className="h-3 w-3" /> Updates
+        </div>
+        <textarea
+          value={updateDraft}
+          onChange={(event) => setUpdateDraft(event.target.value)}
+          placeholder="Log progress, blockers, or decisions..."
+          rows={3}
+          className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:focus:border-stone-500 dark:focus:ring-stone-800"
+        />
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              onAddUpdate(project.id, updateDraft);
+              setUpdateDraft('');
+            }}
+            disabled={!updateDraft.trim()}
+            className="rounded-lg bg-stone-900 px-3 py-2 text-xs font-medium text-white hover:bg-stone-800 disabled:opacity-40 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200"
+          >
+            Add update
+          </button>
+        </div>
+        {recentUpdates.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {recentUpdates.map((entry: ProjectUpdateEntry) => (
+              <div key={entry.id} className="rounded-lg border border-stone-200 bg-white p-3 text-sm text-stone-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200">
+                <div>{entry.content}</div>
+                <div className="mt-2 text-[11px] text-stone-400">{new Date(entry.createdAt).toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {project.experiments.length > 0 && (
         <div>
           <h4 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
@@ -119,8 +213,9 @@ function ProjectCard({ project, sourceIdea, onDelete }: { project: any; sourceId
 }
 
 export default function ProjectsPage() {
-  const { projects, ideas, addProject, deleteProject } = useAppStore();
+  const { projects, ideas, addProject, updateProject, deleteProject } = useAppStore();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState('');
   const [draftDescription, setDraftDescription] = useState('');
 
@@ -130,8 +225,16 @@ export default function ProjectsPage() {
   const activationIdeas = projectIdeas.filter((idea) => !linkedIdeaIds.has(idea.id) && idea.maturity >= ACTIVATION_THRESHOLD);
 
   const handleNewProject = () => {
+    setEditingProjectId(null);
     setDraftTitle('');
     setDraftDescription('');
+    setIsCreateOpen(true);
+  };
+
+  const handleEditProject = (project: Project) => {
+    setEditingProjectId(project.id);
+    setDraftTitle(project.title);
+    setDraftDescription(project.description);
     setIsCreateOpen(true);
   };
 
@@ -140,15 +243,25 @@ export default function ProjectsPage() {
     const description = draftDescription.trim();
     if (!title) return;
 
-    addProject({
-      title,
-      description: description || 'Define the first concrete build, experiment, or execution step for this project.',
-      sourceIdeaId: '',
-      status: 'Active',
-      experiments: [],
-    });
+    if (editingProjectId) {
+      updateProject(editingProjectId, {
+        title,
+        description: description || 'Define the first concrete build, experiment, or execution step for this project.',
+      });
+    } else {
+      addProject({
+        title,
+        description: description || 'Define the first concrete build, experiment, or execution step for this project.',
+        sourceIdeaId: '',
+        status: 'Active',
+        nextAction: '',
+        updates: [],
+        experiments: [],
+      });
+    }
 
     setIsCreateOpen(false);
+    setEditingProjectId(null);
     setDraftTitle('');
     setDraftDescription('');
   };
@@ -161,6 +274,26 @@ export default function ProjectsPage() {
     deleteProject(projectId);
   };
 
+  const handleProjectStatusChange = (projectId: string, status: Project['status']) => {
+    updateProject(projectId, { status });
+  };
+
+  const handleProjectNextActionSave = (projectId: string, nextAction: string) => {
+    updateProject(projectId, { nextAction: nextAction.trim() });
+  };
+
+  const handleProjectAddUpdate = (projectId: string, content: string) => {
+    const target = projects.find((project) => project.id === projectId);
+    const value = content.trim();
+    if (!target || !value) return;
+    const nextEntry: ProjectUpdateEntry = {
+      id: `${projectId}-${Date.now()}`,
+      content: value,
+      createdAt: new Date().toISOString(),
+    };
+    updateProject(projectId, { updates: [nextEntry, ...(target.updates ?? [])] });
+  };
+
   return (
     <>
       {isCreateOpen && (
@@ -168,13 +301,16 @@ export default function ProjectsPage() {
           <div className="w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl dark:border-stone-800 dark:bg-stone-950">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-stone-500 dark:text-stone-400">Create project</div>
-                <h2 className="mt-2 text-xl font-semibold text-stone-900 dark:text-stone-100">Start a new project</h2>
-                <p className="mt-2 text-sm leading-6 text-stone-600 dark:text-stone-300">Give the project a clear name before it enters active execution.</p>
+                <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-stone-500 dark:text-stone-400">{editingProjectId ? 'Edit project' : 'Create project'}</div>
+                <h2 className="mt-2 text-xl font-semibold text-stone-900 dark:text-stone-100">{editingProjectId ? 'Update project' : 'Start a new project'}</h2>
+                <p className="mt-2 text-sm leading-6 text-stone-600 dark:text-stone-300">{editingProjectId ? 'Adjust the project details and keep execution moving.' : 'Give the project a clear name before it enters active execution.'}</p>
               </div>
               <button
                 type="button"
-                onClick={() => setIsCreateOpen(false)}
+                onClick={() => {
+                  setIsCreateOpen(false);
+                  setEditingProjectId(null);
+                }}
                 className="rounded-md p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"
                 aria-label="Close project creator"
               >
@@ -209,7 +345,10 @@ export default function ProjectsPage() {
             <div className="mt-6 flex items-center justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setIsCreateOpen(false)}
+                onClick={() => {
+                  setIsCreateOpen(false);
+                  setEditingProjectId(null);
+                }}
                 className="rounded-xl px-4 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-300 dark:hover:bg-stone-900 dark:hover:text-stone-100"
               >
                 Cancel
@@ -220,7 +359,7 @@ export default function ProjectsPage() {
                 disabled={!draftTitle.trim()}
                 className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200"
               >
-                Create Project
+                {editingProjectId ? 'Save Changes' : 'Create Project'}
               </button>
             </div>
           </div>
@@ -299,7 +438,18 @@ export default function ProjectsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {projects.map(project => {
               const sourceIdea = ideas.find(i => i.id === project.sourceIdeaId);
-              return <ProjectCard key={project.id} project={project} sourceIdea={sourceIdea} onDelete={handleDeleteProject} />;
+              return (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  sourceIdea={sourceIdea}
+                  onDelete={handleDeleteProject}
+                  onEdit={handleEditProject}
+                  onStatusChange={handleProjectStatusChange}
+                  onSaveNextAction={handleProjectNextActionSave}
+                  onAddUpdate={handleProjectAddUpdate}
+                />
+              );
             })}
           </div>
         ) : (

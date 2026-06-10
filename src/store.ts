@@ -153,12 +153,20 @@ export type Idea = {
   weakeningNoteIds?: string[];
 };
 
+export type ProjectUpdateEntry = {
+  id: string;
+  content: string;
+  createdAt: string;
+};
+
 export type Project = {
   id: string;
   title: string;
   description: string;
   sourceIdeaId: string;
   status: 'Active' | 'Paused' | 'Completed';
+  nextAction?: string;
+  updates: ProjectUpdateEntry[];
   experiments: Experiment[];
 };
 
@@ -302,6 +310,7 @@ interface AppState {
   addIdea: (idea: Omit<Idea, 'id' | 'lastReviewed' | 'layer'>) => void;
   updateIdea: (id: string, updates: Partial<Idea>) => void;
   addProject: (project: Omit<Project, 'id'>) => void;
+  updateProject: (id: string, updates: Partial<Project>) => void;
   deleteProject: (id: string) => void;
   addSection: (section: Omit<Section, 'id'>) => string;
   addGoal: (goal: Omit<Goal, 'id' | 'createdAt'>) => void;
@@ -923,7 +932,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   addProject: (project) => set((state) => {
     const next = {
       ...state,
-      projects: [{ ...project, id: randomId() }, ...state.projects],
+      projects: [{ ...project, id: randomId(), updates: project.updates ?? [], nextAction: project.nextAction ?? '' }, ...state.projects],
+    };
+    persistSnapshot(next);
+    return { projects: next.projects };
+  }),
+  updateProject: (id, updates) => set((state) => {
+    const next = {
+      ...state,
+      projects: state.projects.map((project) => project.id === id ? { ...project, ...updates } : project),
     };
     persistSnapshot(next);
     return { projects: next.projects };
