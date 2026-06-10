@@ -7,6 +7,9 @@ type RuntimeConfig = {
   apiKey: string;
 };
 
+const CLOUD_AI_BASE_URL = 'https://humanboardapp.xyz/api/gemma';
+const CLOUD_AI_MODEL = 'deepseek-v4-flash';
+
 type ViteEnvLike = Record<string, string | boolean | undefined>;
 
 function readEnv(key: string, fallback = '') {
@@ -36,6 +39,38 @@ function buildRuntimeError(prefix: string, detail?: string) {
   const status = getGemmaRuntimeStatus();
   const hint = `AI config -> baseUrl=${status.baseUrl}, model=${status.model}. Set VITE_AI_BASE_URL / VITE_AI_MODEL in .env.local if needed.`;
   return new Error(`${prefix}${detail ? ` ${detail}` : ''} ${hint}`.trim());
+}
+
+function canFailOverToCloud(runtimeUrl: string) {
+  if (typeof window === 'undefined') return false;
+  if (window.location.hostname === 'humanboardapp.xyz') return false;
+  return runtimeUrl.startsWith('/') || runtimeUrl.startsWith(window.location.origin);
+}
+
+async function fetchChatCompletion(
+  runtimeUrl: string,
+  headers: HeadersInit,
+  payload: {
+    model: string;
+    temperature: number;
+    messages: Array<{ role: string; content: string }>;
+  },
+) {
+  const request = (url: string, body: typeof payload) => fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  try {
+    return await request(runtimeUrl, payload);
+  } catch (error) {
+    if (!canFailOverToCloud(runtimeUrl)) throw error;
+    return request(`${CLOUD_AI_BASE_URL}/chat/completions`, {
+      ...payload,
+      model: CLOUD_AI_MODEL,
+    });
+  }
 }
 
 function extractJsonObject(raw: string) {
@@ -207,17 +242,13 @@ async function callGemma(prompt: string, systemInstruction: string) {
 
   let response: Response;
   try {
-    response = await fetch(runtime.chatCompletionsUrl, {
-      method: 'POST',
-      headers: requestHeaders,
-      body: JSON.stringify({
-        model: runtime.model,
-        temperature: 0.4,
-        messages: [
-          { role: 'system', content: systemInstruction },
-          { role: 'user', content: prompt },
-        ],
-      }),
+    response = await fetchChatCompletion(runtime.chatCompletionsUrl, requestHeaders, {
+      model: runtime.model,
+      temperature: 0.4,
+      messages: [
+        { role: 'system', content: systemInstruction },
+        { role: 'user', content: prompt },
+      ],
     });
   } catch (error) {
     throw buildRuntimeError('Could not reach the AI runtime.', error instanceof Error ? error.message : String(error));
