@@ -4,6 +4,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Plus, Archive, Lightbulb, Scale, Sparkles, Check, X, ImagePlus, Loader2, Brain, HelpCircle, Dices, ArrowRight, Target, FileText, Upload, GitMerge, Replace } from 'lucide-react';
 import { compileRawNoteToKnowledge, extractCapabilityEvidenceReview } from '../lib/ai';
 import { Link, useSearchParams } from 'react-router-dom';
+import { shouldTreatAsMeaningfulNote } from '../lib/noteQuality';
 import ExtractionReviewPanel from '../components/capability/ExtractionReviewPanel';
 import { createNoteFromImage, getClipboardImage } from '../lib/imageNote';
 import AdaptiveDashboard from '../components/AdaptiveDashboard';
@@ -591,9 +592,15 @@ export default function InboxPage() {
       document.querySelector<HTMLTextAreaElement>('textarea')?.focus();
       return;
     }
+    if (!shouldTreatAsMeaningfulNote(newNote)) {
+      setImageError('This looks accidental or too low-signal to save as a note.');
+      setCaptureHint('HumanBoard skipped a likely accidental or nonsense input.');
+      return;
+    }
     addNote(newNote);
     setNewNote('');
     setCaptureHint(null);
+    setImageError(null);
   };
 
   const promoteToIdea = (noteId: string, noteContent: string) => {

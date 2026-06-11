@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Moon, Sparkles, Loader2 } from 'lucide-react';
 import { useAppStore } from '../store';
 import { compileRawNoteToKnowledge } from '../lib/ai';
+import { shouldTreatAsMeaningfulNote } from '../lib/noteQuality';
 
 export default function MemoryConsolidator() {
   const notes = useAppStore(state => state.notes);
@@ -27,6 +28,11 @@ export default function MemoryConsolidator() {
       for (let i = 0; i < toProcess.length; i++) {
         const note = toProcess[i];
         try {
+          if (!shouldTreatAsMeaningfulNote(note.content)) {
+            setProgress(((i + 1) / toProcess.length) * 100);
+            continue;
+          }
+
           const compiled = await compileRawNoteToKnowledge(note.content);
           
           addIdea({

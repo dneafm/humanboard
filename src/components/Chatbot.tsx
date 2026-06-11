@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import { askGemma, buildMemoryShapedSystemInstruction, getGemmaRuntimeStatus, analyzeImageToNote, extractWebContent } from '../lib/ai';
 import { getClipboardImage } from '../lib/imageNote';
 import { getStoredAutoDistillLevel, autoDistillInstructionForLevel } from '../lib/autoDistill';
+import { shouldTreatAsMeaningfulNote } from '../lib/noteQuality';
 import { colorForNewSection, findSectionByName, normalizeSectionName } from '../lib/sections';
 import { useAppStore } from '../store';
 import { useAuthStore } from '../stores/authStore';
@@ -193,6 +194,7 @@ export default function Chatbot() {
   const shouldCaptureAsInboxContent = (raw: string) => {
     const text = raw.trim().toLowerCase();
     if (!text) return false;
+    if (!shouldTreatAsMeaningfulNote(raw)) return false;
 
     const operationalPatterns = [
       /\bfix\b.*\b(ui|app|bug|build|route|button|page|component|review|inbox)\b/,
