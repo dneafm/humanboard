@@ -487,6 +487,14 @@ export default function Chatbot() {
       const explicitBoardWrite = explicitlyRequestsBoardWrite(userMsg);
       const systemInstruction = buildMemoryShapedSystemInstruction(`Use the provided HumanBoard knowledge context when relevant. Prefer connecting the user to existing notes, ideas, goals, projects, principles, and reflections before giving generic advice.
 
+PRODUCT KNOWLEDGE:
+- HumanBoard's "Sleep / Consolidate" feature currently processes raw inbox notes through AI and turns them into Idea nodes.
+- It links each new idea back to the source note via linkedNoteIds.
+- After a successful consolidation, the current implementation deletes the original raw note from Inbox.
+- If the browser tab becomes hidden and there are at least 3 raw notes, Sleep / Consolidate can auto-trigger in the background.
+- Right now it is not a full markdown inbox or multi-type classifier: it does not yet preserve raw source as a safe inbox archive, and it does not classify into notes, ideas, and projects separately.
+- When users ask what Sleep / Consolidate does, explain the current behavior accurately instead of describing an aspirational future version.
+
 AUTONOMOUS WRITE CAPABILITY:
 Auto-distill is ${autoDistill ? 'ENABLED' : 'DISABLED'}.
 Auto-distill selectivity is ${autoDistillLevel.toUpperCase()}.
