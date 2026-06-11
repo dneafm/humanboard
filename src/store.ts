@@ -67,44 +67,89 @@ export function deriveStrategicIdeaFields(ideas: Idea[], notes: Note[]): Idea[] 
 
   return ideas.map((idea) => {
     const isBaseIdea = idea.type === 'Base Skill' || idea.strategicRole === 'Base';
-    if (!isBaseIdea) return idea;
+    const isIncubationCandidate = idea.type === 'Project' || !!idea.strategicRole || !!idea.activationReadiness || !!idea.baseSkillIds?.length || !!idea.umbrellaGoalIds?.length;
 
-    const supportingNotes = signalNotes.filter((note) => {
-      const assessment = note.signalAssessment;
-      return assessment && assessment.direction === 'Supports' && (
-        assessment.relatedBaseSkillIds?.includes(idea.id) ||
-        assessment.relatedIdeaIds?.includes(idea.id)
-      );
-    });
+    if (!isBaseIdea && !isIncubationCandidate) return idea;
 
-    const weakeningNotes = signalNotes.filter((note) => {
-      const assessment = note.signalAssessment;
-      return assessment && assessment.direction === 'Weakens' && (
-        assessment.relatedBaseSkillIds?.includes(idea.id) ||
-        assessment.relatedIdeaIds?.includes(idea.id)
-      );
-    });
+    let updatedIdea = { ...idea };
+    let changed = false;
 
-    const weightedSupport = supportingNotes.reduce((sum, note) => sum + ((note.signalAssessment?.strength ?? 0) * (note.signalAssessment?.confidence ?? 0)), 0);
-    const weightedWeakening = weakeningNotes.reduce((sum, note) => sum + ((note.signalAssessment?.strength ?? 0) * (note.signalAssessment?.confidence ?? 0)), 0);
-    const rawAlignment = 50 + (weightedSupport * 0.8) - (weightedWeakening * 0.8);
-    const alignmentScore = Math.max(0, Math.min(100, Math.round(rawAlignment)));
-    const supportingNoteIds = supportingNotes.map((note) => note.id);
-    const weakeningNoteIds = weakeningNotes.map((note) => note.id);
+    if (isBaseIdea) {
+      const supportingNotes = signalNotes.filter((note) => {
+        const assessment = note.signalAssessment;
+        return assessment && assessment.direction === 'Supports' && (
+          assessment.relatedBaseSkillIds?.includes(idea.id) ||
+          assessment.relatedIdeaIds?.includes(idea.id)
+        );
+      });
 
-    const unchanged =
-      idea.alignmentScore === alignmentScore &&
-      JSON.stringify(idea.supportingNoteIds ?? []) === JSON.stringify(supportingNoteIds) &&
-      JSON.stringify(idea.weakeningNoteIds ?? []) === JSON.stringify(weakeningNoteIds);
+      const weakeningNotes = signalNotes.filter((note) => {
+        const assessment = note.signalAssessment;
+        return assessment && assessment.direction === 'Weakens' && (
+          assessment.relatedBaseSkillIds?.includes(idea.id) ||
+          assessment.relatedIdeaIds?.includes(idea.id)
+        );
+      });
 
-    if (unchanged) return idea;
+      const weightedSupport = supportingNotes.reduce((sum, note) => sum + ((note.signalAssessment?.strength ?? 0) * (note.signalAssessment?.confidence ?? 0)), 0);
+      const weightedWeakening = weakeningNotes.reduce((sum, note) => sum + ((note.signalAssessment?.strength ?? 0) * (note.signalAssessment?.confidence ?? 0)), 0);
+      const rawAlignment = 50 + (weightedSupport * 0.8) - (weightedWeakening * 0.8);
+      const alignmentScore = Math.max(0, Math.min(100, Math.round(rawAlignment)));
+      const supportingNoteIds = supportingNotes.map((note) => note.id);
+      const weakeningNoteIds = weakeningNotes.map((note) => note.id);
 
-    return {
-      ...idea,
-      alignmentScore,
-      supportingNoteIds,
-      weakeningNoteIds,
-    };
+      if (
+        idea.alignmentScore !== alignmentScore ||
+        JSON.stringify(idea.supportingNoteIds ?? []) !== JSON.stringify(supportingNoteIds) ||
+        JSON.stringify(idea.weakeningNoteIds ?? []) !== JSON.stringify(weakeningNoteIds)
+      ) {
+        updatedIdea.alignmentScore = alignmentScore;
+        updatedIdea.supportingNoteIds = supportingNoteIds;
+        updatedIdea.weakeningNoteIds = weakeningNoteIds;
+        changed = true;
+      }
+    }
+
+    if (isIncubationCandidate) {
+      const supportingNotes = signalNotes.filter((note) => {
+        const assessment = note.signalAssessment;
+        return assessment && assessment.direction === 'Supports' && (
+          assessment.relatedIdeaIds?.includes(idea.id) ||
+          assessment.relatedBaseSkillIds?.includes(idea.id) ||
+          assessment.relatedUmbrellaGoalIds?.includes(idea.id)
+        );
+      });
+
+      const weakeningNotes = signalNotes.filter((note) => {
+        const assessment = note.signalAssessment;
+        return assessment && assessment.direction === 'Weakens' && (
+          assessment.relatedIdeaIds?.includes(idea.id) ||
+          assessment.relatedBaseSkillIds?.includes(idea.id) ||
+          assessment.relatedUmbrellaGoalIds?.includes(idea.id)
+        );
+      });
+
+      const weightedSupport = supportingNotes.reduce((sum, note) => sum + ((note.signalAssessment?.strength ?? 0) * (note.signalAssessment?.confidence ?? 0)), 0);
+      const weightedWeakening = weakeningNotes.reduce((sum, note) => sum + ((note.signalAssessment?.strength ?? 0) * (note.signalAssessment?.confidence ?? 0)), 0);
+      const computedSignal = Math.max(0, Math.min(100, Math.round(50 + (weightedSupport * 0.5) - (weightedWeakening * 0.5))));
+
+      if (idea.activationReadiness) {
+        if (idea.activationReadiness.marketSignal !== computedSignal) {
+          updatedIdea.activationReadiness = {
+            ...idea.activationReadiness,
+            marketSignal: computedSignal,
+          };
+          changed = true;
+        }
+      } else {
+        if (idea.maturity !== computedSignal) {
+          updatedIdea.maturity = computedSignal;
+          changed = true;
+        }
+      }
+    }
+
+    return changed ? updatedIdea : idea;
   });
 }
 
@@ -151,6 +196,8 @@ export type Idea = {
   alignmentScore?: number; // 0-100
   supportingNoteIds?: string[];
   weakeningNoteIds?: string[];
+  incubationDecision?: string;
+  reviewCadence?: string;
 };
 
 export type ProjectUpdateEntry = {
@@ -933,9 +980,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       recordTimeline: true,
       reason: 'signal-change',
     });
+    const nextIdeas = deriveStrategicIdeaFields(state.ideas, nextNotes);
     const next = {
       ...state,
       notes: nextNotes,
+      ideas: nextIdeas,
       capabilityBets: derived.capabilityBets,
       signalEvents: derived.signalEvents,
       capabilityTimelineEvents: derived.capabilityTimelineEvents,
@@ -943,6 +992,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     persistSnapshot(next);
     return {
       notes: next.notes,
+      ideas: next.ideas,
       capabilityBets: next.capabilityBets,
       signalEvents: next.signalEvents,
       capabilityTimelineEvents: next.capabilityTimelineEvents,
@@ -954,9 +1004,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       recordTimeline: true,
       reason: 'signal-change',
     });
+    const nextIdeas = deriveStrategicIdeaFields(state.ideas, nextNotes);
     const next = {
       ...state,
       notes: nextNotes,
+      ideas: nextIdeas,
       capabilityBets: derived.capabilityBets,
       signalEvents: derived.signalEvents,
       capabilityTimelineEvents: derived.capabilityTimelineEvents,
@@ -964,6 +1016,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     persistSnapshot(next);
     return {
       notes: next.notes,
+      ideas: next.ideas,
       capabilityBets: next.capabilityBets,
       signalEvents: next.signalEvents,
       capabilityTimelineEvents: next.capabilityTimelineEvents,
@@ -975,9 +1028,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       recordTimeline: true,
       reason: 'signal-change',
     });
+    const nextIdeas = deriveStrategicIdeaFields(state.ideas, nextNotes);
     const next = {
       ...state,
       notes: nextNotes,
+      ideas: nextIdeas,
       capabilityBets: derived.capabilityBets,
       signalEvents: derived.signalEvents,
       capabilityTimelineEvents: derived.capabilityTimelineEvents,
@@ -985,23 +1040,28 @@ export const useAppStore = create<AppState>((set, get) => ({
     persistSnapshot(next);
     return {
       notes: next.notes,
+      ideas: next.ideas,
       capabilityBets: next.capabilityBets,
       signalEvents: next.signalEvents,
       capabilityTimelineEvents: next.capabilityTimelineEvents,
     };
   }),
   addIdea: (idea) => set((state) => {
+    const newIdeas = [{ ...idea, id: randomId(), layer: 'knowledge' as const, lastReviewed: new Date().toISOString() }, ...state.ideas];
+    const derivedIdeas = deriveStrategicIdeaFields(newIdeas, state.notes);
     const next = {
       ...state,
-      ideas: [{ ...idea, id: randomId(), layer: 'knowledge' as const, lastReviewed: new Date().toISOString() }, ...state.ideas],
+      ideas: derivedIdeas,
     };
     persistSnapshot(next);
     return { ideas: next.ideas };
   }),
   updateIdea: (id, updates) => set((state) => {
+    const updatedIdeas = state.ideas.map(i => i.id === id ? { ...i, ...updates } : i);
+    const derivedIdeas = deriveStrategicIdeaFields(updatedIdeas, state.notes);
     const next = {
       ...state,
-      ideas: state.ideas.map(i => i.id === id ? { ...i, ...updates } : i),
+      ideas: derivedIdeas,
     };
     persistSnapshot(next);
     return { ideas: next.ideas };

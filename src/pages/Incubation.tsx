@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
   Sparkles,
@@ -446,15 +446,19 @@ function CapabilityGraphView({
 }
 
 export default function IncubationPage() {
+  const navigate = useNavigate();
   const {
     ideas,
     notes,
+    projects,
     capabilityBets,
     signalEvents,
     capabilityTimelineEvents,
     addCapabilityBet,
     updateCapabilityBet,
     archiveCapabilityBet,
+    addProject,
+    updateIdea,
   } = useAppStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusIdeaId = searchParams.get('idea');
@@ -481,8 +485,10 @@ export default function IncubationPage() {
     }
   }, [editorMode, selectedCapabilityBet]);
 
+  const activatedProjectIds = useMemo(() => new Set(projects.map((p) => p.sourceIdeaId).filter(Boolean)), [projects]);
+
   const incubationIdeas = ideas
-    .filter((idea) => idea.stage !== 'Archived' && isIncubationCandidate(idea))
+    .filter((idea) => idea.stage !== 'Archived' && isIncubationCandidate(idea) && !activatedProjectIds.has(idea.id))
     .map((idea) => {
       const readiness = getIdeaReadiness(idea);
       const linkedSignalNotes = notes.filter((note) => note.signalAssessment?.detected && (
@@ -584,6 +590,20 @@ export default function IncubationPage() {
       return next;
     });
     resetEditor();
+  };
+
+  const handleActivateProject = (idea: Idea) => {
+    if (idea.type !== 'Project') {
+      updateIdea(idea.id, { type: 'Project' });
+    }
+    addProject({
+      title: idea.title,
+      description: idea.summary || idea.content.slice(0, 200),
+      sourceIdeaId: idea.id,
+      status: 'Active',
+      experiments: [],
+    });
+    navigate('/projects');
   };
 
   return (
@@ -1204,15 +1224,69 @@ export default function IncubationPage() {
               </div>
 
               <div className="w-full lg:w-64 shrink-0 rounded-2xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
-                <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">Suggested actions</div>
-                <div className="mt-4 space-y-2 text-sm">
-                  <ActionLabel icon={Sparkles} text={state === 'Ready' ? 'Activate now' : 'Keep watching'} />
-                  <ActionLabel icon={Radar} text="Link signal" />
-                  <ActionLabel icon={Target} text={idea.nextAction || 'Add a better next question'} />
+                <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">Incubation Controls</div>
+                
+                <label className="block mt-4">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">incubation posture</span>
+                  <select
+                    value={idea.incubationDecision || 'watch'}
+                    onChange={(e) => updateIdea(idea.id, { incubationDecision: e.target.value })}
+                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
+                  >
+                    <option value="watch">👀 Keep Watching</option>
+                    <option value="explore">🔍 Warm Up / Explore</option>
+                    <option value="park">⏸️ Parked / Defer</option>
+                    <option value="ready">✅ Ready to Activate</option>
+                  </select>
+                </label>
+
+                <label className="block mt-4">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">review cadence</span>
+                  <input
+                    type="text"
+                    value={idea.reviewCadence || ''}
+                    onChange={(e) => updateIdea(idea.id, { reviewCadence: e.target.value })}
+                    placeholder="e.g. monthly, weekly"
+                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
+                  />
+                </label>
+
+                <label className="block mt-4">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">next action</span>
+                  <input
+                    type="text"
+                    value={idea.nextAction || ''}
+                    onChange={(e) => updateIdea(idea.id, { nextAction: e.target.value })}
+                    placeholder="What is the next step?"
+                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
+                  />
+                </label>
+
+                <label className="block mt-4">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">strategic posture note</span>
+                  <textarea
+                    value={idea.strategicNote || ''}
+                    onChange={(e) => updateIdea(idea.id, { strategicNote: e.target.value })}
+                    placeholder="Decision rules or strategic criteria..."
+                    rows={3}
+                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 leading-relaxed resize-none"
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => handleActivateProject(idea)}
+                  className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl bg-violet-600 hover:bg-violet-700 px-3 py-2.5 text-xs font-bold uppercase tracking-widest text-white transition-all active:scale-95 shadow-sm hover:shadow"
+                >
+                  <GitBranch className="h-4 w-4" />
+                  Activate as Project
+                </button>
+
+                <div className="mt-4 border-t border-stone-200 dark:border-stone-800 pt-3">
+                  <Link to={`/ideas/${idea.id}`} className="inline-flex items-center gap-2 text-xs font-semibold text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100 transition-colors">
+                    Open full artifact <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
                 </div>
-                <Link to={`/ideas/${idea.id}`} className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-stone-700 hover:text-stone-900 dark:text-stone-300 dark:hover:text-stone-100">
-                  Open full artifact <ArrowRight className="h-4 w-4" />
-                </Link>
               </div>
             </div>
           </article>
