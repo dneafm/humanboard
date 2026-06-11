@@ -8,6 +8,7 @@ import { getClipboardImage } from '../lib/imageNote';
 import { getStoredAutoDistillLevel, autoDistillInstructionForLevel } from '../lib/autoDistill';
 import { shouldTreatAsMeaningfulNote } from '../lib/noteQuality';
 import { colorForNewSection, findSectionByName, normalizeSectionName } from '../lib/sections';
+import { buildWholeVaultIndex } from '../lib/vaultContext';
 import { useAppStore } from '../store';
 import { useAuthStore } from '../stores/authStore';
 import type { ChatMessage } from '../lib/storage/types';
@@ -43,6 +44,8 @@ export default function Chatbot() {
   const projects = useAppStore((state) => state.projects);
   const goals = useAppStore((state) => state.goals);
   const reflections = useAppStore((state) => state.reflections);
+  const capabilityBets = useAppStore((state) => state.capabilityBets);
+  const fusionItems = useAppStore((state) => state.fusionItems);
   const sections = useAppStore((state) => state.sections);
   const addIdea = useAppStore((state) => state.addIdea);
   const addNote = useAppStore((state) => state.addNote);
@@ -408,11 +411,22 @@ export default function Chatbot() {
     const personaText = personaIdea 
       ? `AGENT SYSTEM PERSONA (Operating instructions and user preferences - follow strictly):\n${personaIdea.content}\n---` 
       : '';
+    const wholeVaultIndex = buildWholeVaultIndex({
+      notes,
+      ideas,
+      projects,
+      fusionItems,
+      goals,
+      reflections,
+      capabilityBets,
+      sections,
+    });
 
     return [
       personaText,
       `Current route: ${location.pathname}`,
-      `Knowledge base snapshot: notes=${notes.length}, ideas=${ideas.length}, goals=${goals.length}, projects=${projects.length}, reflections=${reflections.length}`,
+      `Knowledge base snapshot: notes=${notes.length}, ideas=${ideas.length}, goals=${goals.length}, projects=${projects.length}, reflections=${reflections.length}, capability bets=${capabilityBets.length}, fusion artifacts=${fusionItems.length}`,
+      wholeVaultIndex,
       'Memory hierarchy:',
       '- distilled principles first',
       '- then active reflections and unresolved tensions',
@@ -429,7 +443,7 @@ export default function Chatbot() {
       ...relatedNotes,
       ...fallbackIdeas,
     ].filter(Boolean).join('\n');
-  }, [goals, ideas, location.pathname, displayedMessages, notes, projects, reflections, sections]);
+  }, [capabilityBets, fusionItems, goals, ideas, location.pathname, displayedMessages, notes, projects, reflections, sections]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -487,7 +501,7 @@ export default function Chatbot() {
 
       setChatMessages([...chatMessages, userMessage]);
       const explicitBoardWrite = explicitlyRequestsBoardWrite(userMsg);
-      const systemInstruction = buildMemoryShapedSystemInstruction(`Use the provided HumanBoard knowledge context when relevant. Prefer connecting the user to existing notes, ideas, goals, projects, principles, and reflections before giving generic advice.
+      const systemInstruction = buildMemoryShapedSystemInstruction(`Use the provided HumanBoard knowledge context when relevant. The whole-vault index gives complete entity-level awareness; the relevance-ranked context gives deeper evidence. Prefer connecting the user to existing notes, ideas, goals, projects, principles, capability bets, fusion artifacts, and reflections before giving generic advice. For broad assessment requests, explicitly assess patterns, gaps, contradictions, concentration, and neglected areas across the whole vault.
 
 PRODUCT KNOWLEDGE:
 - HumanBoard's "Sleep / Consolidate" feature currently processes raw inbox notes through AI and turns them into Idea nodes.
