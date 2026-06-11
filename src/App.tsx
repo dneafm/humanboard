@@ -162,8 +162,20 @@ function SpotlightTour({
         className="pointer-events-auto absolute rounded-xl border border-stone-700 bg-stone-950/96 p-4 text-stone-100 shadow-2xl"
         style={{ top: cardTop, left: cardLeft, width: cardWidth }}
       >
-        <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-stone-400">Interactive guide</div>
-        <h3 className="mt-2 text-base font-semibold">{step.title}</h3>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-stone-400">Interactive guide</div>
+            <h3 className="mt-2 text-base font-semibold">{step.title}</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-2 text-stone-400 transition-colors hover:bg-stone-800 hover:text-stone-100"
+            aria-label="Close onboarding"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
         <p className="mt-2 text-sm leading-6 text-stone-300">{step.body}</p>
         <div className="mt-4 flex items-center gap-2">
           {uiTourSteps.map((_, index) => (
