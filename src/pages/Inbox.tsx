@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAppStore, type CapabilityBet, type EvidencePolarity, type IdeaType, type Note, type SignalAssessment } from '../store';
 import { formatDistanceToNow } from 'date-fns';
-import { Plus, Archive, Lightbulb, Scale, Sparkles, Check, X, ImagePlus, Loader2, Brain, HelpCircle, Dices, ArrowRight, Target } from 'lucide-react';
+import { Plus, Archive, Lightbulb, Scale, Sparkles, Check, X, ImagePlus, Loader2, Brain, HelpCircle, Dices, ArrowRight, Target, FileText } from 'lucide-react';
 import { compileRawNoteToKnowledge, extractCapabilityEvidenceReview } from '../lib/ai';
 import { Link, useSearchParams } from 'react-router-dom';
 import ExtractionReviewPanel from '../components/capability/ExtractionReviewPanel';
@@ -319,6 +319,7 @@ export default function InboxPage() {
   const [compileError, setCompileError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
+  const [isImportingMarkdown, setIsImportingMarkdown] = useState(false);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
@@ -483,6 +484,32 @@ export default function InboxPage() {
     setImageError(null);
     setPendingImage(file);
     setPendingImagePreview(URL.createObjectURL(file));
+  };
+
+  const importMarkdown = async (file?: File) => {
+    if (!file || isImportingMarkdown) return;
+
+    setImageError(null);
+    setIsImportingMarkdown(true);
+    try {
+      if (!file.name.toLowerCase().endsWith('.md')) {
+        throw new Error('Choose a Markdown file ending in .md.');
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        throw new Error('Markdown files must be 2 MB or smaller.');
+      }
+
+      const content = (await file.text()).trim();
+      if (!content) {
+        throw new Error('That Markdown file is empty.');
+      }
+
+      addNote(content);
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : 'HumanBoard could not import that Markdown file.');
+    } finally {
+      setIsImportingMarkdown(false);
+    }
   };
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -915,9 +942,25 @@ export default function InboxPage() {
                 }}
               />
             </label>
+            <label
+              className="cursor-pointer rounded-lg border border-stone-200 bg-white p-2.5 text-stone-600 shadow-sm transition-all hover:bg-stone-100 hover:text-stone-900 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800"
+              title="Import Markdown into Inbox"
+            >
+              {isImportingMarkdown ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileText className="h-5 w-5" />}
+              <input
+                type="file"
+                accept=".md,text/markdown,text/x-markdown"
+                className="sr-only"
+                disabled={isImportingMarkdown}
+                onChange={(event) => {
+                  void importMarkdown(event.target.files?.[0]);
+                  event.currentTarget.value = '';
+                }}
+              />
+            </label>
             <button
               type="submit"
-              disabled={(!newNote.trim() && !pendingImage) || isAnalyzingImage}
+              disabled={(!newNote.trim() && !pendingImage) || isAnalyzingImage || isImportingMarkdown}
               className="p-2.5 bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 rounded-lg hover:scale-105 active:scale-95 disabled:opacity-30 disabled:scale-100 disabled:cursor-not-allowed transition-all shadow-lg shadow-stone-900/10 dark:shadow-stone-100/10"
             >
               <Plus className="w-5 h-5" />
