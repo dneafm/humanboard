@@ -327,6 +327,7 @@ export default function InboxPage() {
   const [compilingNoteId, setCompilingNoteId] = useState<string | null>(null);
   const [compileError, setCompileError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [captureHint, setCaptureHint] = useState<string | null>(null);
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
   const [isImportingMarkdown, setIsImportingMarkdown] = useState(false);
   const [snapshotImportPreview, setSnapshotImportPreview] = useState<SnapshotImportPreview | null>(null);
@@ -585,9 +586,14 @@ export default function InboxPage() {
       }
       return;
     }
-    if (!newNote.trim()) return;
+    if (!newNote.trim()) {
+      setCaptureHint('Write a thought or attach an image before adding it to Inbox.');
+      document.querySelector<HTMLTextAreaElement>('textarea')?.focus();
+      return;
+    }
     addNote(newNote);
     setNewNote('');
+    setCaptureHint(null);
   };
 
   const promoteToIdea = (noteId: string, noteContent: string) => {
@@ -982,7 +988,10 @@ export default function InboxPage() {
           )}
           <textarea
             value={newNote}
-            onChange={(e) => setNewNote(e.target.value)}
+            onChange={(e) => {
+              setNewNote(e.target.value);
+              if (captureHint) setCaptureHint(null);
+            }}
             onPaste={(event) => {
               const image = getClipboardImage(event.clipboardData);
               if (!image) return;
@@ -1038,7 +1047,9 @@ export default function InboxPage() {
             </label>
             <button
               type="submit"
-              disabled={(!newNote.trim() && !pendingImage) || isAnalyzingImage || isImportingMarkdown}
+              disabled={isAnalyzingImage || isImportingMarkdown}
+              aria-label={newNote.trim() || pendingImage ? 'Add note to Inbox' : 'Focus Inbox capture'}
+              title={newNote.trim() || pendingImage ? 'Add note to Inbox' : 'Write a thought or attach an image first'}
               className="p-2.5 bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 rounded-lg hover:scale-105 active:scale-95 disabled:opacity-30 disabled:scale-100 disabled:cursor-not-allowed transition-all shadow-lg shadow-stone-900/10 dark:shadow-stone-100/10"
             >
               <Plus className="w-5 h-5" />
@@ -1046,6 +1057,7 @@ export default function InboxPage() {
           </div>
         </div>
         {imageError && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{imageError}</p>}
+        {captureHint && <p className="mt-3 text-sm text-stone-500 dark:text-stone-400">{captureHint}</p>}
 
         {/* Interactive Payoff Panel */}
         {selectedTensionModeId && (
