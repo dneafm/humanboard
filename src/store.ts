@@ -216,7 +216,8 @@ export type Project = {
   id: string;
   title: string;
   description: string;
-  sourceIdeaId: string;
+  sourceIdeaId?: string;
+  sourceBetId?: string;
   goalId?: string;
   status: 'Active' | 'Paused' | 'Blocked' | 'Completed';
   nextAction?: string;
@@ -427,7 +428,7 @@ interface AppState {
   deleteNote: (id: string) => void;
   addIdea: (idea: Omit<Idea, 'id' | 'lastReviewed' | 'layer'>) => void;
   updateIdea: (id: string, updates: Partial<Idea>) => void;
-  addProject: (project: Omit<Project, 'id'>) => void;
+  addProject: (project: Omit<Project, 'id' | 'createdAt' | 'lastUpdatedAt' | 'linkedNoteIds' | 'linkedIdeaIds' | 'linkedGoalIds' | 'tasks' | 'updates' | 'experiments'> & Partial<Pick<Project, 'createdAt' | 'lastUpdatedAt' | 'linkedNoteIds' | 'linkedIdeaIds' | 'linkedGoalIds' | 'tasks' | 'updates' | 'experiments'>>) => void;
   updateProject: (id: string, updates: Partial<Project>) => void;
   deleteProject: (id: string) => void;
   addFusionItem: (item: Omit<FusionItem, 'id' | 'createdAt' | 'updatedAt' | 'shareReadiness' | 'checklist'>) => void;
@@ -1084,6 +1085,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         linkedGoalIds: project.linkedGoalIds ?? [],
         tasks: project.tasks ?? [],
         updates: project.updates ?? [],
+        experiments: project.experiments ?? [],
       }, ...state.projects],
     };
     persistSnapshot(next);
@@ -1107,7 +1109,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   }),
   addFusionItem: (item) => set((state) => {
     const now = new Date().toISOString();
-    const draft: FusionItem = {
+    const tempItem = {
+      ...item,
+      linkedNoteIds: item.linkedNoteIds ?? [],
+      linkedIdeaIds: item.linkedIdeaIds ?? [],
+      linkedGoalIds: item.linkedGoalIds ?? [],
+      linkedProjectIds: item.linkedProjectIds ?? [],
+    };
+    const checklist = computeFusionChecklist(tempItem);
+    const shareReadiness = computeFusionReadiness(checklist);
+    const nextItem: FusionItem = {
       ...item,
       id: randomId(),
       createdAt: now,
@@ -1120,9 +1131,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       summary: item.summary ?? '',
       centralConclusion: item.centralConclusion ?? '',
       body: item.body ?? '',
+      checklist,
+      shareReadiness,
     };
-    const checklist = computeFusionChecklist(draft);
-    const nextItem = { ...draft, checklist, shareReadiness: computeFusionReadiness(checklist) };
     const next = {
       ...state,
       fusionItems: [nextItem, ...state.fusionItems],

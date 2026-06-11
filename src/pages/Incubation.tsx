@@ -17,8 +17,11 @@ import {
   Archive,
   Waypoints,
   History,
+  X,
+  Brain,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { askGemma } from '../lib/ai';
 import {
   useAppStore,
   getReadinessScore,
@@ -88,6 +91,31 @@ function getIdeaReadiness(idea: Idea) {
     score,
     state: getReadinessState(score),
   };
+}
+
+const REFLECTION_PROMPTS = [
+  "What is a recurring tension or contradiction in your raw notes this week?",
+  "What capability are you avoiding committing to, and what is the real reason?",
+  "Which idea has the highest pull but zero next actions?",
+  "What pattern is repeating in your observations that you haven't named yet?",
+  "What assumption are you making that has the least evidence supporting it?",
+];
+
+function isReviewOverdue(lastReviewed: string, cadence?: string): boolean {
+  if (!lastReviewed) return true;
+  const lastDate = new Date(lastReviewed);
+  const diffDays = (Date.now() - lastDate.getTime()) / (1000 * 60 * 60 * 24);
+  const lower = (cadence || '').toLowerCase();
+  
+  let threshold = 30; // default is 30 days (monthly)
+  if (lower.includes('bi-week') || lower.includes('biweekly') || lower.includes('2 week') || lower.includes('fortnight')) {
+    threshold = 14;
+  } else if (lower.includes('week')) {
+    threshold = 7;
+  } else if (lower.includes('month')) {
+    threshold = 30;
+  }
+  return diffDays > threshold;
 }
 
 function createCapabilityBetDraft(bet?: CapabilityBet): CapabilityBetDraft {
@@ -459,17 +487,88 @@ export default function IncubationPage() {
     archiveCapabilityBet,
     addProject,
     updateIdea,
+    addNote,
+    addIdea,
   } = useAppStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusIdeaId = searchParams.get('idea');
   const focusNoteId = searchParams.get('note');
   const focusBetId = searchParams.get('bet');
-  const activeCapabilityBets = useMemo(() => capabilityBets.filter((bet) => !bet.archivedAt), [capabilityBets]);
+  const activatedBetIds = useMemo(() => new Set(projects.map((p) => p.sourceBetId).filter(Boolean)), [projects]);
+  const activeCapabilityBets = useMemo(() => capabilityBets.filter((bet) => !bet.archivedAt && !activatedBetIds.has(bet.id)), [capabilityBets, activatedBetIds]);
   const archivedCapabilityBets = useMemo(() => capabilityBets.filter((bet) => !!bet.archivedAt), [capabilityBets]);
   const selectedCapabilityBet = activeCapabilityBets.find((bet) => bet.id === focusBetId) ?? activeCapabilityBets[0] ?? null;
   const [editorMode, setEditorMode] = useState<'create' | 'edit'>(selectedCapabilityBet ? 'edit' : 'create');
   const [editingBetId, setEditingBetId] = useState<string | null>(selectedCapabilityBet?.id ?? null);
   const [draft, setDraft] = useState<CapabilityBetDraft>(createCapabilityBetDraft(selectedCapabilityBet ?? undefined));
+
+  const [promptIndex, setPromptIndex] = useState(0);
+  const [reflectionText, setReflectionText] = useState('');
+  const [isSynthesizing, setIsSynthesizing] = useState(false);
+  const [synthesisError, setSynthesisError] = useState<string | null>(null);
+  const [selectedInsight, setSelectedInsight] = useState<Idea | null>(null);
+  const [justDumped, setJustDumped] = useState(false);
+
+  const handleDumpToInbox = () => {
+    if (!reflectionText.trim()) return;
+    const promptText = REFLECTION_PROMPTS[promptIndex];
+    addNote(`[Subconscious Prompt: ${promptText}]\n\n${reflectionText.trim()}`);
+    setReflectionText('');
+    setJustDumped(true);
+    setTimeout(() => setJustDumped(false), 3000);
+  };
+
+  const handleTriggerSynthesis = async () => {
+    setIsSynthesizing(true);
+    setSynthesisError(null);
+    try {
+      const prompt = `Analyze the following raw notes and ideas from my subconscious vault.
+Identify recent orbits (what topics I'm circling), contradictions, cognitive tensions, and avoided topics.
+Synthesize this into a beautiful, structured markdown report.
+
+Here are my recent raw notes:
+${notes.slice(0, 40).map(n => `- [${n.createdAt}] ${n.content}`).join('\n')}
+
+Here are my current strategic ideas:
+${ideas.filter(i => isIncubationCandidate(i)).map(i => `- ${i.title}: ${i.summary || i.content.slice(0, 150)}`).join('\n')}
+
+Synthesize this into a structured report with:
+- **Subconscious Orbits**: Themes appearing repeatedly.
+- **Cognitive Tensions & Contradictions**: Where my notes suggest one thing but my ideas suggest another, or internal contradictions.
+- **Avoided Patterns**: Areas of high strategic value that I seem to be avoiding or deferring.
+- **Postures & Recommendations**: Strategic advice on capability bets to warm up or ideas to activate.
+
+Return the markdown report. Be direct, insightful, and clear.`;
+
+      const systemInstruction = "You are the HumanBoard Subconscious Synthesis Engine. You analyze raw notes and ideas to find hidden cognitive patterns, orbits, tensions, and avoided topics. Respond in clean, elegant Markdown.";
+      
+      const response = await askGemma(prompt, systemInstruction);
+      
+      addIdea({
+        title: `Subconscious Synthesis - ${new Date().toLocaleDateString()}`,
+        summary: 'AI-synthesized report analyzing cognitive orbits, tensions, and avoided patterns across the vault.',
+        content: response,
+        type: 'Reference',
+        stage: 'Evergreen',
+        confidence: 8,
+        maturity: 90,
+        linkedNoteIds: [],
+        relatedIdeaIds: [],
+        tags: ['Insight', 'Subconscious'],
+      });
+    } catch (err) {
+      console.error(err);
+      setSynthesisError(err instanceof Error ? err.message : 'Failed to generate synthesis.');
+    } finally {
+      setIsSynthesizing(false);
+    }
+  };
+
+  const recentInsights = useMemo(() => {
+    return ideas
+      .filter((i) => i.type === 'Reference' && i.tags?.includes('Insight') && i.tags?.includes('Subconscious'))
+      .sort((a, b) => b.lastReviewed.localeCompare(a.lastReviewed));
+  }, [ideas]);
 
   useEffect(() => {
     if (editorMode === 'edit' && selectedCapabilityBet) {
@@ -623,6 +722,124 @@ export default function IncubationPage() {
           Activate when the stack feels real, roughly <span className="font-semibold text-stone-900 dark:text-stone-100">80% readiness</span>, not just intellectually interesting.
         </div>
       </header>
+
+      {/* Subconscious Insight Engine */}
+      <section className="relative overflow-hidden rounded-3xl border border-violet-200/50 bg-gradient-to-br from-violet-500/10 via-stone-50/50 to-stone-50/50 p-6 shadow-sm dark:border-violet-900/30 dark:from-violet-950/10 dark:via-stone-950/50 dark:to-stone-950/50">
+        <div className="absolute right-0 top-0 -mr-20 -mt-20 h-64 w-64 rounded-full bg-violet-400/20 blur-3xl" />
+        <div className="absolute left-0 bottom-0 -ml-20 -mb-20 h-64 w-64 rounded-full bg-sky-400/10 blur-3xl" />
+        
+        <div className="relative flex items-center justify-between gap-4 border-b border-stone-200/60 pb-5 dark:border-stone-800/60">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
+              <Brain className="h-5 w-5 animate-pulse" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">Subconscious Insight Engine</h2>
+              <p className="text-sm text-stone-500 dark:text-stone-400">Capture daily reflections and synthesize raw signals into high-conviction insights.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="relative mt-6 grid gap-6 md:grid-cols-2">
+          {/* Daily Reflection prompt carousel */}
+          <div className="flex flex-col justify-between rounded-2xl border border-stone-200 bg-white/70 p-5 backdrop-blur-sm dark:border-stone-800 dark:bg-stone-900/40">
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-violet-600 dark:text-violet-400">Daily Reflection Loop</span>
+                <button
+                  type="button"
+                  onClick={() => setPromptIndex((prev) => (prev + 1) % REFLECTION_PROMPTS.length)}
+                  className="text-[10px] font-semibold uppercase tracking-wider text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100 transition-colors"
+                >
+                  Next Prompt →
+                </button>
+              </div>
+              <p className="mt-3 text-base font-medium text-stone-950 dark:text-stone-100 italic">
+                "{REFLECTION_PROMPTS[promptIndex]}"
+              </p>
+              <textarea
+                value={reflectionText}
+                onChange={(e) => setReflectionText(e.target.value)}
+                placeholder="Capture your subconscious response here..."
+                rows={3}
+                className="mt-4 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm leading-relaxed text-stone-900 focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 resize-none"
+              />
+            </div>
+            <div className="mt-4 flex items-center justify-between gap-2">
+              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                {justDumped && '✓ Dumped reflection to inbox!'}
+              </span>
+              <button
+                type="button"
+                onClick={handleDumpToInbox}
+                disabled={!reflectionText.trim()}
+                className="inline-flex items-center gap-2 rounded-xl bg-stone-900 hover:bg-stone-800 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200"
+              >
+                <PenSquare className="h-4 w-4" />
+                Dump to Inbox
+              </button>
+            </div>
+          </div>
+
+          {/* AI Synthesis Trigger */}
+          <div className="flex flex-col justify-between rounded-2xl border border-stone-200 bg-white/70 p-5 backdrop-blur-sm dark:border-stone-800 dark:bg-stone-900/40">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-sky-600 dark:text-sky-400">AI Synthesis Core</span>
+              <p className="mt-3 text-sm leading-relaxed text-stone-600 dark:text-stone-400">
+                Run synthesis to parse recent raw note signals, orbits, and contradictions. Saves a structured report as an Evergreen Reference Idea.
+              </p>
+              
+              {synthesisError && (
+                <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/30 dark:bg-rose-950/20 dark:text-rose-300">
+                  ⚠️ {synthesisError}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={handleTriggerSynthesis}
+                disabled={isSynthesizing}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-violet-600 hover:bg-violet-700 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white transition-all disabled:opacity-75"
+              >
+                {isSynthesizing ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Synthesizing connections...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Trigger Insight Synthesis
+                  </>
+                )}
+              </button>
+
+              {recentInsights.length > 0 && (
+                <div className="border-t border-stone-200 dark:border-stone-800 pt-3">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">Recent Insights</span>
+                  <div className="mt-2 max-h-[120px] overflow-y-auto space-y-2 pr-1">
+                    {recentInsights.map((insight) => (
+                      <button
+                        key={insight.id}
+                        type="button"
+                        onClick={() => setSelectedInsight(insight)}
+                        className="w-full flex items-center justify-between gap-3 text-left rounded-xl border border-stone-100 hover:border-stone-200 bg-stone-50 px-3 py-2 text-xs font-medium text-stone-700 hover:text-stone-900 dark:border-stone-800 dark:bg-stone-950/40 dark:text-stone-300 dark:hover:text-stone-100 transition-colors"
+                      >
+                        <span className="truncate">{insight.title}</span>
+                        <span className="text-[9px] text-stone-400 dark:text-stone-500 whitespace-nowrap">
+                          {formatDistanceToNow(new Date(insight.lastReviewed), { addSuffix: true })}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
 
       <div className="grid gap-4 md:grid-cols-4">
         {grouped.map(({ state, items }) => (
@@ -1002,6 +1219,22 @@ export default function IncubationPage() {
                     <Metric icon={AlertTriangle} label="Contrary risk" value={bet.contradictingSignalIds.length ? Math.min(100, bet.contradictingSignalIds.length * 25) : 0} />
                   </div>
 
+                  {isReviewOverdue(bet.lastReviewed, bet.reviewCadence) && (
+                    <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/30 dark:bg-amber-950/20 dark:text-amber-300">
+                      <div className="flex items-center gap-1.5 font-medium">
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                        <span>⚠️ Review Overdue ({formatDistanceToNow(new Date(bet.lastReviewed), { addSuffix: true })})</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => updateCapabilityBet(bet.id, { lastReviewed: new Date().toISOString() })}
+                        className="rounded-xl bg-amber-600 hover:bg-amber-700 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white transition-colors"
+                      >
+                        Mark Reviewed
+                      </button>
+                    </div>
+                  )}
+
                   <div className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
                     <div className="mb-2 flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">
                       <span>Strategic commitment threshold</span>
@@ -1106,6 +1339,30 @@ export default function IncubationPage() {
                     <ActionLabel icon={Target} text={bet.status === 'preparing' ? 'Set up study system and first use case' : 'Wait for stronger repeated signals'} />
                     <ActionLabel icon={Sparkles} text={bet.status === 'exploring' ? 'Collect higher-quality evidence' : 'Let weak signals accumulate naturally'} />
                   </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      updateCapabilityBet(bet.id, { status: 'committed' });
+                      addProject({
+                        title: bet.title,
+                        description: `Thesis: ${bet.thesis}
+
+Unlock Paths:
+${bet.unlockPaths.map(p => `- ${p}`).join('\n')}
+
+First Use Cases:
+${bet.firstUseCases.map(u => `- ${u}`).join('\n')}`,
+                        sourceBetId: bet.id,
+                        status: 'Active',
+                      });
+                      navigate('/projects');
+                    }}
+                    className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl bg-violet-600 hover:bg-violet-700 px-3 py-2.5 text-xs font-bold uppercase tracking-widest text-white transition-all active:scale-95 shadow-sm hover:shadow"
+                  >
+                    <GitBranch className="h-4 w-4" />
+                    Activate as Project
+                  </button>
                 </div>
               </div>
             </article>
@@ -1154,6 +1411,22 @@ export default function IncubationPage() {
                   <Metric icon={Heart} label="Personal pull" value={idea.activationReadiness?.personalPull} />
                   <Metric icon={Coins} label="Monetization clarity" value={idea.activationReadiness?.monetizationClarity} />
                 </div>
+
+                {isReviewOverdue(idea.lastReviewed, idea.reviewCadence) && (
+                  <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/30 dark:bg-amber-950/20 dark:text-amber-300">
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                      <span>⚠️ Review Overdue ({formatDistanceToNow(new Date(idea.lastReviewed), { addSuffix: true })})</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => updateIdea(idea.id, { lastReviewed: new Date().toISOString() })}
+                      className="rounded-xl bg-amber-600 hover:bg-amber-700 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white transition-colors"
+                    >
+                      Mark Reviewed
+                    </button>
+                  </div>
+                )}
 
                 <div className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
                   <div className="mb-2 flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">
@@ -1298,6 +1571,46 @@ export default function IncubationPage() {
           </div>
         )}
       </div>
+
+      {/* Premium Detail Modal for Insights */}
+      {selectedInsight && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="relative w-full max-w-3xl rounded-3xl border border-stone-200 bg-white shadow-2xl dark:border-stone-800 dark:bg-stone-900 flex flex-col max-h-[85vh] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-stone-100 px-6 py-4 dark:border-stone-800">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.22em] text-violet-700 dark:border-violet-900/30 dark:bg-violet-900/20 dark:text-violet-300">
+                  Subconscious Synthesis
+                </div>
+                <h3 className="mt-1.5 text-lg font-semibold text-stone-900 dark:text-stone-100">{selectedInsight.title}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedInsight(null)}
+                className="rounded-full p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-950 dark:hover:bg-stone-800 dark:hover:text-stone-100 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-5 text-sm text-stone-750 dark:text-stone-300 leading-relaxed whitespace-pre-wrap select-text selection:bg-violet-100 dark:selection:bg-violet-900/40">
+              {selectedInsight.content}
+            </div>
+
+            <div className="flex items-center justify-between border-t border-stone-100 px-6 py-4 dark:border-stone-800">
+              <span className="text-xs text-stone-400 dark:text-stone-500">
+                Created {new Date(selectedInsight.lastReviewed).toLocaleString()}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedInsight(null)}
+                className="rounded-xl bg-stone-900 hover:bg-stone-800 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
