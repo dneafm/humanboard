@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAppStore, type CapabilityBet, type EvidencePolarity, type IdeaType, type Note, type SignalAssessment } from '../store';
 import { formatDistanceToNow } from 'date-fns';
-import { Plus, Archive, Lightbulb, Scale, Sparkles, Check, X, ImagePlus, Loader2, Brain, HelpCircle, Dices, ArrowRight, Target, FileText } from 'lucide-react';
+import { Plus, Archive, Lightbulb, Scale, Sparkles, Check, X, ImagePlus, Loader2, Brain, HelpCircle, Dices, ArrowRight, Target, FileText, Upload, GitMerge, Replace } from 'lucide-react';
 import { compileRawNoteToKnowledge, extractCapabilityEvidenceReview } from '../lib/ai';
 import { Link, useSearchParams } from 'react-router-dom';
 import ExtractionReviewPanel from '../components/capability/ExtractionReviewPanel';
@@ -9,6 +9,10 @@ import { createNoteFromImage, getClipboardImage } from '../lib/imageNote';
 import AdaptiveDashboard from '../components/AdaptiveDashboard';
 import DailySynthesisCard from '../components/DailySynthesisCard';
 import { colorForNewSection } from '../lib/sections';
+import { apiFetch } from '../lib/apiClient';
+import { hydrateAppStoreFromRepository } from '../store';
+import { buildImportedSnapshot, parseSnapshotImport, snapshotImportCounts, type SnapshotImportMode } from '../lib/snapshotImport';
+import type { AppSnapshot } from '../lib/storage/types';
 
 type CompileDraft = {
   noteId: string;
@@ -24,6 +28,11 @@ type CompileDraft = {
   sourceNoteExcerpt: string;
   compileReason: string;
   openQuestions: string[];
+};
+
+type SnapshotImportPreview = {
+  fileName: string;
+  snapshot: AppSnapshot;
 };
 
 const COMPILE_TYPE_LABELS: IdeaType[] = ['Concept', 'Principle', 'Reference', 'Project', 'Question', 'Action', 'Base Skill', 'Umbrella Goal'];
@@ -320,6 +329,10 @@ export default function InboxPage() {
   const [imageError, setImageError] = useState<string | null>(null);
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
   const [isImportingMarkdown, setIsImportingMarkdown] = useState(false);
+  const [snapshotImportPreview, setSnapshotImportPreview] = useState<SnapshotImportPreview | null>(null);
+  const [snapshotImportMode, setSnapshotImportMode] = useState<SnapshotImportMode>('merge');
+  const [snapshotImportError, setSnapshotImportError] = useState<string | null>(null);
+  const [isImportingSnapshot, setIsImportingSnapshot] = useState(false);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
@@ -509,6 +522,50 @@ export default function InboxPage() {
       setImageError(error instanceof Error ? error.message : 'HumanBoard could not import that Markdown file.');
     } finally {
       setIsImportingMarkdown(false);
+    }
+  };
+
+  const stageSnapshotImport = async (file?: File) => {
+    if (!file || isImportingSnapshot) return;
+    setSnapshotImportError(null);
+    try {
+      if (!file.name.toLowerCase().endsWith('.json')) {
+        throw new Error('Choose a HumanBoard snapshot JSON file.');
+      }
+      if (file.size > 25 * 1024 * 1024) {
+        throw new Error('Snapshot files must be 25 MB or smaller.');
+      }
+      setSnapshotImportPreview({
+        fileName: file.name,
+        snapshot: parseSnapshotImport(await file.text()),
+      });
+      setSnapshotImportMode('merge');
+    } catch (error) {
+      setSnapshotImportError(error instanceof Error ? error.message : 'HumanBoard could not read that snapshot.');
+    }
+  };
+
+  const importSnapshot = async () => {
+    if (!snapshotImportPreview || isImportingSnapshot) return;
+    setSnapshotImportError(null);
+    setIsImportingSnapshot(true);
+    try {
+      const currentResponse = await apiFetch('/api/snapshot', { cache: 'no-store' });
+      if (!currentResponse.ok) throw new Error('HumanBoard could not load the current cloud snapshot.');
+      const current = parseSnapshotImport(await currentResponse.text());
+      const next = buildImportedSnapshot(current, snapshotImportPreview.snapshot, snapshotImportMode);
+      const saveResponse = await apiFetch('/api/snapshot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      });
+      if (!saveResponse.ok) throw new Error('HumanBoard could not save the imported snapshot.');
+      await hydrateAppStoreFromRepository();
+      setSnapshotImportPreview(null);
+    } catch (error) {
+      setSnapshotImportError(error instanceof Error ? error.message : 'HumanBoard could not import that snapshot.');
+    } finally {
+      setIsImportingSnapshot(false);
     }
   };
 
@@ -788,17 +845,38 @@ export default function InboxPage() {
 
   return (
     <div className="max-w-3xl mx-auto w-full px-4 py-6 sm:p-8 flex flex-col h-full transition-colors duration-300">
-      <header className="mb-8 sm:mb-10">
-        <div className="flex items-center gap-3 mb-3">
-          <span className="text-[10px] font-bold uppercase tracking-[0.25em] px-3 py-1 rounded-full bg-stone-100 dark:bg-stone-900 border border-stone-200 dark:border-stone-800 text-stone-500 dark:text-stone-400">Raw capture</span>
+      <header className="mb-8 sm:mb-10 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-[10px] font-bold uppercase tracking-[0.25em] px-3 py-1 rounded-full bg-stone-100 dark:bg-stone-900 border border-stone-200 dark:border-stone-800 text-stone-500 dark:text-stone-400">Raw capture</span>
+          </div>
+          <h1 className="text-4xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">Inbox</h1>
+          <p className="text-stone-500 dark:text-stone-400 mt-2 text-lg">Fast capture for raw thoughts that have not been compiled into knowledge yet.</p>
         </div>
-        <h1 className="text-4xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">Inbox</h1>
-        <p className="text-stone-500 dark:text-stone-400 mt-2 text-lg">Fast capture for raw thoughts that have not been compiled into knowledge yet.</p>
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 shadow-sm transition-colors hover:bg-stone-100 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-200 dark:hover:bg-stone-800">
+          <Upload className="h-4 w-4" />
+          Import snapshot
+          <input
+            type="file"
+            accept=".json,application/json"
+            className="sr-only"
+            disabled={isImportingSnapshot}
+            onChange={(event) => {
+              void stageSnapshotImport(event.target.files?.[0]);
+              event.currentTarget.value = '';
+            }}
+          />
+        </label>
       </header>
 
       <div className="mb-6">
         <DailySynthesisCard />
       </div>
+      {snapshotImportError && !snapshotImportPreview && (
+        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+          {snapshotImportError}
+        </div>
+      )}
 
       <form onSubmit={handleAdd} className="mb-12" data-tour="tour-inbox-capture">
         {/* Suggestive Tabs Row */}
@@ -1279,6 +1357,52 @@ export default function InboxPage() {
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-stone-700 dark:text-stone-300">{compileSourceNote.content}</p>
               </div>
             )}
+          </div>
+        )}
+
+        {snapshotImportPreview && (
+          <div className="fixed inset-0 z-[140] flex items-center justify-center bg-stone-950/60 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-lg border border-stone-200 bg-white p-6 shadow-2xl dark:border-stone-800 dark:bg-stone-950">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400">Snapshot preview</div>
+                  <h2 className="mt-2 text-xl font-semibold text-stone-900 dark:text-stone-100">{snapshotImportPreview.fileName}</h2>
+                </div>
+                <button type="button" onClick={() => setSnapshotImportPreview(null)} className="rounded-md p-2 text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-900" aria-label="Close snapshot import">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="mt-5 grid grid-cols-3 gap-2">
+                {Object.entries(snapshotImportCounts(snapshotImportPreview.snapshot)).map(([label, count]) => (
+                  <div key={label} className="rounded-md border border-stone-200 px-3 py-3 dark:border-stone-800">
+                    <div className="text-lg font-semibold text-stone-900 dark:text-stone-100">{count}</div>
+                    <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-stone-400">{label.replace(/([A-Z])/g, ' $1')}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setSnapshotImportMode('merge')} className={`flex items-start gap-3 rounded-lg border p-4 text-left ${snapshotImportMode === 'merge' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30' : 'border-stone-200 dark:border-stone-800'}`}>
+                  <GitMerge className="mt-0.5 h-4 w-4 text-emerald-600" />
+                  <span><strong className="block text-sm text-stone-900 dark:text-stone-100">Merge</strong><span className="mt-1 block text-xs text-stone-500">Keep current vault data and skip duplicates.</span></span>
+                </button>
+                <button type="button" onClick={() => setSnapshotImportMode('replace')} className={`flex items-start gap-3 rounded-lg border p-4 text-left ${snapshotImportMode === 'replace' ? 'border-red-500 bg-red-50 dark:bg-red-950/30' : 'border-stone-200 dark:border-stone-800'}`}>
+                  <Replace className="mt-0.5 h-4 w-4 text-red-600" />
+                  <span><strong className="block text-sm text-stone-900 dark:text-stone-100">Replace</strong><span className="mt-1 block text-xs text-stone-500">Overwrite current vault board data.</span></span>
+                </button>
+              </div>
+
+              {snapshotImportError && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{snapshotImportError}</p>}
+
+              <div className="mt-6 flex justify-end gap-2">
+                <button type="button" onClick={() => setSnapshotImportPreview(null)} className="rounded-lg border border-stone-200 px-4 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-900">Cancel</button>
+                <button type="button" onClick={() => void importSnapshot()} disabled={isImportingSnapshot} className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${snapshotImportMode === 'replace' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
+                  {isImportingSnapshot ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  {snapshotImportMode === 'replace' ? 'Replace vault' : 'Merge snapshot'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
