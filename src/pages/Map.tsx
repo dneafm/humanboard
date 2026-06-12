@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import * as d3 from 'd3';
 import { useAppStore } from '../store';
 import { colorForNewSection } from '../lib/sections';
-import { Network } from 'lucide-react';
+import { askGemma } from '../lib/ai';
+import { Network, Sparkles } from 'lucide-react';
 
 type Node = d3.SimulationNodeDatum & {
   id: string;
@@ -25,7 +26,8 @@ export default function MapPage() {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [newSectionName, setNewSectionName] = useState('');
-  const { ideas, sections, isDarkMode, addSection } = useAppStore();
+  const { ideas, sections, isDarkMode, addSection, updateIdea } = useAppStore();
+  const [isAutoReviewing, setIsAutoReviewing] = useState(false);
   const navigate = useNavigate();
 
   const createSectionFromMap = () => {
@@ -42,6 +44,118 @@ export default function MapPage() {
     });
     setNewSectionName('');
     return id;
+  };
+
+  const handleAutoReviewMap = async () => {
+    setIsAutoReviewing(true);
+    try {
+      const currentSections = sections.map(s => ({ id: s.id, name: s.name }));
+      const currentIdeas = ideas.map(i => ({
+        id: i.id,
+        title: i.title,
+        summary: i.summary,
+        content: i.content,
+        sectionId: i.sectionId,
+        sectionIds: i.sectionIds || [],
+        relatedIdeaIds: i.relatedIdeaIds || []
+      }));
+
+      const prompt = `Analyze our knowledge graph (Map) of Ideas and Fields.
+We want to:
+1. Re-categorize/wire ideas to the most relevant Field(s) (sections). Each idea can belong to one OR MORE fields (sections). An idea belongs to a field if its theme aligns with it.
+2. Propose new Fields (sections) if there are clusters of related ideas that don't fit well into the existing fields.
+3. Automatically interconnect (wire) related ideas together. If two ideas have strong conceptual overlap, support, contradiction, or dependency, link them by adding their IDs to each other's related list.
+
+Existing Fields:
+${JSON.stringify(currentSections, null, 2)}
+
+Ideas:
+${JSON.stringify(currentIdeas, null, 2)}
+
+Respond ONLY with a valid JSON block containing:
+- "newFields": List of any new fields/sections to create (name only).
+- "updates": List of idea updates. For each updated idea, specify:
+  - "ideaId": The ID of the idea (e.g. "idea_123")
+  - "sectionNames": Array of field names (existing or new fields) it should belong to.
+  - "relatedIdeaIds": Array of idea IDs it should connect to.
+
+Example output format:
+{
+  "newFields": [{"name": "Cognitive Science"}],
+  "updates": [
+    {
+      "ideaId": "idea-1",
+      "sectionNames": ["Technology & Tools", "Cognitive Science"],
+      "relatedIdeaIds": ["idea-2", "idea-3"]
+    }
+  ]
+}
+
+Only return raw JSON. Do not include markdown blocks, notes, or chat explanation.`;
+
+      const response = await askGemma(prompt, "You are a logical knowledge mapper. You organize ideas into overlapping fields and connect related thoughts.");
+      
+      const cleanJsonStr = response.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+      const parsed = JSON.parse(cleanJsonStr);
+
+      // 1. Create new sections if any
+      const sectionNameToId = { ...Object.fromEntries(sections.map(s => [s.name.toLowerCase(), s.id])) };
+      
+      if (Array.isArray(parsed.newFields)) {
+        for (const newField of parsed.newFields) {
+          const name = String(newField.name || '').trim();
+          if (name && !sectionNameToId[name.toLowerCase()]) {
+            const newId = addSection({
+              name,
+              color: colorForNewSection(useAppStore.getState().sections),
+            });
+            sectionNameToId[name.toLowerCase()] = newId;
+          }
+        }
+      }
+
+      // 2. Apply updates to ideas
+      if (Array.isArray(parsed.updates)) {
+        for (const update of parsed.updates) {
+          const idea = ideas.find(i => i.id === update.ideaId);
+          if (!idea) continue;
+
+          const sectionIds: string[] = [];
+          if (Array.isArray(update.sectionNames)) {
+            update.sectionNames.forEach((name: string) => {
+              const cleanedName = String(name || '').trim();
+              const id = sectionNameToId[cleanedName.toLowerCase()];
+              if (id) sectionIds.push(id);
+            });
+          }
+
+          // Fallback to existing section if none specified
+          if (sectionIds.length === 0 && idea.sectionId) {
+            sectionIds.push(idea.sectionId);
+          }
+
+          const relatedIdeaIds: string[] = [];
+          if (Array.isArray(update.relatedIdeaIds)) {
+            update.relatedIdeaIds.forEach((rid: string) => {
+              const target = ideas.find(i => i.id === rid);
+              if (target && target.id !== idea.id) {
+                relatedIdeaIds.push(target.id);
+              }
+            });
+          }
+
+          updateIdea(idea.id, {
+            sectionIds,
+            relatedIdeaIds
+          });
+        }
+      }
+    } catch (err) {
+      console.error('AI Auto-Review Map failed:', err);
+      alert('AI Auto-Review failed: Make sure your AI provider is configured and returned valid JSON.');
+    } finally {
+      setIsAutoReviewing(false);
+    }
   };
 
   useEffect(() => {
@@ -90,6 +204,11 @@ export default function MapPage() {
       const isPrinciple = idea.type === 'Principle';
       // Scale radius between 18 and 40 based on maturity (0-100), Principles are fixed size
       const scaledRadius = isPrinciple ? 28 : 18 + (idea.maturity / 100) * 22;
+
+      const ideaSectionIds = Array.isArray(idea.sectionIds) && idea.sectionIds.length > 0
+        ? idea.sectionIds
+        : (idea.sectionId ? [idea.sectionId] : []);
+
       nodes.push({
         id: ideaNodeId,
         name: idea.title,
@@ -97,17 +216,18 @@ export default function MapPage() {
         radius: scaledRadius,
         color: isPrinciple ? (isDarkMode ? '#451a03' : '#fffbeb') : colors.ideaNode,
         type: idea.type,
-        sectionId: idea.sectionId,
+        sectionIds: ideaSectionIds,
+        sectionId: ideaSectionIds[0] || undefined,
       } as any);
 
-      // Link to section
-      if (idea.sectionId) {
+      // Link to sections
+      ideaSectionIds.forEach(secId => {
         links.push({
-          source: idea.sectionId,
+          source: secId,
           target: ideaNodeId,
           type: 'section'
         });
-      }
+      });
 
       // Link to related ideas
       if (idea.relatedIdeaIds) {
@@ -231,7 +351,7 @@ export default function MapPage() {
 
         halos.transition().duration(200)
           .style('opacity', haloNode => {
-            const sameField = haloNode.id === d.id || haloNode.id === d.sectionId || (d.group === 'section' && haloNode.id === d.id);
+            const sameField = haloNode.id === d.id || ((d as any).sectionIds || []).includes(haloNode.id) || (d.group === 'section' && haloNode.id === d.id);
             return sameField ? 1 : 0.18;
           });
         
@@ -296,7 +416,7 @@ export default function MapPage() {
 
     simulation.on('tick', () => {
       halos.attr('d', (sectionNode) => {
-        const memberNodes = nodes.filter((node) => node.group === 'idea' && node.sectionId === sectionNode.id);
+        const memberNodes = nodes.filter((node) => node.group === 'idea' && ((node as any).sectionIds || []).includes(sectionNode.id));
         const points = [sectionNode, ...memberNodes].filter((node) => Number.isFinite(node.x) && Number.isFinite(node.y));
 
         if (points.length < 2) {
@@ -409,20 +529,29 @@ export default function MapPage() {
             </h1>
             <p className="text-stone-500 dark:text-stone-400 mt-2 text-lg">Visualize how your ideas connect across sections.</p>
           </div>
-          <div className="flex w-full max-w-md gap-2 lg:justify-end">
+          <div className="flex w-full max-w-2xl gap-2 lg:justify-end items-center">
             <input
               type="text"
               value={newSectionName}
               onChange={(event) => setNewSectionName(event.target.value)}
               placeholder="Create new field"
-              className="flex-1 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 focus:outline-none focus:ring-4 focus:ring-stone-900/5 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
+              className="flex-1 max-w-[200px] rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 focus:outline-none focus:ring-4 focus:ring-stone-900/5 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
             />
             <button
               type="button"
               onClick={createSectionFromMap}
-              className="rounded-xl border border-stone-300 px-4 py-3 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 dark:border-stone-700 dark:text-stone-200 dark:hover:bg-stone-900"
+              className="rounded-xl border border-stone-300 px-4 py-3 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 dark:border-stone-700 dark:text-stone-200 dark:hover:bg-stone-900 cursor-pointer"
             >
               Add field
+            </button>
+            <button
+              type="button"
+              disabled={isAutoReviewing}
+              onClick={handleAutoReviewMap}
+              className="inline-flex items-center gap-2 rounded-xl bg-stone-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-stone-800 disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200 cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4" />
+              {isAutoReviewing ? 'AI Reviewing...' : 'Auto-Review Map'}
             </button>
           </div>
         </div>

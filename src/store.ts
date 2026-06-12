@@ -176,6 +176,7 @@ export type Idea = {
   type: IdeaType;
   stage: IdeaStage;
   sectionId?: string;
+  sectionIds?: string[];
   confidence: number; // 1-10
   maturity: number; // 0-100
   nextAction?: string;
@@ -1048,7 +1049,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
   }),
   addIdea: (idea) => set((state) => {
-    const newIdeas = [{ ...idea, id: randomId(), layer: 'knowledge' as const, lastReviewed: new Date().toISOString() }, ...state.ideas];
+    const sectionIds = idea.sectionIds ?? (idea.sectionId ? [idea.sectionId] : []);
+    const sectionId = idea.sectionId ?? (sectionIds[0] || undefined);
+    const newIdeas = [{
+      ...idea,
+      id: randomId(),
+      layer: 'knowledge' as const,
+      lastReviewed: new Date().toISOString(),
+      sectionId,
+      sectionIds,
+    }, ...state.ideas];
     const derivedIdeas = deriveStrategicIdeaFields(newIdeas, state.notes);
     const next = {
       ...state,
@@ -1058,7 +1068,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     return { ideas: next.ideas };
   }),
   updateIdea: (id, updates) => set((state) => {
-    const updatedIdeas = state.ideas.map(i => i.id === id ? { ...i, ...updates } : i);
+    let mergedUpdates = { ...updates };
+    if (updates.sectionIds !== undefined) {
+      mergedUpdates.sectionId = updates.sectionIds.length > 0 ? updates.sectionIds[0] : undefined;
+    } else if (updates.sectionId !== undefined) {
+      mergedUpdates.sectionIds = updates.sectionId ? [updates.sectionId] : [];
+    }
+
+    const updatedIdeas = state.ideas.map(i => i.id === id ? { ...i, ...mergedUpdates } : i);
     const derivedIdeas = deriveStrategicIdeaFields(updatedIdeas, state.notes);
     const next = {
       ...state,
