@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, FileText, Link2, Minus, Plus, Sparkles } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, FileText, Link2, Minus, Plus, Sparkles, GripVertical, Columns2, Columns3, Heading1, Heading2, Heading3, Loader2 } from 'lucide-react';
 import { generateFusionArtifact } from '../lib/ai';
-import { useAppStore, type FusionAudience, type FusionStatus, type FusionType } from '../store';
+import { useAppStore, type FusionAudience, type FusionStatus, type FusionType, type FusionSuggestion } from '../store';
+import { cn } from '../lib/utils';
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 
 const fusionTypes: FusionType[] = ['Post', 'Writing', 'Thesis', 'Report'];
 const fusionStatuses: FusionStatus[] = ['Draft', 'Synthesizing', 'Ready', 'Completed'];
@@ -24,6 +27,7 @@ export default function FusionDetailPage() {
   const [showProjectPicker, setShowProjectPicker] = useState(false);
   const [isGenerating, setIsGenerating] = useState<'summary' | 'conclusion' | 'full' | null>(null);
   const [uiError, setUiError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
 
   const linkedNotes = useMemo(() => notes.filter((note) => item?.linkedNoteIds.includes(note.id)), [item?.linkedNoteIds, notes]);
   const linkedIdeas = useMemo(() => ideas.filter((idea) => item?.linkedIdeaIds.includes(idea.id)), [ideas, item?.linkedIdeaIds]);
@@ -154,48 +158,105 @@ export default function FusionDetailPage() {
       )}
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_360px]">
-        <div className="space-y-6">
-          <EditorCard title="Summary" icon={FileText}>
-            <div className="mb-3 flex justify-end">
-              <button
-                type="button"
-                disabled={!canGenerate || isGenerating !== null}
-                onClick={() => handleGenerate('summary')}
-                className="inline-flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-xs font-medium text-stone-700 disabled:opacity-40 dark:border-stone-700 dark:text-stone-200"
-              >
-                <Sparkles className="h-3.5 w-3.5" /> {isGenerating === 'summary' ? 'Generating...' : 'AI Generate summary'}
-              </button>
-            </div>
-            <textarea value={item.summary} onChange={(event) => updateFusionItem(item.id, { summary: event.target.value })} placeholder="Short abstract or summary..." rows={4} className="w-full resize-none rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-100 dark:focus:border-stone-700 dark:focus:ring-stone-900" />
-          </EditorCard>
+        <div className="flex flex-col gap-6 pl-10 pr-2">
+          {/* Edit/Preview Tabs */}
+          <div className="flex items-center gap-2 border-b border-stone-200/60 dark:border-stone-800/60 pb-3 mb-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab('edit')}
+              className={cn(
+                "px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider rounded-lg transition-all cursor-pointer",
+                activeTab === 'edit'
+                  ? "bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-950 font-bold shadow-sm"
+                  : "text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+              )}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('preview')}
+              className={cn(
+                "px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider rounded-lg transition-all cursor-pointer",
+                activeTab === 'preview'
+                  ? "bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-950 font-bold shadow-sm"
+                  : "text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+              )}
+            >
+              Preview
+            </button>
+          </div>
 
-          <EditorCard title="Final conclusion" icon={CheckCircle2}>
-            <div className="mb-3 flex justify-end">
-              <button
-                type="button"
-                disabled={!canGenerate || isGenerating !== null}
-                onClick={() => handleGenerate('conclusion')}
-                className="inline-flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-xs font-medium text-stone-700 disabled:opacity-40 dark:border-stone-700 dark:text-stone-200"
-              >
-                <Sparkles className="h-3.5 w-3.5" /> {isGenerating === 'conclusion' ? 'Generating...' : 'AI Generate conclusion'}
-              </button>
-            </div>
-            <textarea value={item.centralConclusion} onChange={(event) => updateFusionItem(item.id, { centralConclusion: event.target.value })} placeholder="What is the conclusion worth sharing?" rows={4} className="w-full resize-none rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-100 dark:focus:border-stone-700 dark:focus:ring-stone-900" />
-          </EditorCard>
+          {activeTab === 'edit' ? (
+            <div className="space-y-6">
+              <NotionBlockEditor
+                title="Summary"
+                value={item.summary}
+                onChange={(val) => updateFusionItem(item.id, { summary: val })}
+                placeholder="Short abstract or summary..."
+                rows={4}
+                onAiGenerate={() => handleGenerate('summary')}
+                isGenerating={isGenerating === 'summary'}
+                canGenerate={canGenerate}
+                aiLabel="AI Generate summary"
+              />
 
-          <EditorCard title="Body" icon={FileText}>
-            <div className="mb-3 flex justify-end">
-              <button
-                type="button"
-                disabled={!canGenerate || isGenerating !== null}
-                onClick={() => handleGenerate('full')}
-                className="inline-flex items-center gap-2 rounded-lg bg-stone-900 px-3 py-2 text-xs font-medium text-white disabled:opacity-40 dark:bg-stone-100 dark:text-stone-950"
-              >
-                <Sparkles className="h-3.5 w-3.5" /> {isGenerating === 'full' ? 'Generating...' : 'AI Generate draft'}
-              </button>
+              <NotionBlockEditor
+                title="Final conclusion"
+                value={item.centralConclusion}
+                onChange={(val) => updateFusionItem(item.id, { centralConclusion: val })}
+                placeholder="What is the conclusion worth sharing?"
+                rows={4}
+                onAiGenerate={() => handleGenerate('conclusion')}
+                isGenerating={isGenerating === 'conclusion'}
+                canGenerate={canGenerate}
+                aiLabel="AI Generate conclusion"
+              />
+
+              <NotionBlockEditor
+                title="Body"
+                value={item.body}
+                onChange={(val) => updateFusionItem(item.id, { body: val })}
+                placeholder="Write the full post, writing, thesis, or report..."
+                rows={18}
+                onAiGenerate={() => handleGenerate('full')}
+                isGenerating={isGenerating === 'full'}
+                canGenerate={canGenerate}
+                aiLabel="AI Generate draft"
+              />
             </div>
-            <textarea value={item.body} onChange={(event) => updateFusionItem(item.id, { body: event.target.value })} placeholder="Write the full post, writing, thesis, or report..." rows={18} className="w-full resize-y rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 outline-none focus:border-stone-400 focus:ring-2 focus:ring-stone-200 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-100 dark:focus:border-stone-700 dark:focus:ring-stone-900" />
-          </EditorCard>
+          ) : (
+            <div className="prose prose-stone dark:prose-invert max-w-none space-y-8 py-2">
+              {item.summary && (
+                <div className="pl-4 border-l-2 border-stone-300 dark:border-stone-700 italic text-stone-600 dark:text-stone-400 text-base leading-relaxed">
+                  <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                    {item.summary}
+                  </ReactMarkdown>
+                </div>
+              )}
+
+              {item.centralConclusion && (
+                <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 dark:bg-amber-500/5 dark:border-amber-500/10">
+                  <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-1.5">Central Takeaway</div>
+                  <div className="text-stone-850 dark:text-stone-150 font-medium text-base leading-relaxed">
+                    <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                      {item.centralConclusion}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              )}
+
+              {item.body ? (
+                <div className="text-stone-800 dark:text-stone-200 leading-relaxed text-sm space-y-4">
+                  <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                    {item.body}
+                  </ReactMarkdown>
+                </div>
+              ) : (
+                <div className="text-stone-400 dark:text-stone-600 italic text-sm">No body content written yet. Use Edit mode to write or generate context.</div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -358,6 +419,287 @@ function ChecklistItem({ label, checked }: { label: string; checked: boolean }) 
     <div className="mb-2 flex items-center justify-between rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-300">
       <span>{label}</span>
       <span>{checked ? '✓' : '○'}</span>
+    </div>
+  );
+}
+
+function getCaretCoordinates(element: HTMLTextAreaElement, position: number) {
+  const div = document.createElement('div');
+  const style = window.getComputedStyle(element);
+
+  const properties = [
+    'direction', 'boxSizing', 'width', 'height', 'overflowX', 'overflowY',
+    'borderWidth', 'borderStyle', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+    'fontStyle', 'fontVariant', 'fontWeight', 'fontStretch', 'fontSize', 'fontSizeAdjust',
+    'lineHeight', 'fontFamily', 'textAlign', 'textTransform', 'textIndent', 'textDecoration',
+    'letterSpacing', 'wordSpacing', 'tabSize', 'MozTabSize'
+  ];
+
+  div.style.position = 'absolute';
+  div.style.visibility = 'hidden';
+  div.style.whiteSpace = 'pre-wrap';
+  div.style.wordBreak = 'break-all';
+
+  properties.forEach((prop) => {
+    if (style[prop as any]) {
+      div.style[prop as any] = style[prop as any];
+    }
+  });
+
+  div.textContent = element.value.substring(0, position);
+  const span = document.createElement('span');
+  span.textContent = element.value.substring(position) || '.';
+  div.appendChild(span);
+
+  document.body.appendChild(div);
+  const caret = {
+    top: span.offsetTop - element.scrollTop,
+    left: span.offsetLeft - element.scrollLeft,
+  };
+  document.body.removeChild(div);
+
+  return { caret };
+}
+
+function NotionBlockEditor({
+  title,
+  value,
+  onChange,
+  placeholder,
+  rows = 4,
+  onAiGenerate,
+  isGenerating,
+  canGenerate,
+  aiLabel,
+}: {
+  title: string;
+  value: string;
+  onChange: (val: string) => void;
+  placeholder: string;
+  rows?: number;
+  onAiGenerate: () => void;
+  isGenerating: boolean;
+  canGenerate: boolean;
+  aiLabel: string;
+}) {
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const insertTextAtCursor = (textarea: HTMLTextAreaElement, textToInsert: string, replaceSlash = false) => {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const currentVal = textarea.value;
+
+    const actualStart = replaceSlash ? Math.max(0, start - 1) : start;
+    const nextVal = currentVal.substring(0, actualStart) + textToInsert + currentVal.substring(end);
+    onChange(nextVal);
+
+    setTimeout(() => {
+      textarea.focus();
+      const newCursorPos = actualStart + textToInsert.length;
+      textarea.setSelectionRange(newCursorPos, newCursorPos);
+    }, 0);
+  };
+
+  const menuItems = useMemo(() => [
+    {
+      id: 'ai',
+      label: 'Generate with AI',
+      description: 'Generate contents using vault signals',
+      icon: Sparkles,
+      action: (textarea: HTMLTextAreaElement) => {
+        if (canGenerate) onAiGenerate();
+      },
+      disabled: !canGenerate || isGenerating,
+    },
+    {
+      id: '2cols',
+      label: '2 Columns Layout',
+      description: 'Insert a side-by-side grid snippet',
+      icon: Columns2,
+      action: (textarea: HTMLTextAreaElement) => {
+        const snippet = `\n<div class="grid grid-cols-1 md:grid-cols-2 gap-4">\n  <div>\n    <h4>Column 1</h4>\n    <p>Content...</p>\n  </div>\n  <div>\n    <h4>Column 2</h4>\n    <p>Content...</p>\n  </div>\n</div>\n`;
+        insertTextAtCursor(textarea, snippet, true);
+      },
+      disabled: false,
+    },
+    {
+      id: '3cols',
+      label: '3 Columns Layout',
+      description: 'Insert a three-column grid snippet',
+      icon: Columns3,
+      action: (textarea: HTMLTextAreaElement) => {
+        const snippet = `\n<div class="grid grid-cols-1 md:grid-cols-3 gap-4">\n  <div>\n    <h4>Column 1</h4>\n    <p>Content...</p>\n  </div>\n  <div>\n    <h4>Column 2</h4>\n    <p>Content...</p>\n  </div>\n  <div>\n    <h4>Column 3</h4>\n    <p>Content...</p>\n  </div>\n</div>\n`;
+        insertTextAtCursor(textarea, snippet, true);
+      },
+      disabled: false,
+    },
+    {
+      id: 'h1',
+      label: 'Heading 1',
+      description: 'Large section heading',
+      icon: Heading1,
+      action: (textarea: HTMLTextAreaElement) => insertTextAtCursor(textarea, '\n# ', true),
+      disabled: false,
+    },
+    {
+      id: 'h2',
+      label: 'Heading 2',
+      description: 'Medium section heading',
+      icon: Heading2,
+      action: (textarea: HTMLTextAreaElement) => insertTextAtCursor(textarea, '\n## ', true),
+      disabled: false,
+    },
+    {
+      id: 'h3',
+      label: 'Heading 3',
+      description: 'Small section heading',
+      icon: Heading3,
+      action: (textarea: HTMLTextAreaElement) => insertTextAtCursor(textarea, '\n### ', true),
+      disabled: false,
+    },
+    {
+      id: 'divider',
+      label: 'Divider',
+      description: 'Horizontal line divider',
+      icon: Minus,
+      action: (textarea: HTMLTextAreaElement) => insertTextAtCursor(textarea, '\n---\n', true),
+      disabled: false,
+    },
+  ], [canGenerate, isGenerating, onAiGenerate]);
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    onChange(val);
+
+    const selectionStart = e.target.selectionStart;
+    const textBeforeCursor = val.substring(0, selectionStart);
+
+    if (textBeforeCursor.endsWith('/')) {
+      const { caret } = getCaretCoordinates(e.target, selectionStart);
+      setDropdownPosition({
+        top: e.target.offsetTop + caret.top + 20,
+        left: Math.min(e.target.offsetLeft + caret.left, e.target.clientWidth - 220),
+      });
+      setShowDropdown(true);
+      setSelectedIndex(0);
+    } else {
+      setShowDropdown(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!showDropdown) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev + 1) % menuItems.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev - 1 + menuItems.length) % menuItems.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const selected = menuItems[selectedIndex];
+      if (selected && !selected.disabled && textareaRef.current) {
+        selected.action(textareaRef.current);
+      }
+      setShowDropdown(false);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setShowDropdown(false);
+      textareaRef.current?.focus();
+    }
+  };
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative group py-4 animate-fade-in">
+      <button
+        type="button"
+        onClick={(e) => {
+          setDropdownPosition({ top: 28, left: -24 });
+          setShowDropdown(!showDropdown);
+          setSelectedIndex(0);
+        }}
+        className="absolute -left-7 top-4 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center h-6 w-5 text-stone-400 hover:text-stone-700 dark:text-stone-600 dark:hover:text-stone-300 rounded cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-850"
+        title="Block Actions"
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+
+      <div className="flex items-center justify-between gap-4 mb-2">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500">
+          <span>{title}</span>
+        </div>
+        {isGenerating && (
+          <span className="flex items-center gap-1 text-xs text-amber-500 font-medium">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <span>AI generating...</span>
+          </span>
+        )}
+      </div>
+
+      <textarea
+        ref={textareaRef}
+        value={value}
+        onChange={handleTextareaChange}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        rows={rows}
+        className="w-full resize-y bg-transparent py-1 text-sm text-stone-800 dark:text-stone-100 placeholder-stone-400 dark:placeholder-stone-600 outline-none leading-relaxed"
+      />
+
+      {showDropdown && dropdownPosition && (
+        <div
+          style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
+          className="absolute z-50 w-64 rounded-xl border border-stone-200 bg-white p-1 shadow-xl dark:border-stone-800 dark:bg-stone-950"
+        >
+          <div className="px-2.5 py-1.5 text-[10px] font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-wider border-b border-stone-100 dark:border-stone-900 mb-1">
+            Actions & formatting
+          </div>
+          <div className="max-h-60 overflow-y-auto space-y-0.5">
+            {menuItems.map((menuItem, idx) => {
+              const Icon = menuItem.icon;
+              const isSelected = idx === selectedIndex;
+              return (
+                <button
+                  key={menuItem.id}
+                  type="button"
+                  disabled={menuItem.disabled}
+                  onClick={() => {
+                    if (textareaRef.current) menuItem.action(textareaRef.current);
+                    setShowDropdown(false);
+                  }}
+                  className={cn(
+                    "w-full flex items-start gap-2.5 px-2.5 py-1.5 rounded-lg text-left transition-colors disabled:opacity-40 disabled:hover:bg-transparent",
+                    isSelected
+                      ? "bg-stone-100 dark:bg-stone-900 text-stone-900 dark:text-stone-100"
+                      : "text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-900/40"
+                  )}
+                >
+                  <Icon className={cn("h-4 w-4 shrink-0 mt-0.5", isSelected ? "text-stone-950 dark:text-stone-50" : "text-stone-400 dark:text-stone-500")} />
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold">{menuItem.label}</div>
+                    <div className="text-[10px] text-stone-400 dark:text-stone-500 truncate mt-0.5">{menuItem.description}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

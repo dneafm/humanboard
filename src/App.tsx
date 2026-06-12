@@ -470,7 +470,7 @@ function DocsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 prose prose-stone dark:prose-invert max-w-none text-stone-800 dark:text-stone-200">
-          <ReactMarkdown className="space-y-4 text-sm leading-relaxed
+          <div className="space-y-4 text-sm leading-relaxed
             [&>h1]:text-2xl [&>h1]:font-bold [&>h1]:text-stone-900 dark:[&>h1]:text-stone-100 [&>h1]:mt-6 [&>h1]:mb-4
             [&>h2]:text-xl [&>h2]:font-semibold [&>h2]:text-stone-900 dark:[&>h2]:text-stone-100 [&>h2]:mt-6 [&>h2]:mb-2 [&>h2]:pb-1 [&>h2]:border-b [&>h2]:border-stone-100 dark:[&>h2]:border-stone-800
             [&>h3]:text-base [&>h3]:font-medium [&>h3]:text-stone-900 dark:[&>h3]:text-stone-100 [&>h3]:mt-4 [&>h3]:mb-1
@@ -478,8 +478,10 @@ function DocsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
             [&>li>strong]:text-stone-900 dark:[&>li>strong]:text-stone-100
             [&>p]:text-stone-600 dark:[&>p]:text-stone-400
             [&>code]:bg-stone-100 dark:[&>code]:bg-stone-900 [&>code]:px-1 [&>code]:py-0.5 [&>code]:rounded [&>code]:text-xs [&>code]:font-mono">
-            {productDocs}
-          </ReactMarkdown>
+            <ReactMarkdown>
+              {productDocs}
+            </ReactMarkdown>
+          </div>
         </div>
       </div>
     </div>
