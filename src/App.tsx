@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
-import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogOut, HelpCircle, X, LayoutDashboard, Menu, ArrowRight, Check, MessageSquareText, ShieldCheck, Sparkles, Image, Bell, GitBranch, WandSparkles, ChevronDown, Settings as SettingsIcon, FileText } from 'lucide-react';
+import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogOut, HelpCircle, X, LayoutDashboard, Menu, ArrowRight, Check, MessageSquareText, ShieldCheck, Sparkles, Image, Bell, GitBranch, WandSparkles, ChevronDown, Settings as SettingsIcon, FileText, BookOpen } from 'lucide-react';
 import { cn } from './lib/utils';
+import ReactMarkdown from 'react-markdown';
+import productDocs from '../docs/product-knowledge.md?raw';
 import InboxPage from './pages/Inbox';
 import IdeasPage from './pages/Ideas';
 import IdeaDetailPage from './pages/IdeaDetail';
@@ -360,9 +362,7 @@ function TutorialModal({ open, onClose }: { open: boolean; onClose: () => void }
       </div>
     </div>
   );
-}
-
-function GuideButton({ onClick }: { onClick: () => void }) {
+}function GuideButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
@@ -372,6 +372,19 @@ function GuideButton({ onClick }: { onClick: () => void }) {
     >
       <HelpCircle className="h-4 w-4" />
       <span>Guide</span>
+    </button>
+  );
+}
+
+function DocsButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center justify-center gap-2 rounded-md border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 hover:text-stone-950 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-stone-100"
+    >
+      <BookOpen className="h-4 w-4" />
+      <span>Docs</span>
     </button>
   );
 }
@@ -436,6 +449,43 @@ function SettingsModal({ open, onClose }: { open: boolean; onClose: () => void }
   );
 }
 
+function DocsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+      <button type="button" aria-label="Close docs" className="absolute inset-0 bg-stone-950/40 dark:bg-stone-950/60" onClick={onClose} />
+      <div className="relative z-[101] w-full max-w-3xl h-[80vh] flex flex-col rounded-2xl border border-stone-200 bg-white shadow-2xl dark:border-stone-800 dark:bg-stone-950 transition-all">
+        <div className="p-5 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between">
+          <div>
+            <div className="text-lg font-semibold text-stone-900 dark:text-stone-100 flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-stone-700 dark:text-stone-300" />
+              <span>Product Knowledge & Documentation</span>
+            </div>
+            <div className="text-sm text-stone-500 dark:text-stone-400">Official features, guide specifications, and behavior directives.</div>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-md p-2 text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-900 transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 prose prose-stone dark:prose-invert max-w-none text-stone-800 dark:text-stone-200">
+          <ReactMarkdown className="space-y-4 text-sm leading-relaxed
+            [&>h1]:text-2xl [&>h1]:font-bold [&>h1]:text-stone-900 dark:[&>h1]:text-stone-100 [&>h1]:mt-6 [&>h1]:mb-4
+            [&>h2]:text-xl [&>h2]:font-semibold [&>h2]:text-stone-900 dark:[&>h2]:text-stone-100 [&>h2]:mt-6 [&>h2]:mb-2 [&>h2]:pb-1 [&>h2]:border-b [&>h2]:border-stone-100 dark:[&>h2]:border-stone-800
+            [&>h3]:text-base [&>h3]:font-medium [&>h3]:text-stone-900 dark:[&>h3]:text-stone-100 [&>h3]:mt-4 [&>h3]:mb-1
+            [&>ul]:list-disc [&>ul]:pl-5 [&>ul]:space-y-2
+            [&>li>strong]:text-stone-900 dark:[&>li>strong]:text-stone-100
+            [&>p]:text-stone-600 dark:[&>p]:text-stone-400
+            [&>code]:bg-stone-100 dark:[&>code]:bg-stone-900 [&>code]:px-1 [&>code]:py-0.5 [&>code]:rounded [&>code]:text-xs [&>code]:font-mono">
+            {productDocs}
+          </ReactMarkdown>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function UpdateButton() {
   const [hasUpdate, setHasUpdate] = useState(false);
 
@@ -476,7 +526,7 @@ function UpdateButton() {
   );
 }
 
-function Sidebar({ onOpenTutorial, onOpenSettings }: { onOpenTutorial: () => void; onOpenSettings: () => void }) {
+function Sidebar({ onOpenTutorial, onOpenSettings, onOpenDocs }: { onOpenTutorial: () => void; onOpenSettings: () => void; onOpenDocs: () => void }) {
   const { isDarkMode, toggleDarkMode } = useAppStore();
   const { user, signOutUser } = useAuthStore();
   const isLocalCommandCenter = window.location.port === '3010';
@@ -527,6 +577,7 @@ function Sidebar({ onOpenTutorial, onOpenSettings }: { onOpenTutorial: () => voi
         <UpdateButton />
         <NotificationCenter />
         <GuideButton onClick={onOpenTutorial} />
+        <DocsButton onClick={onOpenDocs} />
         <SettingsButton onClick={onOpenSettings} />
         <div className="px-3 py-2 rounded-md bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800">
           <div className="text-xs font-medium text-stone-700 dark:text-stone-200 truncate">{user?.displayName ?? 'Signed in'}</div>
@@ -974,12 +1025,14 @@ function MobileMenu({
   navItems,
   onClose,
   onOpenTutorial,
+  onOpenDocs,
   onOpenSettings,
 }: {
   open: boolean;
   navItems: Array<{ to: string; icon: typeof Inbox; label: string }>;
   onClose: () => void;
   onOpenTutorial: () => void;
+  onOpenDocs: () => void;
   onOpenSettings: () => void;
 }) {
   const { user, signOutUser } = useAuthStore();
@@ -995,47 +1048,49 @@ function MobileMenu({
         className="absolute inset-0 bg-stone-950/55 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="absolute right-0 top-0 h-full w-[85vw] max-w-xs border-l border-stone-200 bg-white p-4 shadow-2xl dark:border-stone-800 dark:bg-stone-950">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">HumanBoard</div>
-            <div className="text-xs text-stone-500 dark:text-stone-400">Navigation</div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"
-            aria-label="Close menu"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="mb-3 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 dark:border-stone-800 dark:bg-stone-900">
-          <div className="text-xs font-medium text-stone-700 dark:text-stone-200 truncate">{user?.displayName ?? 'Signed in'}</div>
-          <div className="text-[11px] text-stone-500 dark:text-stone-500 truncate">{user?.email}</div>
-        </div>
-
-        <div className="space-y-1">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
+      <div className="absolute right-0 top-0 h-full w-[85vw] max-w-xs border-l border-stone-200 bg-white p-4 shadow-2xl dark:border-stone-800 dark:bg-stone-950 flex flex-col justify-between">
+        <div>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">HumanBoard</div>
+              <div className="text-xs text-stone-500 dark:text-stone-400">Navigation</div>
+            </div>
+            <button
+              type="button"
               onClick={onClose}
-              data-tour={item.label === 'Inbox' ? 'tour-sidebar-inbox' : item.label === 'Ideas' ? 'tour-sidebar-ideas' : item.label === 'Goals' ? 'tour-sidebar-goals' : item.label === 'Incubation' ? 'tour-sidebar-incubation' : item.label === 'Review' ? 'tour-sidebar-review' : item.label === 'Projects' ? 'tour-sidebar-projects' : undefined}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all',
-                  isActive
-                    ? 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900'
-                    : 'text-stone-700 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-900'
-                )
-              }
+              className="rounded-md p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100"
+              aria-label="Close menu"
             >
-              <item.icon className="h-4 w-4" />
-              {item.label}
-            </NavLink>
-          ))}
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mb-3 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 dark:border-stone-800 dark:bg-stone-900">
+            <div className="text-xs font-medium text-stone-700 dark:text-stone-200 truncate">{user?.displayName ?? 'Signed in'}</div>
+            <div className="text-[11px] text-stone-500 dark:text-stone-500 truncate">{user?.email}</div>
+          </div>
+
+          <div className="space-y-1">
+            {navItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                onClick={onClose}
+                data-tour={item.label === 'Inbox' ? 'tour-sidebar-inbox' : item.label === 'Ideas' ? 'tour-sidebar-ideas' : item.label === 'Goals' ? 'tour-sidebar-goals' : item.label === 'Incubation' ? 'tour-sidebar-incubation' : item.label === 'Review' ? 'tour-sidebar-review' : item.label === 'Projects' ? 'tour-sidebar-projects' : undefined}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all',
+                    isActive
+                      ? 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900'
+                      : 'text-stone-700 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-900'
+                  )
+                }
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
         </div>
 
         <div className="mt-4 space-y-2 border-t border-stone-200 pt-4 dark:border-stone-800">
@@ -1045,6 +1100,12 @@ function MobileMenu({
             onClick={() => {
               onClose();
               onOpenTutorial();
+            }}
+          />
+          <DocsButton
+            onClick={() => {
+              onClose();
+              onOpenDocs();
             }}
           />
           <SettingsButton
@@ -1091,6 +1152,7 @@ export default function App() {
   const [spotlightStepIndex, setSpotlightStepIndex] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isDocsOpen, setIsDocsOpen] = useState(false);
   const navItems = [
     ...(isLocalCommandCenter ? [{ to: '/command-center', icon: LayoutDashboard, label: 'Command Center' }] : []),
     { to: '/', icon: Inbox, label: 'Inbox' },
@@ -1177,6 +1239,7 @@ export default function App() {
       {enableAiEraKbBridge && <AiEraKbAutoBridge />}
       <NotificationEngine />
       <SettingsModal open={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      <DocsModal open={isDocsOpen} onClose={() => setIsDocsOpen(false)} />
       <TutorialModal open={isTutorialOpen && !isSpotlightTourOpen} onClose={closeGuide} />
       <SpotlightTour
         open={isSpotlightTourOpen}
@@ -1190,10 +1253,11 @@ export default function App() {
         onClose={() => setIsMobileMenuOpen(false)}
         navItems={navItems}
         onOpenTutorial={openGuide}
+        onOpenDocs={() => setIsDocsOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
       <div className="flex min-h-screen bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 font-sans selection:bg-stone-200 dark:selection:bg-stone-800 transition-colors duration-300">
-        <Sidebar onOpenTutorial={openGuide} onOpenSettings={() => setIsSettingsOpen(true)} />
+        <Sidebar onOpenTutorial={openGuide} onOpenSettings={() => setIsSettingsOpen(true)} onOpenDocs={() => setIsDocsOpen(true)} />
         <main className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0">
           <div className="sticky top-0 z-40 md:hidden border-b border-stone-200/80 dark:border-stone-800/80 bg-stone-50/95 dark:bg-stone-950/95 backdrop-blur px-3 py-2">
             <div className="flex items-center justify-between gap-3">
