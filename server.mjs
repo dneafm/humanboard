@@ -5,6 +5,8 @@ import fs from 'fs/promises';
 import { copyFileSync, existsSync, mkdirSync } from 'fs';
 import { execFileSync, spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import admin from 'firebase-admin';
+import { getAuth } from 'firebase-admin/auth';
 import { applyAiCostRecord, calculateAiCost, createEmptyAiCostState, getDailyRequestUsage, incrementDailyRequestUsage, roundUsd, toFiniteNumber } from './server/aiCostTracker.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,6 +23,24 @@ const AI_BASE_URL = String(process.env.AI_BASE_URL || process.env.GEMMA_BASE_URL
 const AI_API_KEY = String(process.env.AI_API_KEY || process.env.GEMMA_API_KEY || '').trim();
 const AI_FALLBACK_MODEL = String(process.env.AI_FALLBACK_MODEL || '').trim();
 const AI_DAILY_REQUEST_LIMIT = Math.max(1, Number(process.env.AI_DAILY_REQUEST_LIMIT || 1000));
+
+// Initialize Firebase Admin if projectId is configured
+const firebaseProjectId = process.env.VITE_FIREBASE_PROJECT_ID;
+let isFirebaseAdminInitialized = false;
+let firebaseAuth = null;
+
+if (firebaseProjectId) {
+  try {
+    const adminApp = admin.initializeApp({
+      projectId: firebaseProjectId,
+    });
+    firebaseAuth = getAuth(adminApp);
+    isFirebaseAdminInitialized = true;
+    console.log(`Firebase Admin initialized successfully for project: ${firebaseProjectId}`);
+  } catch (err) {
+    console.error('Failed to initialize Firebase Admin SDK:', err);
+  }
+}
 
 const DEFAULT_SECTIONS = [
   {
@@ -288,16 +308,33 @@ function validateSnapshotCandidate(candidate) {
   return normalizeSnapshot(candidate);
 }
 
-function getRequestUserId(req) {
-  const raw = req.headers['x-user-id'];
-  const userId = Array.isArray(raw) ? raw[0] : raw;
-  const normalized = String(userId || '').trim();
-
-  if (!normalized) {
-    return null;
+async function getRequestUserId(req) {
+  // 1. Try to verify Firebase ID Token from Authorization header
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+    const token = authHeader.substring(7).trim();
+    if (token) {
+      if (isFirebaseAdminInitialized && firebaseAuth) {
+        try {
+          const decodedToken = await firebaseAuth.verifyIdToken(token);
+          return decodedToken.uid;
+        } catch (error) {
+          console.error('Firebase token verification failed:', error.message);
+          return null;
+        }
+      }
+    }
   }
 
-  return normalized;
+  // 2. Fallback to X-User-ID header if Firebase Admin is NOT initialized (dev/fallback mode)
+  if (!isFirebaseAdminInitialized) {
+    const raw = req.headers['x-user-id'];
+    const userId = Array.isArray(raw) ? raw[0] : raw;
+    const normalized = String(userId || '').trim();
+    return normalized || null;
+  }
+
+  return null;
 }
 
 function sanitizeUserIdForPath(userId) {
@@ -317,11 +354,15 @@ function getUserSnapshotPaths(userId) {
   };
 }
 
-function requireUserId(req, res) {
-  const userId = getRequestUserId(req);
+async function requireUserId(req, res) {
+  const userId = await getRequestUserId(req);
 
   if (!userId) {
-    res.status(400).json({ error: 'Missing Header: X-User-ID' });
+    if (isFirebaseAdminInitialized) {
+      res.status(401).json({ error: 'Unauthorized: Invalid or missing Firebase token' });
+    } else {
+      res.status(400).json({ error: 'Missing Header: X-User-ID' });
+    }
     return null;
   }
 
@@ -584,7 +625,7 @@ app.get('/api/version', async (_req, res) => {
 });
 
 app.get('/api/ai-costs', async (req, res) => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
 
   try {
@@ -668,7 +709,7 @@ app.get('/api/admin/events', async (_req, res) => {
 });
 
 app.post('/api/snapshot/reset', async (req, res) => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
 
   try {
@@ -685,7 +726,7 @@ app.post('/api/snapshot/reset', async (req, res) => {
 });
 
 app.get('/api/snapshot', async (req, res) => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
 
   try {
@@ -697,7 +738,7 @@ app.get('/api/snapshot', async (req, res) => {
 });
 
 app.post('/api/snapshot', express.json({ limit: '25mb' }), async (req, res) => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
 
   try {
@@ -715,10 +756,10 @@ app.post('/api/snapshot', express.json({ limit: '25mb' }), async (req, res) => {
   }
 });
 
-app.get('/api/ai-era-kb', (req, res) => {
+app.get('/api/ai-era-kb', async (req, res) => {
   const ownerId = process.env.HUMANBOARD_OWNER_ID;
   if (ownerId) {
-    const userId = getRequestUserId(req);
+    const userId = await getRequestUserId(req);
     const allowedOwners = ownerId.split(',').map(id => id.trim());
     if (!userId || !allowedOwners.includes(userId)) {
       res.status(403).json({ error: 'Forbidden: Access to AI Era KB is restricted to the owner.' });
@@ -734,7 +775,7 @@ app.get('/api/ai-era-kb', (req, res) => {
 });
 
 app.post('/api/extract-web', express.json({ limit: '1mb' }), async (req, res) => {
-  const userId = requireUserId(req, res);
+  const userId = await requireUserId(req, res);
   if (!userId) return;
 
   const rawUrl = String(req.body?.url || '').trim();
@@ -798,11 +839,15 @@ app.all(['/api/ai/*', '/api/gemma/*'], express.raw({ type: '*/*', limit: '25mb' 
   const startedAt = Date.now();
   const requestId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   const isGemmaChat = /^\/api\/(?:ai|gemma)\/chat\/completions(?:\?|$)/.test(req.originalUrl);
-  const userId = getRequestUserId(req);
+  const userId = await getRequestUserId(req);
   try {
     if (isGemmaChat) {
       if (!userId) {
-        res.status(400).json({ error: 'Missing Header: X-User-ID' });
+        if (isFirebaseAdminInitialized) {
+          res.status(401).json({ error: 'Unauthorized: Invalid or missing Firebase token' });
+        } else {
+          res.status(400).json({ error: 'Missing Header: X-User-ID' });
+        }
         return;
       }
       const quota = await consumeAiDailyRequest(userId);

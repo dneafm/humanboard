@@ -54,6 +54,7 @@ export default function Chatbot() {
   const updateIdea = useAppStore((state) => state.updateIdea);
   const updateGoal = useAppStore((state) => state.updateGoal);
   const deleteProject = useAppStore((state) => state.deleteProject);
+  const addFusionItem = useAppStore((state) => state.addFusionItem);
   const userId = useAuthStore((state) => state.userId);
   const [isExpanded, setIsExpanded] = useState(false);
   const [autoDistill, setAutoDistill] = useState(false);
@@ -182,6 +183,33 @@ export default function Chatbot() {
     if (!Array.isArray(values)) return [];
     return values
       .map((value) => findIdeaByReference(value)?.id)
+      .filter((id): id is string => Boolean(id));
+  };
+
+  const findNoteByReference = (value?: string) => {
+    const normalized = normalizeText(value);
+    if (!normalized) return undefined;
+    return notes.find((note) => normalizeText(note.id) === normalized || normalizeText(note.content).includes(normalized));
+  };
+
+  const findRelatedNoteIds = (values?: string[]) => {
+    if (!Array.isArray(values)) return [];
+    return values
+      .map((value) => findNoteByReference(value)?.id)
+      .filter((id): id is string => Boolean(id));
+  };
+
+  const findRelatedGoalIds = (values?: string[]) => {
+    if (!Array.isArray(values)) return [];
+    return values
+      .map((value) => findGoalByReference(value)?.id)
+      .filter((id): id is string => Boolean(id));
+  };
+
+  const findRelatedProjectIds = (values?: string[]) => {
+    if (!Array.isArray(values)) return [];
+    return values
+      .map((value) => findProjectByReference(value)?.id)
       .filter((id): id is string => Boolean(id));
   };
 
@@ -598,9 +626,27 @@ Tool 7: Delete an existing Project. Use this when the user explicitly asks to de
 }
 </toolcall_delete_project>
 
+Tool 8: Create a Fusion item. Use this when the user explicitly requests to synthesize notes/ideas/projects/goals into a written fusion, post, report, or thesis.
+<toolcall_create_fusion>
+{
+  "title": "Fusion title",
+  "type": "Post|Writing|Thesis|Report",
+  "status": "Draft|Synthesizing|Ready|Completed",
+  "summary": "Short abstract summary",
+  "centralConclusion": "The core takeaway or conclusion",
+  "body": "Markdown or text contents",
+  "audience": "Personal|Team|Public|Client",
+  "linkedNotes": ["optional note content snippet or id"],
+  "linkedIdeas": ["optional idea title or id"],
+  "linkedGoals": ["optional goal title or id"],
+  "linkedProjects": ["optional project title or id"]
+}
+</toolcall_create_fusion>
+
 When the user asks to create or manage a map idea node, prefer toolcall_create_idea or toolcall_update_idea instead of only describing what to do.
 When the user asks to create or edit a goal or roadmap panel, use toolcall_create_goal or toolcall_update_goal instead of only describing what to do.
 When the user explicitly asks to remove a project, use toolcall_delete_project instead of only describing what to do.
+When the user asks to create, synthesize, or write a fusion, post, report, or thesis, use toolcall_create_fusion instead of only describing what to do or creating a regular idea.
 Include the toolcall anywhere in your response. You can use multiple toolcalls if needed.`);
 
       const userPrompt = imageAnalysisResult
@@ -619,6 +665,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       let matchedGoal = false;
       let matchedGoalUpdate = false;
       let matchedProjectDelete = false;
+      let matchedFusion = false;
       const allowNoteIdeaWrites = (autoDistill && autoDistillLevel !== 'off') || explicitBoardWrite;
       let blockedInferredWrite = false;
 
@@ -801,8 +848,40 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       }
       cleanText = cleanText.replace(deleteProjectRegex, '').trim();
 
+      // Extract Create Fusion tool calls
+      const fusionRegex = /<toolcall_create_fusion>([\s\S]*?)<\/toolcall_create_fusion>/gi;
+      let fusionMatch;
+      while ((fusionMatch = fusionRegex.exec(responseText)) !== null) {
+        try {
+          const jsonStr = fusionMatch[1].trim();
+          const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+          const fusionData = JSON.parse(cleanJsonStr);
+          if (!allowNoteIdeaWrites) {
+            blockedInferredWrite = true;
+            continue;
+          }
+          matchedFusion = true;
+          addFusionItem({
+            title: fusionData.title || 'Untitled Fusion',
+            type: fusionData.type || 'Writing',
+            status: fusionData.status || 'Draft',
+            summary: fusionData.summary || '',
+            centralConclusion: fusionData.centralConclusion || '',
+            body: fusionData.body || '',
+            audience: fusionData.audience || 'Personal',
+            linkedNoteIds: findRelatedNoteIds(fusionData.linkedNotes),
+            linkedIdeaIds: findRelatedIdeaIds(fusionData.linkedIdeas),
+            linkedGoalIds: findRelatedGoalIds(fusionData.linkedGoals),
+            linkedProjectIds: findRelatedProjectIds(fusionData.linkedProjects)
+          });
+        } catch (err) {
+          console.error("Failed to parse create_fusion toolcall JSON:", err);
+        }
+      }
+      cleanText = cleanText.replace(fusionRegex, '').trim();
+
       let actionMessage = '';
-      if (matchedNote || matchedIdea || matchedIdeaUpdate || matchedPersona || matchedGoal || matchedGoalUpdate || matchedProjectDelete) {
+      if (matchedNote || matchedIdea || matchedIdeaUpdate || matchedPersona || matchedGoal || matchedGoalUpdate || matchedProjectDelete || matchedFusion) {
         actionMessage = "\n\n*(AI: ";
         const acts = [];
         if (matchedNote) acts.push("added to Inbox");
@@ -812,6 +891,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
         if (matchedGoal) acts.push("created Goal");
         if (matchedGoalUpdate) acts.push("updated Goal panel");
         if (matchedProjectDelete) acts.push("deleted Project");
+        if (matchedFusion) acts.push("created Fusion item");
         actionMessage += acts.join(", ") + ")*";
       }
 

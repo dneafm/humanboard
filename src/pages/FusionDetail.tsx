@@ -111,11 +111,45 @@ export default function FusionDetailPage() {
             </div>
           </div>
         </div>
+
+        <div className="flex flex-wrap gap-2 lg:self-end">
+          {item.status === 'Draft' || item.status === 'Synthesizing' ? (
+            <button
+              type="button"
+              onClick={() => updateFusionItem(item.id, { status: 'Ready' })}
+              className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-850 cursor-pointer"
+            >
+              Mark Ready to Share
+            </button>
+          ) : item.status === 'Ready' ? (
+            <button
+              type="button"
+              onClick={() => updateFusionItem(item.id, { status: 'Completed', completedAt: new Date().toISOString() })}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 dark:bg-emerald-750 dark:hover:bg-emerald-850 cursor-pointer"
+            >
+              Complete Fusion
+            </button>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() => navigate('/fusion')}
+            className="inline-flex items-center gap-2 rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200 cursor-pointer"
+          >
+            Save & Close
+          </button>
+        </div>
       </div>
 
       {uiError && (
         <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
           {uiError}
+        </div>
+      )}
+
+      {!canGenerate && (
+        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/50 px-5 py-4 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+          💡 <strong>AI Generation Disabled</strong>: Link notes or ideas in the <strong>Source material</strong> panel on the right to enable AI-powered synthesis.
         </div>
       )}
 

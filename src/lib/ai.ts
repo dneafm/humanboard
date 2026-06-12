@@ -234,7 +234,7 @@ async function callGemma(prompt: string, systemInstruction: string) {
   }
 
   const requestHeaders = runtime.chatCompletionsUrl.startsWith(apiUrl('/api/'))
-    ? buildApiHeaders({ 'Content-Type': 'application/json' })
+    ? await buildApiHeaders({ 'Content-Type': 'application/json' })
     : {
         'Content-Type': 'application/json',
         ...(runtime.apiKey ? { Authorization: `Bearer ${runtime.apiKey}` } : {}),
@@ -388,7 +388,7 @@ export async function analyzeImageToNote(imageDataUrl: string, fileName: string,
   const imageModel = readEnv('IMAGE_ANALYSIS_MODEL', 'gpt-4o-mini');
   const endpoint = `${runtime.baseUrl}/chat/completions`;
   const requestHeaders = endpoint.startsWith(apiUrl('/api/'))
-    ? buildApiHeaders({ 'Content-Type': 'application/json' })
+    ? await buildApiHeaders({ 'Content-Type': 'application/json' })
     : {
         'Content-Type': 'application/json',
         ...(runtime.apiKey ? { Authorization: `Bearer ${runtime.apiKey}` } : {}),

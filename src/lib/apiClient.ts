@@ -10,9 +10,18 @@ export function getApiUserId() {
   return useAuthStore.getState().userId;
 }
 
-export function buildApiHeaders(headers?: HeadersInit) {
+export async function buildApiHeaders(headers?: HeadersInit): Promise<Headers> {
   const merged = new Headers(headers);
-  const userId = getApiUserId();
+  const { user, userId } = useAuthStore.getState();
+
+  if (user) {
+    try {
+      const token = await user.getIdToken();
+      merged.set('Authorization', `Bearer ${token}`);
+    } catch (err) {
+      console.error('Failed to get Firebase ID token:', err);
+    }
+  }
 
   if (userId && !merged.has('X-User-ID')) {
     merged.set('X-User-ID', userId);
@@ -21,9 +30,10 @@ export function buildApiHeaders(headers?: HeadersInit) {
   return merged;
 }
 
-export function apiFetch(path: string, init: RequestInit = {}) {
+export async function apiFetch(path: string, init: RequestInit = {}) {
+  const headers = await buildApiHeaders(init.headers);
   return fetch(apiUrl(path), {
     ...init,
-    headers: buildApiHeaders(init.headers),
+    headers,
   });
 }
