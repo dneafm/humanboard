@@ -532,12 +532,16 @@ export default function Chatbot() {
       const systemInstruction = buildMemoryShapedSystemInstruction(`Use the provided HumanBoard knowledge context when relevant. The whole-vault index gives complete entity-level awareness; the relevance-ranked context gives deeper evidence. Prefer connecting the user to existing notes, ideas, goals, projects, principles, capability bets, fusion artifacts, and reflections before giving generic advice. For broad assessment requests, explicitly assess patterns, gaps, contradictions, concentration, and neglected areas across the whole vault.
 
 PRODUCT KNOWLEDGE:
-- HumanBoard's "Sleep / Consolidate" feature currently processes raw inbox notes through AI and turns them into Idea nodes.
-- It links each new idea back to the source note via linkedNoteIds.
-- After a successful consolidation, the current implementation deletes the original raw note from Inbox.
-- If the browser tab becomes hidden and there are at least 3 raw notes, Sleep / Consolidate can auto-trigger in the background.
-- Right now it is not a full markdown inbox or multi-type classifier: it does not yet preserve raw source as a safe inbox archive, and it does not classify into notes, ideas, and projects separately.
-- When users ask what Sleep / Consolidate does, explain the current behavior accurately instead of describing an aspirational future version.
+- HumanBoard's "Sleep / Consolidate" feature currently processes raw inbox notes through AI and turns them into Idea nodes, linking them back to the source notes, and then deletes the raw notes from the Inbox. It can auto-trigger in the background when the tab is hidden and there are at least 3 notes.
+- Incubation Workflow / Incubation Page: Handles evaluating raw ideas and capability bets. Automation features include:
+  1) Review Cadence Alerts: Automatically calculates if a review is overdue (weekly: >7 days, bi-weekly: >14 days, default/monthly: >30 days) based on the "lastReviewed" date, rendering a "Review Overdue" banner.
+  2) Mark Reviewed: A button that updates the "lastReviewed" date to the current date, clearing the warning.
+  3) Posture Selector: Sets project readiness (Keep Watching, Warm Up / Explore, Parked / Defer, Ready to Activate).
+  4) Daily Reflection Carousel: Loops through deep prompts (Desire, Tension, Repetition, Uncertainty) and captures user entries to the inbox.
+  5) Trigger Insight Synthesis: Analyzes note/idea vaults for repeats, avoidances, and tensions, outputting a subconscious insights report.
+- Fusion Page: Synthesizes notes and ideas into public posts, writings, reports, or theses. Features include linking source material (notes/ideas) to enable AI Generate (summary, conclusion, body draft) and state progression actions ("Mark Ready to Share" and "Complete Fusion" to save work and mark completed).
+- Idea Map Page: Renders a D3 force graph. Ideas can be associated with multiple fields (sections), creating links and drawing overlapping Venn-diagram concentric halos. Features "Auto-Review Map" which uses AI to automatically categorize ideas, suggest new fields, and wire conceptually related ideas to each other.
+- When users ask about application functionality (e.g., "what automation part of the incubation?" or how a feature works), refer to these official HumanBoard features instead of retrieving unrelated personal notes or ideas from the user's vault to invent an answer.
 
 AUTONOMOUS WRITE CAPABILITY:
 Auto-distill is ${autoDistill ? 'ENABLED' : 'DISABLED'}.
