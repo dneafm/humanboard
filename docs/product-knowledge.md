@@ -33,5 +33,18 @@ This document outlines the official features and technical functionality of the 
 - **Multi-Field Venn Halos**: Ideas can belong to multiple fields (sections) via the `sectionIds` array. The D3 layout links ideas to all parent sections (causing them to float in intersections) and draws overlapping concentric curved halos (Venn diagram curves).
 - **AI Auto-Review Map**: An AI utility that reviews the topology of the map, creates new fields/sections if conceptual clusters are identified, re-associates ideas with the most relevant fields, and establishes interconnections (links) between conceptually related ideas.
 
-## 6. General Behavior Directive
+## 6. User Interface (UI) Navigation & Layout
+- **Left Sidebar Navigation**: Provides quick links to navigate the application:
+  - **Inbox**: Captured raw thoughts, screenshots, and clippings. Features "Sleep / Consolidate" and the floating Chatbot.
+  - **Idea Map**: Visual D3 graph of sections (fields) and ideas. Supports scrolling to zoom, dragging nodes, and hovering to highlight connections.
+  - **Ideas**: List view of structured knowledge cards. Allows searching, filtering, and opening details.
+  - **Goals & Projects**: Task tracker and roadmap progression board.
+  - **Incubation**: Dashboard for watchlist candidates, cadence alerts, and reflection synthesis.
+  - **Fusion**: Synthesis draft editor for publishing posts, reports, and theses.
+- **Visual Theme & Aesthetics**: Implements a clean, responsive layout supporting:
+  - Curated light and dark modes matching OS preferences.
+  - Harmonious, HSL-tailored warm colors and premium card shadows.
+  - Interactive hover transitions and smooth micro-animations.
+
+## 7. General Behavior Directive
 - When users ask about application functionality (e.g., "what automation part of the incubation?" or how a feature works), refer to these official HumanBoard features instead of retrieving unrelated personal notes or ideas from the user's vault to invent an answer.
