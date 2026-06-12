@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, FileText, Link2, Minus, Plus, Sparkles, GripVertical, Columns2, Columns3, Heading1, Heading2, Heading3, Loader2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, FileText, Link2, Minus, Plus, Sparkles, GripVertical, Columns2, Columns3, Heading1, Heading2, Heading3, Loader2, Trash2 } from 'lucide-react';
 import { generateFusionArtifact } from '../lib/ai';
 import { useAppStore, type FusionAudience, type FusionStatus, type FusionType, type FusionSuggestion } from '../store';
 import { cn } from '../lib/utils';
@@ -461,6 +461,177 @@ function getCaretCoordinates(element: HTMLTextAreaElement, position: number) {
   return { caret };
 }
 
+interface Block {
+  id: string;
+  type: 'text' | 'h1' | 'h2' | 'h3' | 'divider' | 'columns2' | 'columns3';
+  content: string;
+  columns?: string[];
+}
+
+function serializeBlocks(blocks: Block[]): string {
+  return blocks
+    .map((block) => {
+      switch (block.type) {
+        case 'h1':
+          return `# ${block.content}`;
+        case 'h2':
+          return `## ${block.content}`;
+        case 'h3':
+          return `### ${block.content}`;
+        case 'divider':
+          return `---`;
+        case 'columns2':
+          return `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">\n  <div>\n    ${(block.columns?.[0] || '').trim()}\n  </div>\n  <div>\n    ${(block.columns?.[1] || '').trim()}\n  </div>\n</div>`;
+        case 'columns3':
+          return `<div class="grid grid-cols-1 md:grid-cols-3 gap-4">\n  <div>\n    ${(block.columns?.[0] || '').trim()}\n  </div>\n  <div>\n    ${(block.columns?.[1] || '').trim()}\n  </div>\n  <div>\n    ${(block.columns?.[2] || '').trim()}\n  </div>\n</div>`;
+        default:
+          return block.content;
+      }
+    })
+    .join('\n\n');
+}
+
+function deserializeBlocks(text: string): Block[] {
+  if (!text) {
+    return [{ id: Math.random().toString(), type: 'text', content: '' }];
+  }
+
+  const tempCol2: string[][] = [];
+  const tempCol3: string[][] = [];
+
+  // Match 3 columns layout
+  let workingText = text.replace(/<div class="grid grid-cols-1 md:grid-cols-3 gap-4">([\s\S]*?)<\/div>/gi, (match) => {
+    const divs: string[] = [];
+    const divRegex = /<div>([\s\S]*?)<\/div>/gi;
+    let m;
+    while ((m = divRegex.exec(match)) !== null) {
+      divs.push(m[1].trim());
+    }
+    while (divs.length < 3) divs.push('');
+    tempCol3.push(divs.slice(0, 3));
+    return `\n\n[[BLOCK_COL3_${tempCol3.length - 1}]]\n\n`;
+  });
+
+  // Match 2 columns layout
+  workingText = workingText.replace(/<div class="grid grid-cols-1 md:grid-cols-2 gap-4">([\s\S]*?)<\/div>/gi, (match) => {
+    const divs: string[] = [];
+    const divRegex = /<div>([\s\S]*?)<\/div>/gi;
+    let m;
+    while ((m = divRegex.exec(match)) !== null) {
+      divs.push(m[1].trim());
+    }
+    while (divs.length < 2) divs.push('');
+    tempCol2.push(divs.slice(0, 2));
+    return `\n\n[[BLOCK_COL2_${tempCol2.length - 1}]]\n\n`;
+  });
+
+  const lines = workingText.split('\n');
+  const blocks: Block[] = [];
+  let currentTextBlockContent: string[] = [];
+
+  const flushTextBlock = () => {
+    if (currentTextBlockContent.length > 0) {
+      const content = currentTextBlockContent.join('\n').trim();
+      if (content || blocks.length === 0) {
+        blocks.push({
+          id: Math.random().toString(),
+          type: 'text',
+          content,
+        });
+      }
+      currentTextBlockContent = [];
+    }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+
+    const col3Match = /^\[\[BLOCK_COL3_(\d+)\]\]$/.exec(line);
+    if (col3Match) {
+      flushTextBlock();
+      const index = parseInt(col3Match[1]);
+      blocks.push({
+        id: Math.random().toString(),
+        type: 'columns3',
+        content: '',
+        columns: tempCol3[index] || ['', '', ''],
+      });
+      continue;
+    }
+
+    const col2Match = /^\[\[BLOCK_COL2_(\d+)\]\]$/.exec(line);
+    if (col2Match) {
+      flushTextBlock();
+      const index = parseInt(col2Match[1]);
+      blocks.push({
+        id: Math.random().toString(),
+        type: 'columns2',
+        content: '',
+        columns: tempCol2[index] || ['', ''],
+      });
+      continue;
+    }
+
+    if (line === '---' || line === '***' || line === '___') {
+      flushTextBlock();
+      blocks.push({
+        id: Math.random().toString(),
+        type: 'divider',
+        content: '',
+      });
+      continue;
+    }
+
+    if (line.startsWith('# ')) {
+      flushTextBlock();
+      blocks.push({
+        id: Math.random().toString(),
+        type: 'h1',
+        content: line.substring(2).trim(),
+      });
+      continue;
+    }
+
+    if (line.startsWith('## ')) {
+      flushTextBlock();
+      blocks.push({
+        id: Math.random().toString(),
+        type: 'h2',
+        content: line.substring(3).trim(),
+      });
+      continue;
+    }
+
+    if (line.startsWith('### ')) {
+      flushTextBlock();
+      blocks.push({
+        id: Math.random().toString(),
+        type: 'h3',
+        content: line.substring(4).trim(),
+      });
+      continue;
+    }
+
+    if (lines[i].trim() === '') {
+      if (currentTextBlockContent.length > 0 && currentTextBlockContent[currentTextBlockContent.length - 1] === '') {
+        flushTextBlock();
+      } else {
+        currentTextBlockContent.push('');
+      }
+    } else {
+      currentTextBlockContent.push(lines[i]);
+    }
+  }
+
+  flushTextBlock();
+
+  if (blocks.length === 0) {
+    blocks.push({ id: Math.random().toString(), type: 'text', content: '' });
+  }
+
+  return blocks;
+}
+
 function NotionBlockEditor({
   title,
   value,
@@ -482,26 +653,68 @@ function NotionBlockEditor({
   canGenerate: boolean;
   aiLabel: string;
 }) {
+  const [blocks, setBlocks] = useState<Block[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
+  const [activeColIndex, setActiveColIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const insertTextAtCursor = (textarea: HTMLTextAreaElement, textToInsert: string, replaceSlash = false) => {
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const currentVal = textarea.value;
+  // Sync state with parent value changes (e.g. from AI generation)
+  useEffect(() => {
+    const currentSerialized = serializeBlocks(blocks);
+    if (value !== currentSerialized) {
+      setBlocks(deserializeBlocks(value));
+    }
+  }, [value]);
 
-    const actualStart = replaceSlash ? Math.max(0, start - 1) : start;
-    const nextVal = currentVal.substring(0, actualStart) + textToInsert + currentVal.substring(end);
-    onChange(nextVal);
+  const updateBlockContent = (id: string, content: string) => {
+    const next = blocks.map(b => b.id === id ? { ...b, content } : b);
+    setBlocks(next);
+    onChange(serializeBlocks(next));
+  };
 
-    setTimeout(() => {
-      textarea.focus();
-      const newCursorPos = actualStart + textToInsert.length;
-      textarea.setSelectionRange(newCursorPos, newCursorPos);
-    }, 0);
+  const updateColumnContent = (id: string, colIndex: number, colContent: string) => {
+    const next = blocks.map(b => {
+      if (b.id === id) {
+        const cols = [...(b.columns || ['', '', ''])];
+        cols[colIndex] = colContent;
+        return { ...b, columns: cols };
+      }
+      return b;
+    });
+    setBlocks(next);
+    onChange(serializeBlocks(next));
+  };
+
+  const insertBlockBelow = (blockId: string, type: Block['type']) => {
+    const index = blocks.findIndex(b => b.id === blockId);
+    if (index === -1) return;
+
+    const newBlock: Block = {
+      id: Math.random().toString(),
+      type,
+      content: '',
+      columns: type === 'columns2' ? ['', ''] : type === 'columns3' ? ['', '', ''] : undefined,
+    };
+
+    const next = [...blocks];
+    next.splice(index + 1, 0, newBlock);
+    setBlocks(next);
+    onChange(serializeBlocks(next));
+  };
+
+  const changeBlockType = (blockId: string, type: Block['type'], content: string) => {
+    const next = blocks.map(b => b.id === blockId ? { ...b, type, content } : b);
+    setBlocks(next);
+    onChange(serializeBlocks(next));
+  };
+
+  const deleteBlock = (blockId: string) => {
+    const next = blocks.filter(b => b.id !== blockId);
+    setBlocks(next);
+    onChange(serializeBlocks(next));
   };
 
   const menuItems = useMemo(() => [
@@ -510,7 +723,18 @@ function NotionBlockEditor({
       label: 'Generate with AI',
       description: 'Generate contents using vault signals',
       icon: Sparkles,
-      action: (textarea: HTMLTextAreaElement) => {
+      action: (textarea: HTMLTextAreaElement, blockId: string, colIndex?: number) => {
+        const start = textarea.selectionStart;
+        const currentVal = textarea.value;
+        const actualStart = Math.max(0, start - 1);
+        const cleanVal = currentVal.substring(0, actualStart) + currentVal.substring(start);
+        
+        if (colIndex !== undefined) {
+          updateColumnContent(blockId, colIndex, cleanVal);
+        } else {
+          updateBlockContent(blockId, cleanVal);
+        }
+
         if (canGenerate) onAiGenerate();
       },
       disabled: !canGenerate || isGenerating,
@@ -518,22 +742,42 @@ function NotionBlockEditor({
     {
       id: '2cols',
       label: '2 Columns Layout',
-      description: 'Insert a side-by-side grid snippet',
+      description: 'Insert a side-by-side grid template',
       icon: Columns2,
-      action: (textarea: HTMLTextAreaElement) => {
-        const snippet = `\n<div class="grid grid-cols-1 md:grid-cols-2 gap-4">\n  <div>\n    <h4>Column 1</h4>\n    <p>Content...</p>\n  </div>\n  <div>\n    <h4>Column 2</h4>\n    <p>Content...</p>\n  </div>\n</div>\n`;
-        insertTextAtCursor(textarea, snippet, true);
+      action: (textarea: HTMLTextAreaElement, blockId: string, colIndex?: number) => {
+        const start = textarea.selectionStart;
+        const currentVal = textarea.value;
+        const actualStart = Math.max(0, start - 1);
+        const cleanVal = currentVal.substring(0, actualStart) + currentVal.substring(start);
+        
+        if (colIndex !== undefined) {
+          updateColumnContent(blockId, colIndex, cleanVal);
+        } else {
+          updateBlockContent(blockId, cleanVal);
+        }
+
+        insertBlockBelow(blockId, 'columns2');
       },
       disabled: false,
     },
     {
       id: '3cols',
       label: '3 Columns Layout',
-      description: 'Insert a three-column grid snippet',
+      description: 'Insert a three-column grid template',
       icon: Columns3,
-      action: (textarea: HTMLTextAreaElement) => {
-        const snippet = `\n<div class="grid grid-cols-1 md:grid-cols-3 gap-4">\n  <div>\n    <h4>Column 1</h4>\n    <p>Content...</p>\n  </div>\n  <div>\n    <h4>Column 2</h4>\n    <p>Content...</p>\n  </div>\n  <div>\n    <h4>Column 3</h4>\n    <p>Content...</p>\n  </div>\n</div>\n`;
-        insertTextAtCursor(textarea, snippet, true);
+      action: (textarea: HTMLTextAreaElement, blockId: string, colIndex?: number) => {
+        const start = textarea.selectionStart;
+        const currentVal = textarea.value;
+        const actualStart = Math.max(0, start - 1);
+        const cleanVal = currentVal.substring(0, actualStart) + currentVal.substring(start);
+        
+        if (colIndex !== undefined) {
+          updateColumnContent(blockId, colIndex, cleanVal);
+        } else {
+          updateBlockContent(blockId, cleanVal);
+        }
+
+        insertBlockBelow(blockId, 'columns3');
       },
       disabled: false,
     },
@@ -542,7 +786,14 @@ function NotionBlockEditor({
       label: 'Heading 1',
       description: 'Large section heading',
       icon: Heading1,
-      action: (textarea: HTMLTextAreaElement) => insertTextAtCursor(textarea, '\n# ', true),
+      action: (textarea: HTMLTextAreaElement, blockId: string, colIndex?: number) => {
+        const start = textarea.selectionStart;
+        const currentVal = textarea.value;
+        const actualStart = Math.max(0, start - 1);
+        const cleanVal = currentVal.substring(0, actualStart) + currentVal.substring(start);
+        
+        changeBlockType(blockId, 'h1', cleanVal);
+      },
       disabled: false,
     },
     {
@@ -550,7 +801,14 @@ function NotionBlockEditor({
       label: 'Heading 2',
       description: 'Medium section heading',
       icon: Heading2,
-      action: (textarea: HTMLTextAreaElement) => insertTextAtCursor(textarea, '\n## ', true),
+      action: (textarea: HTMLTextAreaElement, blockId: string, colIndex?: number) => {
+        const start = textarea.selectionStart;
+        const currentVal = textarea.value;
+        const actualStart = Math.max(0, start - 1);
+        const cleanVal = currentVal.substring(0, actualStart) + currentVal.substring(start);
+        
+        changeBlockType(blockId, 'h2', cleanVal);
+      },
       disabled: false,
     },
     {
@@ -558,7 +816,14 @@ function NotionBlockEditor({
       label: 'Heading 3',
       description: 'Small section heading',
       icon: Heading3,
-      action: (textarea: HTMLTextAreaElement) => insertTextAtCursor(textarea, '\n### ', true),
+      action: (textarea: HTMLTextAreaElement, blockId: string, colIndex?: number) => {
+        const start = textarea.selectionStart;
+        const currentVal = textarea.value;
+        const actualStart = Math.max(0, start - 1);
+        const cleanVal = currentVal.substring(0, actualStart) + currentVal.substring(start);
+        
+        changeBlockType(blockId, 'h3', cleanVal);
+      },
       disabled: false,
     },
     {
@@ -566,24 +831,60 @@ function NotionBlockEditor({
       label: 'Divider',
       description: 'Horizontal line divider',
       icon: Minus,
-      action: (textarea: HTMLTextAreaElement) => insertTextAtCursor(textarea, '\n---\n', true),
+      action: (textarea: HTMLTextAreaElement, blockId: string, colIndex?: number) => {
+        const start = textarea.selectionStart;
+        const currentVal = textarea.value;
+        const actualStart = Math.max(0, start - 1);
+        const cleanVal = currentVal.substring(0, actualStart) + currentVal.substring(start);
+        
+        if (colIndex !== undefined) {
+          updateColumnContent(blockId, colIndex, cleanVal);
+        } else {
+          updateBlockContent(blockId, cleanVal);
+        }
+
+        insertBlockBelow(blockId, 'divider');
+      },
       disabled: false,
     },
-  ], [canGenerate, isGenerating, onAiGenerate]);
+    {
+      id: 'delete',
+      label: 'Delete Block',
+      description: 'Remove this block from document',
+      icon: Trash2,
+      action: (textarea: HTMLTextAreaElement, blockId: string) => {
+        deleteBlock(blockId);
+      },
+      disabled: blocks.length <= 1,
+    },
+  ], [canGenerate, isGenerating, onAiGenerate, blocks]);
 
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleBlockChange = (e: React.ChangeEvent<HTMLTextAreaElement>, blockId: string, colIndex?: number) => {
     const val = e.target.value;
-    onChange(val);
+    
+    if (colIndex !== undefined) {
+      updateColumnContent(blockId, colIndex, val);
+    } else {
+      updateBlockContent(blockId, val);
+    }
 
     const selectionStart = e.target.selectionStart;
     const textBeforeCursor = val.substring(0, selectionStart);
 
     if (textBeforeCursor.endsWith('/')) {
       const { caret } = getCaretCoordinates(e.target, selectionStart);
-      setDropdownPosition({
-        top: e.target.offsetTop + caret.top + 20,
-        left: Math.min(e.target.offsetLeft + caret.left, e.target.clientWidth - 220),
-      });
+      const textareaRect = e.target.getBoundingClientRect();
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      
+      if (textareaRect && containerRect) {
+        setDropdownPosition({
+          top: (textareaRect.top - containerRect.top) + caret.top + 20,
+          left: Math.min((textareaRect.left - containerRect.left) + caret.left, containerRect.width - 240),
+        });
+      }
+      
+      setActiveBlockId(blockId);
+      setActiveColIndex(colIndex !== undefined ? colIndex : null);
       setShowDropdown(true);
       setSelectedIndex(0);
     } else {
@@ -591,26 +892,47 @@ function NotionBlockEditor({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (!showDropdown) return;
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setSelectedIndex((prev) => (prev + 1) % menuItems.length);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setSelectedIndex((prev) => (prev - 1 + menuItems.length) % menuItems.length);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      const selected = menuItems[selectedIndex];
-      if (selected && !selected.disabled && textareaRef.current) {
-        selected.action(textareaRef.current);
+  const handleBlockKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, blockId: string, colIndex?: number) => {
+    if (showDropdown && activeBlockId === blockId) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev + 1) % menuItems.length);
+        return;
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev - 1 + menuItems.length) % menuItems.length);
+        return;
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const selected = menuItems[selectedIndex];
+        if (selected && !selected.disabled) {
+          selected.action(e.currentTarget, blockId, colIndex);
+        }
+        setShowDropdown(false);
+        return;
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowDropdown(false);
+        return;
       }
-      setShowDropdown(false);
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      setShowDropdown(false);
-      textareaRef.current?.focus();
+    }
+
+    if (e.key === 'Backspace') {
+      const block = blocks.find(b => b.id === blockId);
+      if (block) {
+        if (block.type !== 'columns2' && block.type !== 'columns3' && block.content === '') {
+          if (blocks.length > 1) {
+            e.preventDefault();
+            deleteBlock(blockId);
+          }
+        } else if ((block.type === 'columns2' || block.type === 'columns3') && colIndex !== undefined) {
+          const isEmpty = (block.columns || []).every(c => c === '');
+          if (isEmpty && blocks.length > 1) {
+            e.preventDefault();
+            deleteBlock(blockId);
+          }
+        }
+      }
     }
   };
 
@@ -625,20 +947,7 @@ function NotionBlockEditor({
   }, []);
 
   return (
-    <div ref={containerRef} className="relative group py-4 animate-fade-in">
-      <button
-        type="button"
-        onClick={(e) => {
-          setDropdownPosition({ top: 28, left: -24 });
-          setShowDropdown(!showDropdown);
-          setSelectedIndex(0);
-        }}
-        className="absolute -left-7 top-4 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center h-6 w-5 text-stone-400 hover:text-stone-700 dark:text-stone-600 dark:hover:text-stone-300 rounded cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-850"
-        title="Block Actions"
-      >
-        <GripVertical className="h-4 w-4" />
-      </button>
-
+    <div ref={containerRef} className="relative w-full space-y-4 py-2">
       <div className="flex items-center justify-between gap-4 mb-2">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500">
           <span>{title}</span>
@@ -651,15 +960,143 @@ function NotionBlockEditor({
         )}
       </div>
 
-      <textarea
-        ref={textareaRef}
-        value={value}
-        onChange={handleTextareaChange}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        rows={rows}
-        className="w-full resize-y bg-transparent py-1 text-sm text-stone-800 dark:text-stone-100 placeholder-stone-400 dark:placeholder-stone-600 outline-none leading-relaxed"
-      />
+      <div className="space-y-4">
+        {blocks.map((block) => {
+          return (
+            <div key={block.id} className="relative group flex items-start gap-3 w-full pl-6">
+              {/* Grip handle button visible on hover */}
+              <div className="absolute left-0 top-1.5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center h-6 w-5 text-stone-400 dark:text-stone-600">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveBlockId(block.id);
+                    // Open dropdown below the grip button
+                    const el = containerRef.current;
+                    const gripEl = document.getElementById(`grip-${block.id}`);
+                    if (el && gripEl) {
+                      const gripRect = gripEl.getBoundingClientRect();
+                      const containerRect = el.getBoundingClientRect();
+                      setDropdownPosition({
+                        top: (gripRect.top - containerRect.top) + 24,
+                        left: (gripRect.left - containerRect.left),
+                      });
+                    } else {
+                      setDropdownPosition({ top: 30, left: 10 });
+                    }
+                    setShowDropdown(true);
+                    setSelectedIndex(0);
+                  }}
+                  id={`grip-${block.id}`}
+                  className="hover:text-stone-700 dark:hover:text-stone-300 rounded hover:bg-stone-155 dark:hover:bg-stone-850 cursor-pointer p-0.5"
+                  title="Block Options"
+                >
+                  <GripVertical className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Block Content Renderers */}
+              <div className="w-full">
+                {block.type === 'divider' ? (
+                  <div className="w-full py-3 group/div relative">
+                    <hr className="border-stone-200 dark:border-stone-800" />
+                    <button
+                      type="button"
+                      onClick={() => deleteBlock(block.id)}
+                      className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 group-hover/div:opacity-100 transition-opacity text-[10px] text-red-500 hover:text-red-700 cursor-pointer"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : block.type === 'columns2' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full border border-dashed border-stone-200 dark:border-stone-800 rounded-xl p-3 bg-stone-50/30 dark:bg-stone-900/10">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[9px] uppercase tracking-wider font-semibold text-stone-400 dark:text-stone-500">Column 1</span>
+                      <textarea
+                        value={block.columns?.[0] || ''}
+                        onChange={(e) => handleBlockChange(e, block.id, 0)}
+                        onKeyDown={(e) => handleBlockKeyDown(e, block.id, 0)}
+                        placeholder="Column 1 content..."
+                        rows={3}
+                        className="w-full resize-y bg-transparent py-1 text-sm text-stone-850 dark:text-stone-100 placeholder-stone-400 dark:placeholder-stone-750 outline-none leading-relaxed"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1 border-t md:border-t-0 md:border-l border-dashed border-stone-200 dark:border-stone-800 pt-2 md:pt-0 md:pl-4">
+                      <span className="text-[9px] uppercase tracking-wider font-semibold text-stone-400 dark:text-stone-500">Column 2</span>
+                      <textarea
+                        value={block.columns?.[1] || ''}
+                        onChange={(e) => handleBlockChange(e, block.id, 1)}
+                        onKeyDown={(e) => handleBlockKeyDown(e, block.id, 1)}
+                        placeholder="Column 2 content..."
+                        rows={3}
+                        className="w-full resize-y bg-transparent py-1 text-sm text-stone-850 dark:text-stone-100 placeholder-stone-400 dark:placeholder-stone-750 outline-none leading-relaxed"
+                      />
+                    </div>
+                  </div>
+                ) : block.type === 'columns3' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full border border-dashed border-stone-200 dark:border-stone-800 rounded-xl p-3 bg-stone-50/30 dark:bg-stone-900/10">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[9px] uppercase tracking-wider font-semibold text-stone-400 dark:text-stone-500">Column 1</span>
+                      <textarea
+                        value={block.columns?.[0] || ''}
+                        onChange={(e) => handleBlockChange(e, block.id, 0)}
+                        onKeyDown={(e) => handleBlockKeyDown(e, block.id, 0)}
+                        placeholder="Column 1 content..."
+                        rows={3}
+                        className="w-full resize-y bg-transparent py-1 text-sm text-stone-850 dark:text-stone-100 placeholder-stone-400 dark:placeholder-stone-750 outline-none leading-relaxed"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1 border-t md:border-t-0 md:border-l border-dashed border-stone-200 dark:border-stone-800 pt-2 md:pt-0 md:pl-4">
+                      <span className="text-[9px] uppercase tracking-wider font-semibold text-stone-400 dark:text-stone-500">Column 2</span>
+                      <textarea
+                        value={block.columns?.[1] || ''}
+                        onChange={(e) => handleBlockChange(e, block.id, 1)}
+                        onKeyDown={(e) => handleBlockKeyDown(e, block.id, 1)}
+                        placeholder="Column 2 content..."
+                        rows={3}
+                        className="w-full resize-y bg-transparent py-1 text-sm text-stone-850 dark:text-stone-100 placeholder-stone-400 dark:placeholder-stone-750 outline-none leading-relaxed"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1 border-t md:border-t-0 md:border-l border-dashed border-stone-200 dark:border-stone-800 pt-2 md:pt-0 md:pl-4">
+                      <span className="text-[9px] uppercase tracking-wider font-semibold text-stone-400 dark:text-stone-500">Column 3</span>
+                      <textarea
+                        value={block.columns?.[2] || ''}
+                        onChange={(e) => handleBlockChange(e, block.id, 2)}
+                        onKeyDown={(e) => handleBlockKeyDown(e, block.id, 2)}
+                        placeholder="Column 3 content..."
+                        rows={3}
+                        className="w-full resize-y bg-transparent py-1 text-sm text-stone-850 dark:text-stone-100 placeholder-stone-400 dark:placeholder-stone-750 outline-none leading-relaxed"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <textarea
+                    value={block.content}
+                    onChange={(e) => handleBlockChange(e, block.id)}
+                    onKeyDown={(e) => handleBlockKeyDown(e, block.id)}
+                    placeholder={
+                      block.type === 'h1'
+                        ? 'Heading 1'
+                        : block.type === 'h2'
+                        ? 'Heading 2'
+                        : block.type === 'h3'
+                        ? 'Heading 3'
+                        : placeholder
+                    }
+                    rows={block.type === 'text' ? rows : 1}
+                    className={cn(
+                      "w-full bg-transparent py-1 resize-y outline-none leading-relaxed transition-all duration-200 border-b border-transparent focus:border-stone-100 dark:focus:border-stone-800",
+                      block.type === 'h1' && "text-2xl font-bold text-stone-900 dark:text-stone-100 tracking-tight",
+                      block.type === 'h2' && "text-xl font-semibold text-stone-900 dark:text-stone-100 tracking-tight",
+                      block.type === 'h3' && "text-lg font-medium text-stone-900 dark:text-stone-100 tracking-tight",
+                      block.type === 'text' && "text-sm text-stone-800 dark:text-stone-100 placeholder-stone-450 dark:placeholder-stone-650"
+                    )}
+                  />
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
       {showDropdown && dropdownPosition && (
         <div
@@ -679,7 +1116,15 @@ function NotionBlockEditor({
                   type="button"
                   disabled={menuItem.disabled}
                   onClick={() => {
-                    if (textareaRef.current) menuItem.action(textareaRef.current);
+                    const blockId = activeBlockId;
+                    const colIndex = activeColIndex !== null ? activeColIndex : undefined;
+                    const fakeTextarea = document.createElement('textarea');
+                    fakeTextarea.value = '/';
+                    fakeTextarea.selectionStart = 1;
+                    fakeTextarea.selectionEnd = 1;
+                    if (blockId) {
+                      menuItem.action(fakeTextarea, blockId, colIndex);
+                    }
                     setShowDropdown(false);
                   }}
                   className={cn(
