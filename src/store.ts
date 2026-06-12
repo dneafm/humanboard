@@ -289,6 +289,17 @@ export type FusionItem = {
   completedAt?: string;
 };
 
+export type FusionSuggestion = {
+  id: string;
+  title: string;
+  type: FusionType;
+  thesis: string;
+  reasoning: string;
+  linkedNoteIds: string[];
+  linkedIdeaIds: string[];
+  readinessScore: number;
+};
+
 export function computeFusionChecklist(item: Partial<FusionItem>): FusionChecklist {
   return {
     title: !!item.title?.trim(),
@@ -461,6 +472,11 @@ interface AppState {
   recomputeStrategicAlignment: () => void;
   recomputeCapabilityBetSignals: () => void;
   toggleDarkMode: () => void;
+  fusionSuggestions: FusionSuggestion[];
+  lastDailyFusionScan: string;
+  setFusionSuggestions: (suggestions: FusionSuggestion[]) => void;
+  setLastDailyFusionScan: (timestamp: string) => void;
+  dismissFusionSuggestion: (id: string) => void;
 }
 
 const initialNotes: Note[] = [];
@@ -966,6 +982,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   capabilityTimelineEvents: initialCapabilityTimelineEvents,
   isDarkMode: false,
   chatMessages: [],
+  fusionSuggestions: [],
+  lastDailyFusionScan: '',
   setChatMessages: (messages) => set((state) => {
     const chatCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const nextMessages = messages.filter((m) => m && m.createdAt && m.createdAt >= chatCutoff);
@@ -1402,6 +1420,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     persistSnapshot(next);
     return { isDarkMode: next.isDarkMode };
   }),
+  setFusionSuggestions: (suggestions) => set((state) => {
+    const next = { ...state, fusionSuggestions: suggestions };
+    persistSnapshot(next);
+    return { fusionSuggestions: next.fusionSuggestions };
+  }),
+  setLastDailyFusionScan: (timestamp) => set((state) => {
+    const next = { ...state, lastDailyFusionScan: timestamp };
+    persistSnapshot(next);
+    return { lastDailyFusionScan: next.lastDailyFusionScan };
+  }),
+  dismissFusionSuggestion: (id) => set((state) => {
+    const next = { ...state, fusionSuggestions: state.fusionSuggestions.filter((s) => s.id !== id) };
+    persistSnapshot(next);
+    return { fusionSuggestions: next.fusionSuggestions };
+  }),
 }));
 
 export async function hydrateAppStoreFromRepository() {
@@ -1463,5 +1496,8 @@ export async function hydrateAppStoreFromRepository() {
     isDarkMode: finalSnapshot.isDarkMode,
     chatMessages: (Array.isArray(finalSnapshot.chatMessages) ? finalSnapshot.chatMessages : [])
       .filter((m) => m && m.createdAt && m.createdAt >= chatCutoff),
+    fusionItems: finalSnapshot.fusionItems ?? [],
+    fusionSuggestions: finalSnapshot.fusionSuggestions ?? [],
+    lastDailyFusionScan: finalSnapshot.lastDailyFusionScan ?? '',
   });
 }

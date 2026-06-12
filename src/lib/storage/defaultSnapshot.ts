@@ -19,4 +19,7 @@ export const defaultSnapshot: AppSnapshot = {
   capabilityTimelineEvents: [],
   isDarkMode: false,
   chatMessages: [],
+  fusionItems: [],
+  fusionSuggestions: [],
+  lastDailyFusionScan: '',
 };

@@ -38,6 +38,9 @@ async function fetchServerSnapshot(): Promise<AppSnapshot | null> {
       signalEvents: parsed.signalEvents ?? defaultSnapshot.signalEvents,
       capabilityTimelineEvents: parsed.capabilityTimelineEvents ?? defaultSnapshot.capabilityTimelineEvents,
       isDarkMode: parsed.isDarkMode ?? defaultSnapshot.isDarkMode,
+      fusionItems: parsed.fusionItems ?? defaultSnapshot.fusionItems,
+      fusionSuggestions: parsed.fusionSuggestions ?? defaultSnapshot.fusionSuggestions,
+      lastDailyFusionScan: parsed.lastDailyFusionScan ?? defaultSnapshot.lastDailyFusionScan,
     };
   } catch {
     return null;
@@ -72,7 +75,7 @@ export class LocalSnapshotRepository implements StorageRepository {
       const raw = window.localStorage.getItem(getStorageKey());
       if (!raw) return defaultSnapshot;
       const parsed = JSON.parse(raw) as Partial<AppSnapshot>;
-      const finalSnapshot = {
+      const finalSnapshot: AppSnapshot = {
         ...defaultSnapshot,
         ...parsed,
         notes: parsed.notes ?? defaultSnapshot.notes,
@@ -85,6 +88,9 @@ export class LocalSnapshotRepository implements StorageRepository {
         signalEvents: parsed.signalEvents ?? defaultSnapshot.signalEvents,
         capabilityTimelineEvents: parsed.capabilityTimelineEvents ?? defaultSnapshot.capabilityTimelineEvents,
         isDarkMode: parsed.isDarkMode ?? defaultSnapshot.isDarkMode,
+        fusionItems: parsed.fusionItems ?? defaultSnapshot.fusionItems,
+        fusionSuggestions: parsed.fusionSuggestions ?? defaultSnapshot.fusionSuggestions,
+        lastDailyFusionScan: parsed.lastDailyFusionScan ?? defaultSnapshot.lastDailyFusionScan,
       };
       return finalSnapshot;
     } catch {

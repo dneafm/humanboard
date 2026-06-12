@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Plus, Search, Sparkles, CheckCircle2, PenSquare } from 'lucide-react';
+import { FileText, Plus, Search, Sparkles, CheckCircle2, PenSquare, WandSparkles, RefreshCw, Trash2, Loader2, BookOpen } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { type FusionAudience, type FusionItem, type FusionStatus, type FusionType, useAppStore } from '../store';
+import { type FusionAudience, type FusionItem, type FusionStatus, type FusionType, type FusionSuggestion, useAppStore } from '../store';
+import { askGemma } from '../lib/ai';
 
 const fusionTypes: FusionType[] = ['Post', 'Writing', 'Thesis', 'Report'];
 const fusionStatuses: FusionStatus[] = ['Draft', 'Synthesizing', 'Ready', 'Completed'];
@@ -10,12 +11,152 @@ const fusionAudiences: FusionAudience[] = ['Personal', 'Team', 'Public', 'Client
 
 export default function FusionPage() {
   const navigate = useNavigate();
-  const { fusionItems, addFusionItem, deleteFusionItem } = useAppStore();
+  const {
+    fusionItems,
+    addFusionItem,
+    deleteFusionItem,
+    fusionSuggestions,
+    lastDailyFusionScan,
+    setFusionSuggestions,
+    setLastDailyFusionScan,
+    dismissFusionSuggestion,
+    notes,
+    ideas
+  } = useAppStore();
+
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'All' | FusionType>('All');
   const [statusFilter, setStatusFilter] = useState<'All' | FusionStatus>('All');
   const [audienceFilter, setAudienceFilter] = useState<'All' | FusionAudience>('All');
   const [sortBy, setSortBy] = useState<'updated' | 'readiness' | 'type'>('updated');
+
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+
+  const runSynthesisInsightScan = async (force = false) => {
+    if (isScanning) return;
+    setIsScanning(true);
+    setScanError(null);
+
+    try {
+      const now = new Date();
+      if (!force && lastDailyFusionScan) {
+        const lastScanDate = new Date(lastDailyFusionScan);
+        const diffHours = (now.getTime() - lastScanDate.getTime()) / (1000 * 60 * 60);
+        if (diffHours < 24) {
+          setIsScanning(false);
+          return;
+        }
+      }
+
+      if (notes.length === 0 && ideas.length === 0) {
+        setScanError('Not enough notes or ideas to detect patterns yet. Add some materials first!');
+        setIsScanning(false);
+        return;
+      }
+
+      const prompt = `You are the HumanBoard Daily Synthesis Insight Engine.
+Analyze the following raw notes and ideas in the user's vault to find patterns, themes, or logical connections.
+Identify up to 20 potential "Fusions" (writings, reports, articles, or theses) that can be generated from these materials.
+
+Raw Notes:
+${notes.slice(0, 40).map(n => `- ID: ${n.id} | Date: ${n.createdAt} | Content: ${n.content.slice(0, 300)}`).join('\n')}
+
+Ideas:
+${ideas.slice(0, 40).map(i => `- ID: ${i.id} | Title: ${i.title} | Content: ${i.content.slice(0, 300)}`).join('\n')}
+
+For each suggested Fusion, provide:
+1. A descriptive title.
+2. The recommended type ('Post', 'Writing', 'Thesis', 'Report').
+3. A short thesis (summary of what this fusion will compile/explain).
+4. The reasoning behind the connection.
+5. The list of Note IDs and Idea IDs that should be linked.
+6. A readiness score (0-100) based on how complete/detailed the source materials are.
+
+Respond ONLY with a valid JSON array of objects, with no markdown code block formatting or extra explanation, matching this schema:
+[
+  {
+    "title": "Proposed Title",
+    "type": "Post" | "Writing" | "Thesis" | "Report",
+    "thesis": "Short thesis or summary",
+    "reasoning": "Reasoning explaining why these notes/ideas connect",
+    "linkedNoteIds": ["note-id-1", ...],
+    "linkedIdeaIds": ["idea-id-1", ...],
+    "readinessScore": 85
+  }
+]`;
+
+      const systemInstruction = "You are the HumanBoard Daily Synthesis Insight Engine. You analyze notes and ideas to find patterns and suggest new writings. Respond ONLY with a valid JSON array.";
+
+      const responseText = await askGemma(prompt, systemInstruction);
+      const cleanJson = responseText
+        .replace(/```json/gi, '')
+        .replace(/```/g, '')
+        .trim();
+
+      const suggestions = JSON.parse(cleanJson);
+      if (Array.isArray(suggestions)) {
+        const formattedSuggestions = suggestions.map((s: any) => ({
+          ...s,
+          id: s.id || Math.random().toString(36).substring(2, 10),
+          readinessScore: Math.min(100, Math.max(0, Number(s.readinessScore || 0))),
+          linkedNoteIds: Array.isArray(s.linkedNoteIds) ? s.linkedNoteIds : [],
+          linkedIdeaIds: Array.isArray(s.linkedIdeaIds) ? s.linkedIdeaIds : [],
+        }));
+        setFusionSuggestions(formattedSuggestions);
+        setLastDailyFusionScan(now.toISOString());
+      } else {
+        throw new Error('Invalid response format from AI. Expected JSON array.');
+      }
+    } catch (err) {
+      console.error(err);
+      setScanError(err instanceof Error ? err.message : 'Failed to scan vault for insights.');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  useEffect(() => {
+    void runSynthesisInsightScan(false);
+  }, []);
+
+  const handleCreateFromSuggestion = (suggestion: FusionSuggestion) => {
+    addFusionItem({
+      title: suggestion.title,
+      type: suggestion.type,
+      status: 'Draft',
+      summary: suggestion.thesis,
+      centralConclusion: '',
+      body: '',
+      audience: 'Personal',
+      linkedNoteIds: suggestion.linkedNoteIds,
+      linkedIdeaIds: suggestion.linkedIdeaIds,
+      linkedGoalIds: [],
+      linkedProjectIds: [],
+    });
+    const latest = useAppStore.getState().fusionItems[0];
+    const nextId = latest?.id ?? '';
+    if (nextId) navigate(`/fusion/${nextId}`);
+  };
+
+  const handleCreateFusion = () => {
+    addFusionItem({
+      title: 'Untitled Fusion',
+      type: 'Writing',
+      status: 'Draft',
+      summary: '',
+      centralConclusion: '',
+      body: '',
+      audience: 'Personal',
+      linkedNoteIds: [],
+      linkedIdeaIds: [],
+      linkedGoalIds: [],
+      linkedProjectIds: [],
+    });
+    const latest = useAppStore.getState().fusionItems[0];
+    const nextId = latest?.id ?? '';
+    if (nextId) navigate(`/fusion/${nextId}`);
+  };
 
   const filteredItems = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -38,26 +179,6 @@ export default function FusionPage() {
   const readyItems = filteredItems.filter((item) => item.status === 'Ready');
   const completedItems = filteredItems.filter((item) => item.status === 'Completed');
 
-  const handleCreateFusion = () => {
-    let nextId = '';
-    addFusionItem({
-      title: 'Untitled Fusion',
-      type: 'Writing',
-      status: 'Draft',
-      summary: '',
-      centralConclusion: '',
-      body: '',
-      audience: 'Personal',
-      linkedNoteIds: [],
-      linkedIdeaIds: [],
-      linkedGoalIds: [],
-      linkedProjectIds: [],
-    });
-    const latest = useAppStore.getState().fusionItems[0];
-    nextId = latest?.id ?? '';
-    if (nextId) navigate(`/fusion/${nextId}`);
-  };
-
   return (
     <div className="max-w-6xl mx-auto w-full p-8 flex flex-col h-full">
       <header className="mb-8 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
@@ -74,6 +195,109 @@ export default function FusionPage() {
           New Fusion
         </button>
       </header>
+
+      {/* Daily Synthesis Insights suggestion deck */}
+      <section className="mb-8 rounded-2xl border border-stone-200/60 bg-stone-50/50 p-6 dark:border-stone-800/60 dark:bg-stone-900/30 backdrop-blur-sm">
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-amber-500 animate-pulse" />
+            <div>
+              <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-100 flex items-center gap-2">
+                <span>Synthesis Insights</span>
+                {lastDailyFusionScan && (
+                  <span className="text-xs font-normal text-stone-400 dark:text-stone-500">
+                    Last scanned {new Date(lastDailyFusionScan).toLocaleDateString()}
+                  </span>
+                )}
+              </h2>
+              <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">Auto-detected connection clusters ready to fuse into drafts.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            disabled={isScanning}
+            onClick={() => runSynthesisInsightScan(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200/80 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 transition hover:bg-stone-50 disabled:opacity-50 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-850"
+          >
+            {isScanning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            {isScanning ? 'Scanning...' : 'Scan / Refresh'}
+          </button>
+        </div>
+
+        {scanError && (
+          <div className="rounded-xl border border-red-100 bg-red-50/50 p-4 text-sm text-red-800 dark:border-red-900/30 dark:bg-red-950/20 dark:text-red-300 mb-2">
+            {scanError}
+          </div>
+        )}
+
+        {isScanning ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="animate-pulse rounded-xl border border-stone-200/50 bg-white/50 p-4 dark:border-stone-800/50 dark:bg-stone-950/30 h-40 flex flex-col justify-between">
+                <div className="space-y-2">
+                  <div className="h-4 w-3/4 rounded bg-stone-200 dark:bg-stone-850" />
+                  <div className="h-3 w-1/4 rounded bg-stone-200 dark:bg-stone-850" />
+                  <div className="h-3 w-5/6 rounded bg-stone-200 dark:bg-stone-850 mt-2" />
+                </div>
+                <div className="h-8 w-24 rounded bg-stone-200 dark:bg-stone-850" />
+              </div>
+            ))}
+          </div>
+        ) : fusionSuggestions.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {fusionSuggestions.slice(0, 6).map((suggestion) => (
+              <div key={suggestion.id} className="relative flex flex-col justify-between rounded-xl border border-stone-200 bg-white p-4 shadow-sm dark:border-stone-800 dark:bg-stone-950 hover:shadow-md transition-all">
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="rounded-full bg-stone-100 dark:bg-stone-900 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-stone-500 dark:text-stone-400">
+                      {suggestion.type}
+                    </span>
+                    <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 px-2 py-0.5 rounded-full">
+                      {suggestion.readinessScore}% ready
+                    </span>
+                  </div>
+                  <h3 className="mt-2 text-sm font-semibold text-stone-900 dark:text-stone-100 line-clamp-1">{suggestion.title}</h3>
+                  <p className="mt-1 text-xs text-stone-500 dark:text-stone-400 line-clamp-2">{suggestion.thesis}</p>
+                  
+                  <div className="mt-3 rounded-lg bg-stone-50 p-2.5 dark:bg-stone-900/50">
+                    <div className="text-[9px] font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500">Connection reasoning</div>
+                    <p className="text-[11px] text-stone-600 dark:text-stone-400 mt-0.5 line-clamp-2">{suggestion.reasoning}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center justify-between border-t border-stone-100 pt-3 dark:border-stone-900">
+                  <span className="text-[11px] text-stone-400 dark:text-stone-500">
+                    {suggestion.linkedNoteIds.length} notes · {suggestion.linkedIdeaIds.length} ideas
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => dismissFusionSuggestion(suggestion.id)}
+                      className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-red-500 dark:hover:bg-stone-900 transition-colors"
+                      title="Dismiss suggestion"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCreateFromSuggestion(suggestion)}
+                      className="inline-flex items-center gap-1 rounded-lg bg-stone-900 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200 transition-all"
+                    >
+                      <WandSparkles className="h-3 w-3" />
+                      <span>Draft</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-6 rounded-xl border border-dashed border-stone-200 dark:border-stone-800 bg-white/30 dark:bg-stone-950/10">
+            <BookOpen className="h-8 w-8 text-stone-300 dark:text-stone-700 mx-auto mb-2" />
+            <p className="text-xs text-stone-500 dark:text-stone-400">No active fusion suggestions. Add more notes or click "Scan" to compile themes.</p>
+          </div>
+        )}
+      </section>
 
       <div className="mb-8 grid gap-3 md:grid-cols-5">
         <label className="md:col-span-2 flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 dark:border-stone-800 dark:bg-stone-900">

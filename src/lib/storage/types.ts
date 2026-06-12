@@ -1,4 +1,4 @@
-import type { CapabilityBet, CapabilityTimelineEvent, Goal, Idea, Note, Project, Reflection, Section, SignalEvent } from '../../store';
+import type { CapabilityBet, CapabilityTimelineEvent, Goal, Idea, Note, Project, Reflection, Section, SignalEvent, FusionItem, FusionSuggestion } from '../../store';
 
 export type ChatMessage = {
   id: string;
@@ -20,6 +20,9 @@ export interface AppSnapshot {
   capabilityTimelineEvents: CapabilityTimelineEvent[];
   isDarkMode: boolean;
   chatMessages?: ChatMessage[];
+  fusionItems?: FusionItem[];
+  fusionSuggestions?: FusionSuggestion[];
+  lastDailyFusionScan?: string;
 }
 
 export interface StorageRepository {

@@ -77,6 +77,9 @@ const DEFAULT_SNAPSHOT = {
   capabilityTimelineEvents: [],
   isDarkMode: false,
   chatMessages: [],
+  fusionItems: [],
+  fusionSuggestions: [],
+  lastDailyFusionScan: '',
 };
 
 let appVersion = '0.0.0';
@@ -178,6 +181,9 @@ function normalizeSnapshot(raw = {}) {
   snapshot.signalEvents = Array.isArray(snapshot.signalEvents) ? snapshot.signalEvents : [];
   snapshot.capabilityTimelineEvents = Array.isArray(snapshot.capabilityTimelineEvents) ? snapshot.capabilityTimelineEvents : [];
   snapshot.isDarkMode = Boolean(snapshot.isDarkMode);
+  snapshot.fusionItems = Array.isArray(snapshot.fusionItems) ? snapshot.fusionItems : [];
+  snapshot.fusionSuggestions = Array.isArray(snapshot.fusionSuggestions) ? snapshot.fusionSuggestions : [];
+  snapshot.lastDailyFusionScan = String(snapshot.lastDailyFusionScan || '');
   
   const chatCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   snapshot.chatMessages = (Array.isArray(snapshot.chatMessages) ? snapshot.chatMessages : [])
