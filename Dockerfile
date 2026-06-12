@@ -6,6 +6,7 @@ RUN npm ci
 COPY .env ./
 COPY src/ ./src
 COPY public/ ./public
+COPY docs/ ./docs
 COPY index.html ./
 COPY tsconfig.json ./
 COPY vite.config.ts ./
