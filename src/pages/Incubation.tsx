@@ -509,6 +509,7 @@ export default function IncubationPage() {
   const [synthesisError, setSynthesisError] = useState<string | null>(null);
   const [selectedInsight, setSelectedInsight] = useState<Idea | null>(null);
   const [justDumped, setJustDumped] = useState(false);
+  const [showNewBetForm, setShowNewBetForm] = useState(false);
 
   // AI Bet Scout state
   type ScoutedBet = {
@@ -965,26 +966,28 @@ Return the markdown report. Be direct, insightful, and clear.`;
               Bets are no longer hardcoded watch cards. They now have editable definitions, a visible graph from notes into ideas, and a timeline that records conviction shifts instead of hiding them inside one current number.
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
             <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-600 shadow-sm dark:border-stone-800 dark:bg-stone-900/40 dark:text-stone-300">
               {signalEvents.length} linked signal event{signalEvents.length === 1 ? '' : 's'} across {activeCapabilityBets.length} active bet{activeCapabilityBets.length === 1 ? '' : 's'}
             </div>
             <button
               type="button"
+              onClick={() => { resetEditor(); setShowNewBetForm(true); }}
+              className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 shadow-sm transition-all hover:bg-emerald-100 hover:shadow dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300"
+            >
+              <Plus className="h-4 w-4" />
+              New Bet
+            </button>
+            <button
+              type="button"
               onClick={handleScoutBets}
               disabled={isScouting}
-              className="inline-flex items-center gap-2 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-semibold text-violet-700 shadow-sm transition-all hover:bg-violet-100 hover:shadow disabled:opacity-60 dark:border-violet-900/40 dark:bg-violet-950/20 dark:text-violet-300 dark:hover:bg-violet-950/40"
+              className="inline-flex items-center gap-2 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-semibold text-violet-700 shadow-sm transition-all hover:bg-violet-100 hover:shadow disabled:opacity-60 dark:border-violet-900/40 dark:bg-violet-950/20 dark:text-violet-300"
             >
               {isScouting ? (
-                <>
-                  <BrainCircuit className="h-4 w-4 animate-pulse" />
-                  Scouting…
-                </>
+                <><BrainCircuit className="h-4 w-4 animate-pulse" />Scouting…</>
               ) : (
-                <>
-                  <Wand2 className="h-4 w-4" />
-                  Scout Bets
-                </>
+                <><Wand2 className="h-4 w-4" />Scout Bets</>
               )}
             </button>
           </div>
@@ -1164,430 +1167,301 @@ Return the markdown report. Be direct, insightful, and clear.`;
           </div>
         )}
 
-        <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
-          <div className="space-y-5">
-            <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm dark:border-stone-800 dark:bg-stone-900/40">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-700 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-emerald-300">
-                    <PenSquare className="h-3.5 w-3.5" />
-                    editable bet manager
-                  </div>
-                  <h3 className="mt-3 text-xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">
-                    {editorMode === 'edit' && editingBetId ? 'Edit selected bet' : 'Create a new capability bet'}
-                  </h3>
-                  <p className="mt-2 text-sm leading-relaxed text-stone-600 dark:text-stone-400">
-                    Titles, thesis, thresholds, keywords, unlock paths, first use cases, and decision rule now live in the UI and persist through snapshot storage.
-                  </p>
+        {/* ── New Bet slide-in form ── */}
+        {showNewBetForm && (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5 dark:border-emerald-900/30 dark:bg-emerald-950/10 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                  <PenSquare className="h-3.5 w-3.5" />
+                  {editorMode === 'edit' ? 'Edit bet' : 'New capability bet'}
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={resetEditor}
-                    className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-[0.22em] text-stone-600 hover:border-stone-300 hover:text-stone-900 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:border-stone-600 dark:hover:text-stone-100"
-                  >
-                    <Plus className="h-4 w-4" />
-                    New bet
-                  </button>
-                  {editorMode === 'edit' && editingBetId && (
-                    <button
-                      type="button"
-                      onClick={archiveEditingBet}
-                      className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.22em] text-rose-700 hover:border-rose-300 hover:text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-300"
-                    >
-                      <Archive className="h-4 w-4" />
-                      Archive
-                    </button>
-                  )}
-                </div>
+                <h3 className="mt-2 text-lg font-semibold tracking-tight text-stone-900 dark:text-stone-100">
+                  {editorMode === 'edit' ? draft.title || 'Edit selected bet' : 'Define a new capability to watch'}
+                </h3>
               </div>
-
-              <div className="mt-5 space-y-5">
-                <div className="grid gap-3">
-                  {activeCapabilityBets.length ? activeCapabilityBets.map((bet) => (
-                    <button
-                      key={bet.id}
-                      type="button"
-                      onClick={() => selectCapabilityBet(bet.id)}
-                      className={cn(
-                        'rounded-2xl border px-4 py-4 text-left transition-colors',
-                        selectedCapabilityBet?.id === bet.id
-                          ? 'border-sky-400 bg-sky-50 dark:border-sky-500 dark:bg-sky-950/20'
-                          : 'border-stone-200 bg-stone-50 hover:border-stone-300 dark:border-stone-800 dark:bg-stone-950/40 dark:hover:border-stone-700',
-                      )}
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">{bet.title}</div>
-                          <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">{bet.conviction}% conviction and {bet.salience}% salience</div>
-                        </div>
-                        <span className={cn('inline-flex rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em]', BET_STATUS_STYLE[bet.status])}>
-                          {bet.status}
-                        </span>
-                      </div>
-                    </button>
-                  )) : (
-                    <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50/80 px-4 py-5 text-sm text-stone-500 dark:border-stone-700 dark:bg-stone-950/20 dark:text-stone-400">
-                      No active bets yet. Start with one capability that deserves patient evidence tracking.
-                    </div>
-                  )}
-                </div>
-
-                {archivedCapabilityBets.length > 0 && (
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-4 dark:border-stone-800 dark:bg-stone-950/40">
-                    <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">Archived bets</div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {archivedCapabilityBets.map((bet) => (
-                        <span key={bet.id} className="rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300">
-                          {bet.title}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {editorMode === 'edit' && editingBetId && (
+                  <button type="button" onClick={archiveEditingBet}
+                    className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.22em] text-rose-600 hover:bg-rose-50 dark:border-rose-900/40 dark:bg-transparent dark:text-rose-400">
+                    <Archive className="h-3.5 w-3.5" /> Archive
+                  </button>
                 )}
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <label className="block">
-                    <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Title</span>
-                    <input
-                      type="text"
-                      value={draft.title}
-                      onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
-                      className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 focus:outline-none focus:ring-4 focus:ring-sky-900/5 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
-                      placeholder="Learn Chinese"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Review cadence</span>
-                    <input
-                      type="text"
-                      value={draft.reviewCadence}
-                      onChange={(event) => setDraft((current) => ({ ...current, reviewCadence: event.target.value }))}
-                      className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 focus:outline-none focus:ring-4 focus:ring-sky-900/5 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
-                      placeholder="monthly or when new strong signals land"
-                    />
-                  </label>
-                </div>
-
-                <label className="block">
-                  <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Thesis</span>
-                  <textarea
-                    value={draft.thesis}
-                    onChange={(event) => setDraft((current) => ({ ...current, thesis: event.target.value }))}
-                    className="w-full min-h-[120px] rounded-2xl border border-stone-200 bg-white px-4 py-4 text-sm leading-relaxed text-stone-900 focus:outline-none focus:ring-4 focus:ring-sky-900/5 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
-                    placeholder="Why is this capability worth watching?"
-                  />
-                </label>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <label className="block">
-                    <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Baseline conviction</span>
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={draft.baselineConviction}
-                      onChange={(event) => setDraft((current) => ({ ...current, baselineConviction: Number(event.target.value) }))}
-                      className="w-full"
-                    />
-                    <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">{draft.baselineConviction}% baseline</div>
-                  </label>
-                  <label className="block">
-                    <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Commit threshold</span>
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={draft.thresholdToCommit}
-                      onChange={(event) => setDraft((current) => ({ ...current, thresholdToCommit: Number(event.target.value) }))}
-                      className="w-full"
-                    />
-                    <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">{draft.thresholdToCommit}% to commit</div>
-                  </label>
-                </div>
-
-                <label className="block">
-                  <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Keywords</span>
-                  <input
-                    type="text"
-                    value={draft.keywordsText}
-                    onChange={(event) => setDraft((current) => ({ ...current, keywordsText: event.target.value }))}
-                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 focus:outline-none focus:ring-4 focus:ring-sky-900/5 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
-                    placeholder="chinese, mandarin, china, wechat"
-                  />
-                </label>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <label className="block">
-                    <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Unlock paths</span>
-                    <textarea
-                      value={draft.unlockPathsText}
-                      onChange={(event) => setDraft((current) => ({ ...current, unlockPathsText: event.target.value }))}
-                      className="w-full min-h-[140px] rounded-2xl border border-stone-200 bg-white px-4 py-4 text-sm leading-relaxed text-stone-900 focus:outline-none focus:ring-4 focus:ring-sky-900/5 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
-                      placeholder={'direct market reading\nrelationship access'}
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">First use cases</span>
-                    <textarea
-                      value={draft.firstUseCasesText}
-                      onChange={(event) => setDraft((current) => ({ ...current, firstUseCasesText: event.target.value }))}
-                      className="w-full min-h-[140px] rounded-2xl border border-stone-200 bg-white px-4 py-4 text-sm leading-relaxed text-stone-900 focus:outline-none focus:ring-4 focus:ring-sky-900/5 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
-                      placeholder={'read primary-source chatter\nnavigate docs and products'}
-                    />
-                  </label>
-                </div>
-
-                <label className="block">
-                  <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Cost of not knowing</span>
-                  <textarea
-                    value={draft.costOfNotKnowing}
-                    onChange={(event) => setDraft((current) => ({ ...current, costOfNotKnowing: event.target.value }))}
-                    className="w-full min-h-[96px] rounded-2xl border border-stone-200 bg-white px-4 py-4 text-sm leading-relaxed text-stone-900 focus:outline-none focus:ring-4 focus:ring-sky-900/5 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
-                    placeholder="What edge gets left on the table if this never gets explored?"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Decision rule</span>
-                  <textarea
-                    value={draft.strategicNote}
-                    onChange={(event) => setDraft((current) => ({ ...current, strategicNote: event.target.value }))}
-                    className="w-full min-h-[110px] rounded-2xl border border-stone-200 bg-white px-4 py-4 text-sm leading-relaxed text-stone-900 focus:outline-none focus:ring-4 focus:ring-sky-900/5 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
-                    placeholder="What should be true before this bet becomes active commitment?"
-                  />
-                </label>
-
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={saveCapabilityBet}
-                    disabled={!draft.title.trim() || !draft.thesis.trim()}
-                    className="inline-flex items-center gap-2 rounded-full bg-sky-600 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.22em] text-white transition-colors hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
-                    {editorMode === 'edit' ? 'Save bet' : 'Create bet'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={resetEditor}
-                    className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-[0.22em] text-stone-600 hover:border-stone-300 hover:text-stone-900 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:border-stone-600 dark:hover:text-stone-100"
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    Reset form
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-5">
-            <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm dark:border-stone-800 dark:bg-stone-900/40">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-amber-700 dark:border-amber-900/30 dark:bg-amber-950/20 dark:text-amber-300">
-                    <History className="h-3.5 w-3.5" />
-                    calibration timeline
-                  </div>
-                  <h3 className="mt-3 text-xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">Recent conviction shifts</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-stone-600 dark:text-stone-400">
-                    Every material change now lands as history instead of silently overwriting the previous state.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-5 space-y-3">
-                {recentTimelineEvents.length ? recentTimelineEvents.map((event) => {
-                  const bet = capabilityBets.find((entry) => entry.id === event.capabilityBetId);
-                  const noteLinks = event.evidenceIds
-                    .map((id) => id.split(':').slice(1).join(':'))
-                    .map((noteId) => notes.find((note) => note.id === noteId))
-                    .filter(Boolean) as Note[];
-
-                  return (
-                    <div key={event.id} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-4 dark:border-stone-800 dark:bg-stone-950/40">
-                      <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div>
-                          <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">{bet?.title ?? 'Capability bet'}</div>
-                          <p className="mt-1 text-sm leading-relaxed text-stone-600 dark:text-stone-400">{event.summary}</p>
-                        </div>
-                        <div className="text-right">
-                          <span className={cn('inline-flex rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em]', getTimelineColor(event.delta))}>
-                            {event.delta > 0 ? '+' : ''}{event.delta}
-                          </span>
-                          <div className="mt-2 text-xs text-stone-500 dark:text-stone-400">{formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}</div>
-                        </div>
-                      </div>
-                      {noteLinks.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {noteLinks.slice(0, 3).map((note) => (
-                            <Link
-                              key={note.id}
-                              to={`/inbox?note=${note.id}`}
-                              className="rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-600 hover:border-stone-300 hover:text-stone-900 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:border-stone-600 dark:hover:text-stone-100"
-                            >
-                              {note.content.split('\n')[0].slice(0, 28)}
-                            </Link>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                }) : (
-                  <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50/80 px-4 py-5 text-sm text-stone-500 dark:border-stone-700 dark:bg-stone-950/20 dark:text-stone-400">
-                    No calibration events yet. As evidence is accepted, this feed will show conviction moves and the notes behind them.
-                  </div>
-                )}
+                <button type="button" onClick={() => { setShowNewBetForm(false); if (editorMode === 'create') resetEditor(); }}
+                  className="p-1.5 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors">
+                  <X className="h-4 w-4" />
+                </button>
               </div>
             </div>
 
-            <CapabilityGraphView
-              bet={selectedCapabilityBet}
-              noteNodes={graphData.noteNodes}
-              ideaNodes={graphData.ideaNodes}
-              edges={graphData.edges}
-              focusNoteId={focusNoteId}
-              focusIdeaId={focusIdeaId}
-            />
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Title</span>
+                <input type="text" value={draft.title}
+                  onChange={(e) => setDraft(c => ({ ...c, title: e.target.value }))}
+                  className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
+                  placeholder="Learn Chinese" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Review cadence</span>
+                <input type="text" value={draft.reviewCadence}
+                  onChange={(e) => setDraft(c => ({ ...c, reviewCadence: e.target.value }))}
+                  className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
+                  placeholder="monthly" />
+              </label>
+            </div>
+
+            <label className="block">
+              <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Thesis</span>
+              <textarea value={draft.thesis} rows={3}
+                onChange={(e) => setDraft(c => ({ ...c, thesis: e.target.value }))}
+                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 resize-none"
+                placeholder="Why is this capability worth watching?" />
+            </label>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Baseline conviction — {draft.baselineConviction}%</span>
+                <input type="range" min={0} max={100} value={draft.baselineConviction}
+                  onChange={(e) => setDraft(c => ({ ...c, baselineConviction: Number(e.target.value) }))}
+                  className="w-full accent-sky-500" />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Commit threshold — {draft.thresholdToCommit}%</span>
+                <input type="range" min={0} max={100} value={draft.thresholdToCommit}
+                  onChange={(e) => setDraft(c => ({ ...c, thresholdToCommit: Number(e.target.value) }))}
+                  className="w-full accent-emerald-500" />
+              </label>
+            </div>
+
+            <label className="block">
+              <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Keywords (comma-separated)</span>
+              <input type="text" value={draft.keywordsText}
+                onChange={(e) => setDraft(c => ({ ...c, keywordsText: e.target.value }))}
+                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
+                placeholder="chinese, mandarin, china" />
+            </label>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Unlock paths (one per line)</span>
+                <textarea value={draft.unlockPathsText} rows={3}
+                  onChange={(e) => setDraft(c => ({ ...c, unlockPathsText: e.target.value }))}
+                  className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 resize-none"
+                  placeholder={'direct market reading\nrelationship access'} />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">First use cases (one per line)</span>
+                <textarea value={draft.firstUseCasesText} rows={3}
+                  onChange={(e) => setDraft(c => ({ ...c, firstUseCasesText: e.target.value }))}
+                  className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 resize-none"
+                  placeholder={'read primary-source chatter\nnavigate docs'} />
+              </label>
+            </div>
+
+            <label className="block">
+              <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Decision rule</span>
+              <textarea value={draft.strategicNote} rows={2}
+                onChange={(e) => setDraft(c => ({ ...c, strategicNote: e.target.value }))}
+                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 resize-none"
+                placeholder="What should be true before this becomes active commitment?" />
+            </label>
+
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => { saveCapabilityBet(); setShowNewBetForm(false); }}
+                disabled={!draft.title.trim() || !draft.thesis.trim()}
+                className="inline-flex items-center gap-2 rounded-full bg-sky-600 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.22em] text-white hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                <CheckCircle2 className="h-4 w-4" />
+                {editorMode === 'edit' ? 'Save changes' : 'Create bet'}
+              </button>
+              <button type="button" onClick={() => { setShowNewBetForm(false); resetEditor(); }}
+                className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-[0.22em] text-stone-600 hover:border-stone-300 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 transition-colors">
+                Cancel
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="flex flex-wrap gap-2">
-          {activeCapabilityBets.map((bet) => (
-            <button
-              key={bet.id}
-              type="button"
-              onClick={() => selectCapabilityBet(bet.id)}
-              className={cn(
-                'rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.22em] transition-colors',
-                selectedCapabilityBet?.id === bet.id
-                  ? 'border-sky-500 bg-sky-500 text-white'
-                  : 'border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:text-stone-900 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:border-stone-600 dark:hover:text-stone-100',
-              )}
-            >
-              {bet.title}
-            </button>
-          ))}
-        </div>
+        {/* ── Selected bet detail panel (single, shown on card click) ── */}
+        {selectedCapabilityBet && (() => {
+          const bet = selectedCapabilityBet;
+          const betHistory = capabilityTimelineEvents
+            .filter(e => e.capabilityBetId === bet.id)
+            .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+          const betSignalEvents = signalEvents
+            .filter(e => e.capabilityBetId === bet.id)
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+          const betGraphData = buildCapabilityGraphData(bet, notes, ideas, signalEvents);
 
-        <div className="space-y-4">
-          {sortedCapabilityBets.map((bet) => (
-            <article key={bet.id} className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm dark:border-stone-800 dark:bg-stone-900/40">
-              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          // Auto-connect notes by keyword match
+          const betKeywords = (bet.keywords ?? []).map(k => k.toLowerCase());
+          const autoConnectedNotes = betKeywords.length > 0
+            ? notes.filter(n =>
+                betKeywords.some(kw => n.content.toLowerCase().includes(kw)) &&
+                !betSignalEvents.some(e => e.noteId === n.id)
+              ).slice(0, 6)
+            : [];
+
+          return (
+            <div className="rounded-3xl border border-stone-200 bg-white shadow-sm dark:border-stone-800 dark:bg-stone-900/40 overflow-hidden">
+              {/* Panel header */}
+              <div className="flex flex-wrap items-start justify-between gap-4 p-5 border-b border-stone-100 dark:border-stone-800">
                 <div className="min-w-0 flex-1">
-                  <div className="mb-3 flex flex-wrap items-center gap-2">
-                    <span className={cn('inline-flex rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em]', BET_STATUS_STYLE[bet.status])}>{bet.status}</span>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">commit at {bet.thresholdToCommit}%</span>
-                    <button
-                      type="button"
-                      onClick={() => selectCapabilityBet(bet.id)}
-                      className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-violet-700 dark:border-violet-900/40 dark:bg-violet-950/20 dark:text-violet-300"
-                    >
-                      Open graph
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditorMode('edit');
-                        setEditingBetId(bet.id);
-                        setDraft(createCapabilityBetDraft(bet));
-                        selectCapabilityBet(bet.id);
-                      }}
-                      className="rounded-full border border-stone-200 bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-600 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300"
-                    >
-                      Edit
-                    </button>
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span className={cn('inline-flex rounded-full border px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em]', BET_STATUS_STYLE[bet.status])}>
+                      {bet.status}
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500">
+                      commit at {bet.thresholdToCommit}%
+                    </span>
+                    {isReviewOverdue(bet.lastReviewed, bet.reviewCadence) && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-700 dark:border-amber-900/30 dark:bg-amber-950/20 dark:text-amber-300">
+                        <AlertTriangle className="h-3 w-3" /> Overdue
+                      </span>
+                    )}
                   </div>
-                  <h3 className="text-2xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">{bet.title}</h3>
-                  <p className="mt-2 max-w-3xl text-stone-600 dark:text-stone-400 leading-relaxed">{bet.thesis}</p>
+                  <h3 className="text-xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">{bet.title}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-stone-500 dark:text-stone-400 max-w-2xl">{bet.thesis}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button type="button"
+                    onClick={() => { setEditorMode('edit'); setEditingBetId(bet.id); setDraft(createCapabilityBetDraft(bet)); setShowNewBetForm(true); }}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-600 hover:border-stone-300 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 transition-colors">
+                    <PenSquare className="h-3 w-3" /> Edit
+                  </button>
+                  <button type="button"
+                    onClick={() => { updateCapabilityBet(bet.id, { status: 'committed' }); addProject({ title: bet.title, description: `Thesis: ${bet.thesis}\n\nUnlock Paths:\n${bet.unlockPaths.map(p => `- ${p}`).join('\n')}\n\nFirst Use Cases:\n${bet.firstUseCases.map(u => `- ${u}`).join('\n')}`, sourceBetId: bet.id, status: 'Active' }); navigate('/projects'); }}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-violet-300 bg-violet-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-violet-700 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-300 transition-colors">
+                    <GitBranch className="h-3 w-3" /> Activate
+                  </button>
+                  <button type="button"
+                    onClick={() => setSearchParams(p => { const n = new URLSearchParams(p); n.delete('bet'); return n; })}
+                    className="p-1.5 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors" aria-label="Close panel">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
 
-                  <div className="mt-5 grid gap-3 md:grid-cols-3 xl:grid-cols-4">
+              <div className="p-5 grid gap-5 lg:grid-cols-[1fr_300px]">
+                {/* Main content column */}
+                <div className="space-y-5">
+                  {/* Metrics */}
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                     <Metric icon={Target} label="Conviction" value={bet.conviction} />
                     <Metric icon={Radar} label="Salience" value={bet.salience} />
                     <Metric icon={CheckCircle2} label="Supporting" value={bet.supportingSignalIds.length ? Math.min(100, bet.supportingSignalIds.length * 20) : 0} />
-                    <Metric icon={AlertTriangle} label="Contrary risk" value={bet.contradictingSignalIds.length ? Math.min(100, bet.contradictingSignalIds.length * 25) : 0} />
+                    <Metric icon={AlertTriangle} label="Contrary" value={bet.contradictingSignalIds.length ? Math.min(100, bet.contradictingSignalIds.length * 25) : 0} />
                   </div>
 
+                  {/* Conviction bar */}
+                  <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
+                    <div className="mb-1.5 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500">
+                      <span>Progress to commit</span>
+                      <span className="text-stone-600 dark:text-stone-300">{bet.conviction}% / {bet.thresholdToCommit}%</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-stone-200 dark:bg-stone-800 overflow-hidden">
+                      <div className={cn('h-full rounded-full transition-all', bet.conviction >= bet.thresholdToCommit ? 'bg-emerald-500' : bet.conviction >= 60 ? 'bg-sky-500' : bet.conviction >= 40 ? 'bg-amber-400' : 'bg-stone-400')}
+                        style={{ width: `${Math.min(100, (bet.conviction / bet.thresholdToCommit) * 100)}%` }} />
+                    </div>
+                    <div className="mt-3 grid gap-2 grid-cols-2 md:grid-cols-4 text-xs text-stone-500 dark:text-stone-400">
+                      <div><span className="font-semibold text-stone-700 dark:text-stone-300">Baseline:</span> {bet.baselineConviction}%</div>
+                      <div><span className="font-semibold text-stone-700 dark:text-stone-300">Cadence:</span> {bet.reviewCadence || 'not set'}</div>
+                      <div><span className="font-semibold text-stone-700 dark:text-stone-300">Last reviewed:</span> {formatDistanceToNow(new Date(bet.lastReviewed), { addSuffix: true })}</div>
+                      <div><span className="font-semibold text-stone-700 dark:text-stone-300">Cost of skip:</span> {bet.costOfNotKnowing || 'n/a'}</div>
+                    </div>
+                  </div>
+
+                  {/* Overdue action */}
                   {isReviewOverdue(bet.lastReviewed, bet.reviewCadence) && (
-                    <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/30 dark:bg-amber-950/20 dark:text-amber-300">
-                      <div className="flex items-center gap-1.5 font-medium">
-                        <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                        <span>⚠️ Review Overdue ({formatDistanceToNow(new Date(bet.lastReviewed), { addSuffix: true })})</span>
+                    <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/30 dark:bg-amber-950/20 dark:text-amber-300">
+                      <div className="flex items-center gap-2 font-medium">
+                        <AlertTriangle className="h-4 w-4 shrink-0" />
+                        Review overdue — {formatDistanceToNow(new Date(bet.lastReviewed), { addSuffix: true })}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => updateCapabilityBet(bet.id, { lastReviewed: new Date().toISOString() })}
-                        className="rounded-xl bg-amber-600 hover:bg-amber-700 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white transition-colors"
-                      >
+                      <button type="button" onClick={() => updateCapabilityBet(bet.id, { lastReviewed: new Date().toISOString() })}
+                        className="rounded-xl bg-amber-600 hover:bg-amber-700 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white transition-colors shrink-0">
                         Mark Reviewed
                       </button>
                     </div>
                   )}
 
-                  <div className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
-                    <div className="mb-2 flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">
-                      <span>Strategic commitment threshold</span>
-                      <span>{bet.conviction}%</span>
+                  {/* Auto-connected notes */}
+                  {autoConnectedNotes.length > 0 && (
+                    <div className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4 dark:border-sky-900/30 dark:bg-sky-950/10">
+                      <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-sky-600 dark:text-sky-400">
+                        <BrainCircuit className="h-3.5 w-3.5" />
+                        Auto-connected notes ({autoConnectedNotes.length}) — matched by keywords
+                      </div>
+                      <div className="space-y-2">
+                        {autoConnectedNotes.map(note => (
+                          <Link key={note.id} to={`/inbox?note=${note.id}`}
+                            className="flex items-start gap-2 rounded-xl border border-sky-100 bg-white/80 px-3 py-2 text-xs text-stone-700 hover:border-sky-300 hover:shadow-sm transition-all dark:border-sky-900/20 dark:bg-stone-900/40 dark:text-stone-300">
+                            <ArrowRight className="h-3 w-3 mt-0.5 text-sky-500 shrink-0" />
+                            <span className="line-clamp-2">{note.content.split('\n')[0].slice(0, 120)}</span>
+                            <span className="ml-auto shrink-0 text-stone-400">{formatDistanceToNow(new Date(note.createdAt), { addSuffix: true })}</span>
+                          </Link>
+                        ))}
+                      </div>
                     </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800">
-                      <div className="h-full rounded-full bg-sky-500 transition-all" style={{ width: `${bet.conviction}%` }} />
-                    </div>
-                    <div className="mt-3 grid gap-2 md:grid-cols-4 text-sm text-stone-600 dark:text-stone-400">
-                      <div><span className="font-medium text-stone-900 dark:text-stone-100">Baseline:</span> {bet.baselineConviction}%</div>
-                      <div><span className="font-medium text-stone-900 dark:text-stone-100">Review cadence:</span> {bet.reviewCadence ?? 'not set'}</div>
-                      <div><span className="font-medium text-stone-900 dark:text-stone-100">Last evidence:</span> {formatDistanceToNow(new Date(bet.lastReviewed), { addSuffix: true })}</div>
-                      <div><span className="font-medium text-stone-900 dark:text-stone-100">If not pursued:</span> {bet.costOfNotKnowing ?? 'n/a'}</div>
-                    </div>
-                  </div>
+                  )}
 
-                  <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">Unlock paths</div>
-                      <ul className="mt-3 space-y-2 text-sm text-stone-700 dark:text-stone-300">
-                        {bet.unlockPaths.map((item) => <li key={item}>- {item}</li>)}
-                      </ul>
+                  {/* Signal events */}
+                  {betSignalEvents.length > 0 && (
+                    <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
+                      <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">
+                        <GitBranch className="h-3.5 w-3.5" />
+                        Linked evidence ({betSignalEvents.length})
+                      </div>
+                      <div className="space-y-2">
+                        {betSignalEvents.slice(0, 5).map(event => (
+                          <div key={event.id} className="flex items-start gap-3 rounded-xl border border-stone-200 bg-white/80 px-3 py-2.5 dark:border-stone-700 dark:bg-stone-900/40">
+                            <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider mt-0.5',
+                              event.polarity === 'supports' ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-emerald-300'
+                              : event.polarity === 'contradicts' ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/30 dark:bg-rose-950/20 dark:text-rose-300'
+                              : 'border-stone-200 bg-stone-100 text-stone-600 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300')}>
+                              {event.polarity}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs text-stone-700 dark:text-stone-300 leading-relaxed line-clamp-2">{event.summary}</p>
+                              <div className="mt-1 text-[10px] text-stone-400 dark:text-stone-500">weight {event.weight} · {formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">First use cases</div>
-                      <ul className="mt-3 space-y-2 text-sm text-stone-700 dark:text-stone-300">
-                        {bet.firstUseCases.map((item) => <li key={item}>- {item}</li>)}
-                      </ul>
-                    </div>
-                  </div>
+                  )}
 
-                  <div className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">Conviction history</div>
-                      <span className="text-xs text-stone-500 dark:text-stone-400">{bet.history.length} event{bet.history.length === 1 ? '' : 's'}</span>
+                  {/* Conviction history */}
+                  <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
+                    <div className="mb-3 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">
+                      <span className="flex items-center gap-2"><History className="h-3.5 w-3.5" /> Conviction history</span>
+                      <span>{betHistory.length} event{betHistory.length === 1 ? '' : 's'}</span>
                     </div>
-                    <Sparkline values={bet.history.map((entry) => entry.conviction)} />
-                    <div className="mt-4 space-y-3">
-                      {bet.history.slice(-4).reverse().map((event: CapabilityTimelineEvent) => {
+                    <Sparkline values={betHistory.map(e => e.conviction)} />
+                    <div className="mt-4 space-y-2">
+                      {betHistory.slice(-4).reverse().map((event: CapabilityTimelineEvent) => {
                         const noteLinks = event.evidenceIds
-                          .map((id) => id.split(':').slice(1).join(':'))
-                          .map((noteId) => notes.find((note) => note.id === noteId))
+                          .map(id => id.split(':').slice(1).join(':'))
+                          .map(nid => notes.find(n => n.id === nid))
                           .filter(Boolean) as Note[];
                         return (
-                          <div key={event.id} className="rounded-2xl border border-white/80 bg-white/90 px-4 py-3 dark:border-stone-800 dark:bg-stone-900/60">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className={cn('inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.22em]', getTimelineColor(event.delta))}>
+                          <div key={event.id} className="rounded-xl border border-stone-200 bg-white/90 px-3 py-2.5 dark:border-stone-700 dark:bg-stone-900/60">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider', getTimelineColor(event.delta))}>
                                   {event.delta > 0 ? '+' : ''}{event.delta}
                                 </span>
                                 <span className="text-xs text-stone-500 dark:text-stone-400">{event.reason}</span>
                               </div>
-                              <span className="text-xs text-stone-500 dark:text-stone-400">{formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}</span>
+                              <span className="text-[10px] text-stone-400 dark:text-stone-500">{formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}</span>
                             </div>
-                            <p className="mt-2 text-sm leading-relaxed text-stone-700 dark:text-stone-300">{event.summary}</p>
+                            <p className="mt-1.5 text-xs leading-relaxed text-stone-600 dark:text-stone-400">{event.summary}</p>
                             {noteLinks.length > 0 && (
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                {noteLinks.slice(0, 3).map((note) => (
-                                  <Link
-                                    key={note.id}
-                                    to={`/inbox?note=${note.id}`}
-                                    className="rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-600 hover:border-stone-300 hover:text-stone-900 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:border-stone-600 dark:hover:text-stone-100"
-                                  >
-                                    {note.content.split('\n')[0].slice(0, 28)}
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {noteLinks.slice(0, 3).map(note => (
+                                  <Link key={note.id} to={`/inbox?note=${note.id}`}
+                                    className="rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-[10px] text-stone-600 hover:border-stone-300 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300">
+                                    {note.content.split('\n')[0].slice(0, 24)}…
                                   </Link>
                                 ))}
                               </div>
@@ -1597,73 +1471,84 @@ Return the markdown report. Be direct, insightful, and clear.`;
                       })}
                     </div>
                   </div>
+                </div>
 
-                  {!!bet.relatedEvents?.length && (
-                    <div className="mt-5 rounded-2xl border border-sky-200 bg-sky-50/70 p-4 dark:border-sky-900/40 dark:bg-sky-950/20">
-                      <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-sky-700 dark:text-sky-300">
-                        <GitBranch className="h-3.5 w-3.5" />
-                        latest linked evidence
-                      </div>
-                      <div className="space-y-3">
-                        {bet.relatedEvents.slice(0, 4).map((event) => (
-                          <div key={event.id} className="rounded-2xl border border-sky-100 bg-white/90 px-4 py-3 dark:border-sky-900/30 dark:bg-stone-900/50">
-                            <div className="mb-2 flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">
-                              <span>{event.polarity}</span>
-                              <span>weight {event.weight}</span>
-                              <span>{formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}</span>
-                            </div>
-                            <p className="text-sm leading-relaxed text-stone-700 dark:text-stone-300">{event.summary}</p>
-                          </div>
+                {/* Right sidebar */}
+                <div className="space-y-4">
+                  {/* Decision rule */}
+                  <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500 mb-2">Decision rule</div>
+                    <p className="text-sm leading-relaxed text-stone-700 dark:text-stone-300">
+                      {bet.strategicNote || 'Commit only when repeated signals make this economically or strategically real.'}
+                    </p>
+                    <div className="mt-4 space-y-2">
+                      <ActionLabel icon={Radar} text={bet.status === 'committed' ? 'Move into active execution' : 'Keep passively monitoring notes'} />
+                      <ActionLabel icon={Target} text={bet.status === 'preparing' ? 'Set up study system and first use case' : 'Wait for stronger repeated signals'} />
+                      <ActionLabel icon={Sparkles} text={bet.status === 'exploring' ? 'Collect higher-quality evidence' : 'Let weak signals accumulate naturally'} />
+                    </div>
+                  </div>
+
+                  {/* Keywords */}
+                  {(bet.keywords ?? []).length > 0 && (
+                    <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500 mb-2">Keywords</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {bet.keywords.map(k => (
+                          <span key={k} className="rounded-full border border-stone-200 bg-white px-2.5 py-0.5 text-xs text-stone-600 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300">{k}</span>
                         ))}
                       </div>
                     </div>
                   )}
-                </div>
 
-                <div className="w-full lg:w-72 shrink-0 rounded-2xl border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
-                  <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">Decision rule</div>
-                  <p className="mt-3 text-sm leading-relaxed text-stone-700 dark:text-stone-300">{bet.strategicNote ?? 'Commit only when repeated signals make this economically or strategically real.'}</p>
-                  <div className="mt-4 space-y-2 text-sm">
-                    <ActionLabel icon={Radar} text={bet.status === 'committed' ? 'Move into active execution' : 'Keep passively monitoring notes'} />
-                    <ActionLabel icon={Target} text={bet.status === 'preparing' ? 'Set up study system and first use case' : 'Wait for stronger repeated signals'} />
-                    <ActionLabel icon={Sparkles} text={bet.status === 'exploring' ? 'Collect higher-quality evidence' : 'Let weak signals accumulate naturally'} />
-                  </div>
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      updateCapabilityBet(bet.id, { status: 'committed' });
-                      addProject({
-                        title: bet.title,
-                        description: `Thesis: ${bet.thesis}
+                  {/* Unlock paths */}
+                  {(bet.unlockPaths ?? []).length > 0 && (
+                    <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500 mb-2">Unlock paths</div>
+                      <ul className="space-y-1.5">
+                        {bet.unlockPaths.map(item => <li key={item} className="text-xs text-stone-700 dark:text-stone-300 flex items-start gap-1.5"><span className="text-stone-400 mt-0.5">–</span>{item}</li>)}
+                      </ul>
+                    </div>
+                  )}
 
-Unlock Paths:
-${bet.unlockPaths.map(p => `- ${p}`).join('\n')}
+                  {/* First use cases */}
+                  {(bet.firstUseCases ?? []).length > 0 && (
+                    <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500 mb-2">First use cases</div>
+                      <ul className="space-y-1.5">
+                        {bet.firstUseCases.map(item => <li key={item} className="text-xs text-stone-700 dark:text-stone-300 flex items-start gap-1.5"><span className="text-stone-400 mt-0.5">–</span>{item}</li>)}
+                      </ul>
+                    </div>
+                  )}
 
-First Use Cases:
-${bet.firstUseCases.map(u => `- ${u}`).join('\n')}`,
-                        sourceBetId: bet.id,
-                        status: 'Active',
-                      });
-                      navigate('/projects');
-                    }}
-                    className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl bg-violet-600 hover:bg-violet-700 px-3 py-2.5 text-xs font-bold uppercase tracking-widest text-white transition-all active:scale-95 shadow-sm hover:shadow"
-                  >
-                    <GitBranch className="h-4 w-4" />
-                    Activate as Project
-                  </button>
+                  {/* Graph view mini */}
+                  <CapabilityGraphView
+                    bet={bet}
+                    noteNodes={betGraphData.noteNodes}
+                    ideaNodes={betGraphData.ideaNodes}
+                    edges={betGraphData.edges}
+                    focusNoteId={focusNoteId}
+                    focusIdeaId={focusIdeaId}
+                  />
                 </div>
               </div>
-            </article>
-          ))}
-
-          {!sortedCapabilityBets.length && (
-            <div className="rounded-3xl border border-dashed border-stone-300 bg-stone-50 p-10 text-center text-stone-500 dark:border-stone-700 dark:bg-stone-900/20 dark:text-stone-400">
-              No capability bets yet. Add one above and it will start accumulating evidence through Inbox and Review.
             </div>
-          )}
-        </div>
+          );
+        })()}
+
+        {/* Empty state */}
+        {!selectedCapabilityBet && activeCapabilityBets.length === 0 && !showNewBetForm && (
+          <div className="rounded-3xl border border-dashed border-stone-300 bg-stone-50 p-10 text-center text-stone-500 dark:border-stone-700 dark:bg-stone-900/20 dark:text-stone-400">
+            No capability bets yet. Click <strong>New Bet</strong> above to start tracking your first capability.
+          </div>
+        )}
+
+        {!selectedCapabilityBet && activeCapabilityBets.length > 0 && !showNewBetForm && (
+          <div className="rounded-2xl border border-dashed border-stone-200 bg-stone-50/50 px-4 py-5 text-center text-sm text-stone-400 dark:border-stone-700 dark:bg-stone-950/20 dark:text-stone-500">
+            Click any bet card above to see its full detail panel.
+          </div>
+        )}
       </section>
+
 
       <div className="space-y-5">
         {incubationIdeas.map(({ idea, score, state, linkedSignalNotes, isFocused }) => (
