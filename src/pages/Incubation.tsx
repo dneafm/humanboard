@@ -19,6 +19,7 @@ import {
   History,
   X,
   Brain,
+  Wand2,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { askGemma } from '../lib/ai';
@@ -509,6 +510,100 @@ export default function IncubationPage() {
   const [selectedInsight, setSelectedInsight] = useState<Idea | null>(null);
   const [justDumped, setJustDumped] = useState(false);
 
+  // AI Bet Scout state
+  type ScoutedBet = {
+    id: string;
+    title: string;
+    thesis: string;
+    keywords: string[];
+    unlockPaths: string[];
+    firstUseCases: string[];
+    costOfNotKnowing: string;
+    reasoning: string;
+  };
+  const [scoutedBets, setScoutedBets] = useState<ScoutedBet[]>([]);
+  const [isScouting, setIsScouting] = useState(false);
+  const [scoutError, setScoutError] = useState<string | null>(null);
+
+  const handleScoutBets = async () => {
+    setIsScouting(true);
+    setScoutError(null);
+    setScoutedBets([]);
+    try {
+      const existingTitles = capabilityBets.filter(b => !b.archivedAt).map(b => b.title).join(', ');
+      const notesSample = notes.slice(0, 50).map(n => `- ${n.content.slice(0, 120)}`).join('\n');
+      const ideasSample = ideas.slice(0, 30).map(i => `- ${i.title}: ${i.summary?.slice(0, 100) || ''}`).join('\n');
+      const goalsSample = useAppStore.getState().goals.map(g => `- ${g.title}: ${g.description?.slice(0, 80) || ''}`).join('\n');
+
+      const prompt = `You are a strategic capability advisor. Based on the user's personal knowledge vault, identify 3 to 5 capability bets they should formally track but haven't yet.
+
+A capability bet is a specific skill, domain, or strategic area worth patiently developing and monitoring for market/personal signals.
+
+Existing bets (DO NOT suggest duplicates): ${existingTitles || 'none yet'}
+
+Recent raw notes:
+${notesSample || '(none)'}
+
+Strategic ideas:
+${ideasSample || '(none)'}
+
+Goals:
+${goalsSample || '(none)'}
+
+Rules:
+- Suggest only bets NOT already tracked above
+- Each bet must be grounded in actual patterns from their notes/ideas, not generic advice
+- Be specific, not vague ("Conversational AI Product Design" not "Learn AI")
+- Return ONLY valid JSON — no markdown, no explanation outside the JSON
+
+Return this exact JSON format:
+[
+  {
+    "title": "Short precise bet name",
+    "thesis": "2-3 sentence strategic case for why this capability matters now",
+    "keywords": ["keyword1", "keyword2", "keyword3"],
+    "unlockPaths": ["First concrete step", "Second step"],
+    "firstUseCases": ["First real application", "Second application"],
+    "costOfNotKnowing": "What the user risks by ignoring this",
+    "reasoning": "One sentence citing specific evidence from their notes/ideas"
+  }
+]`;
+
+      const systemInstruction = 'You are a strategic capability advisor. Always return only valid JSON arrays. No markdown code blocks, no commentary outside JSON.';
+      const raw = await askGemma(prompt, systemInstruction);
+
+      // Strip possible markdown code fences
+      const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+      const parsed = JSON.parse(cleaned) as Omit<ScoutedBet, 'id'>[];
+      const withIds = parsed.map((b, i) => ({ ...b, id: `scout-${Date.now()}-${i}` }));
+      setScoutedBets(withIds);
+    } catch (err) {
+      console.error(err);
+      setScoutError(err instanceof Error ? err.message : 'Scout failed. Try again.');
+    } finally {
+      setIsScouting(false);
+    }
+  };
+
+  const handleAcceptScoutedBet = (bet: ScoutedBet) => {
+    addCapabilityBet({
+      title: bet.title,
+      thesis: bet.thesis,
+      keywords: bet.keywords,
+      unlockPaths: bet.unlockPaths,
+      firstUseCases: bet.firstUseCases,
+      costOfNotKnowing: bet.costOfNotKnowing,
+      baselineConviction: 30,
+      thresholdToCommit: 80,
+      reviewCadence: 'monthly',
+    });
+    setScoutedBets(prev => prev.filter(b => b.id !== bet.id));
+  };
+
+  const handleDismissScoutedBet = (id: string) => {
+    setScoutedBets(prev => prev.filter(b => b.id !== id));
+  };
+
   const handleDumpToInbox = () => {
     if (!reflectionText.trim()) return;
     const promptText = REFLECTION_PROMPTS[promptIndex];
@@ -859,7 +954,7 @@ Return the markdown report. Be direct, insightful, and clear.`;
       </div>
 
       <section className="space-y-5">
-        <div className="flex items-end justify-between gap-4">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-sky-700 dark:border-sky-900/30 dark:bg-sky-900/20 dark:text-sky-300">
               <Globe2 className="h-3.5 w-3.5" />
@@ -870,8 +965,28 @@ Return the markdown report. Be direct, insightful, and clear.`;
               Bets are no longer hardcoded watch cards. They now have editable definitions, a visible graph from notes into ideas, and a timeline that records conviction shifts instead of hiding them inside one current number.
             </p>
           </div>
-          <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-600 shadow-sm dark:border-stone-800 dark:bg-stone-900/40 dark:text-stone-300">
-            {signalEvents.length} linked signal event{signalEvents.length === 1 ? '' : 's'} across {activeCapabilityBets.length} active bet{activeCapabilityBets.length === 1 ? '' : 's'}
+          <div className="flex items-center gap-3">
+            <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-600 shadow-sm dark:border-stone-800 dark:bg-stone-900/40 dark:text-stone-300">
+              {signalEvents.length} linked signal event{signalEvents.length === 1 ? '' : 's'} across {activeCapabilityBets.length} active bet{activeCapabilityBets.length === 1 ? '' : 's'}
+            </div>
+            <button
+              type="button"
+              onClick={handleScoutBets}
+              disabled={isScouting}
+              className="inline-flex items-center gap-2 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-semibold text-violet-700 shadow-sm transition-all hover:bg-violet-100 hover:shadow disabled:opacity-60 dark:border-violet-900/40 dark:bg-violet-950/20 dark:text-violet-300 dark:hover:bg-violet-950/40"
+            >
+              {isScouting ? (
+                <>
+                  <BrainCircuit className="h-4 w-4 animate-pulse" />
+                  Scouting…
+                </>
+              ) : (
+                <>
+                  <Wand2 className="h-4 w-4" />
+                  Scout Bets
+                </>
+              )}
+            </button>
           </div>
         </div>
 
@@ -969,6 +1084,83 @@ Return the markdown report. Be direct, insightful, and clear.`;
                   </button>
                 );
               })}
+          </div>
+        )}
+
+        {/* Scout error */}
+        {scoutError && (
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/30 dark:bg-rose-950/20 dark:text-rose-300">
+            <span>{scoutError}</span>
+            <button type="button" onClick={() => setScoutError(null)} className="shrink-0 text-rose-400 hover:text-rose-600"><X className="h-4 w-4" /></button>
+          </div>
+        )}
+
+        {/* Scouted draft bet cards */}
+        {scoutedBets.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-violet-600 dark:text-violet-400">
+              <Wand2 className="h-3.5 w-3.5" />
+              AI Suggested Bets — review and accept any that resonate
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {scoutedBets.map((bet) => (
+                <div
+                  key={bet.id}
+                  className="relative flex flex-col gap-3 rounded-2xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-900/40 dark:bg-violet-950/10"
+                >
+                  {/* Dismiss */}
+                  <button
+                    type="button"
+                    onClick={() => handleDismissScoutedBet(bet.id)}
+                    className="absolute top-3 right-3 p-0.5 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 transition-colors"
+                    aria-label="Dismiss suggestion"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+
+                  {/* Status chip */}
+                  <span className="inline-flex w-fit rounded-full border border-violet-300 bg-white px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-violet-600 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300">
+                    AI suggestion
+                  </span>
+
+                  {/* Title */}
+                  <div className="text-sm font-semibold text-stone-900 dark:text-stone-100 leading-snug pr-5">
+                    {bet.title}
+                  </div>
+
+                  {/* Thesis */}
+                  <p className="text-xs leading-relaxed text-stone-600 dark:text-stone-400 line-clamp-3">
+                    {bet.thesis}
+                  </p>
+
+                  {/* Reasoning chip */}
+                  <div className="rounded-xl border border-violet-100 bg-white/70 px-3 py-2 text-[10px] text-violet-700 dark:border-violet-900/30 dark:bg-violet-950/20 dark:text-violet-300 leading-relaxed">
+                    <span className="font-bold uppercase tracking-wider mr-1">Why:</span>{bet.reasoning}
+                  </div>
+
+                  {/* Keywords */}
+                  {bet.keywords.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {bet.keywords.slice(0, 5).map(k => (
+                        <span key={k} className="rounded-full border border-stone-200 bg-white px-2 py-0.5 text-[9px] font-medium text-stone-600 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300">
+                          {k}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Accept */}
+                  <button
+                    type="button"
+                    onClick={() => handleAcceptScoutedBet(bet)}
+                    className="mt-auto flex items-center justify-center gap-2 rounded-xl bg-violet-600 hover:bg-violet-700 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white transition-all active:scale-95"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add to Watchlist
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
