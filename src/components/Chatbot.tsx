@@ -1013,7 +1013,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
   return (
     <div 
       className={cn(
-        "fixed z-50 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-850 shadow-2xl flex transition-all duration-300 ease-in-out overflow-hidden bottom-3 right-3 left-3 max-w-[calc(100vw-1.5rem)] md:left-auto md:bottom-6 md:right-6",
+        "fixed z-50 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 shadow-2xl flex transition-all duration-300 ease-in-out overflow-hidden bottom-3 right-3 left-3 max-w-[calc(100vw-1.5rem)] md:left-auto md:bottom-6 md:right-6",
         isExpanded
           ? "h-[85vh] md:w-[760px] md:h-[800px] rounded-xl"
           : "w-full h-[70vh] md:w-[400px] md:h-[600px] rounded-2xl"
@@ -1085,7 +1085,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
         </div>
 
         {/* Sidebar Chat List */}
-        <div className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3 space-y-1">
           {filteredThreads.length === 0 ? (
             <div className="text-center py-8 text-xs text-stone-400">
               {searchQuery ? 'No matching chats' : 'No chats yet'}
@@ -1228,7 +1228,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
         </div>
 
         {/* Message List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-white dark:bg-stone-900">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-6 bg-white dark:bg-stone-900">
           {displayedMessages.map((msg) => (
             <div key={msg.id} className={cn("flex", msg.role === 'user' ? "justify-end" : "justify-start")}>
               <div className={cn(
