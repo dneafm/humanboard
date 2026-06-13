@@ -80,6 +80,8 @@ const DEFAULT_SNAPSHOT = {
   fusionItems: [],
   fusionSuggestions: [],
   lastDailyFusionScan: '',
+  chatThreads: [],
+  activeThreadId: '',
 };
 
 let appVersion = '0.0.0';
@@ -185,9 +187,23 @@ function normalizeSnapshot(raw = {}) {
   snapshot.fusionSuggestions = Array.isArray(snapshot.fusionSuggestions) ? snapshot.fusionSuggestions : [];
   snapshot.lastDailyFusionScan = String(snapshot.lastDailyFusionScan || '');
   
+  snapshot.chatThreads = Array.isArray(snapshot.chatThreads) ? snapshot.chatThreads : [];
+  snapshot.activeThreadId = String(snapshot.activeThreadId || '');
+  
   const chatCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   snapshot.chatMessages = (Array.isArray(snapshot.chatMessages) ? snapshot.chatMessages : [])
     .filter(m => m && m.createdAt && m.createdAt >= chatCutoff);
+
+  if (snapshot.chatThreads.length === 0 && snapshot.chatMessages.length > 0) {
+    snapshot.chatThreads.push({
+      id: 'legacy-thread',
+      title: 'Legacy Chat',
+      messages: snapshot.chatMessages,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    snapshot.activeThreadId = 'legacy-thread';
+  }
   snapshot.aiCostTracking = snapshot.aiCostTracking && typeof snapshot.aiCostTracking === 'object'
     ? {
         totals: {

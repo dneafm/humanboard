@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { defaultSections } from './lib/storage/defaultSnapshot';
 import { localSnapshotRepository } from './lib/storage/localSnapshotRepository';
-import type { AppSnapshot, ChatMessage } from './lib/storage/types';
+import type { AppSnapshot, ChatMessage, ChatThread } from './lib/storage/types';
 
 export type SignalDirection = 'Supports' | 'Weakens' | 'Mixed' | 'Unclear';
 export type PredictionHorizon = 'Near' | 'Mid' | 'Long';
@@ -434,7 +434,14 @@ interface AppState {
   capabilityTimelineEvents: CapabilityTimelineEvent[];
   isDarkMode: boolean;
   chatMessages: ChatMessage[];
+  chatThreads: ChatThread[];
+  activeThreadId: string;
   setChatMessages: (messages: ChatMessage[]) => void;
+  setChatThreads: (threads: ChatThread[]) => void;
+  setActiveThreadId: (id: string) => void;
+  createChatThread: (title?: string) => string;
+  deleteChatThread: (id: string) => void;
+  renameChatThread: (id: string, title: string) => void;
   addNote: (content: string) => void;
   updateNote: (id: string, updates: Partial<Note>) => void;
   deleteNote: (id: string) => void;
@@ -982,17 +989,126 @@ export const useAppStore = create<AppState>((set, get) => ({
   capabilityTimelineEvents: initialCapabilityTimelineEvents,
   isDarkMode: false,
   chatMessages: [],
+  chatThreads: [],
+  activeThreadId: '',
   fusionSuggestions: [],
   lastDailyFusionScan: '',
   setChatMessages: (messages) => set((state) => {
-    const chatCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const nextMessages = messages.filter((m) => m && m.createdAt && m.createdAt >= chatCutoff);
+    let activeId = state.activeThreadId;
+    let chatThreads = [...state.chatThreads];
+    
+    // Auto-rename title if it's the default name and it's the user's first prompt
+    const userPrompt = messages.find(m => m.role === 'user')?.content || '';
+    const cleanPrompt = userPrompt.slice(0, 32).trim();
+    
+    if (!activeId) {
+      activeId = randomId();
+      chatThreads = [{
+        id: activeId,
+        title: cleanPrompt || 'New Conversation',
+        messages,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }, ...chatThreads];
+    } else {
+      chatThreads = chatThreads.map(t => t.id === activeId ? {
+        ...t,
+        messages,
+        updatedAt: new Date().toISOString(),
+        title: (t.title === 'New Conversation' || t.title === 'Legacy Chat') && cleanPrompt
+          ? cleanPrompt
+          : t.title
+      } : t);
+    }
+    
     const next = {
       ...state,
-      chatMessages: nextMessages,
+      chatThreads,
+      activeThreadId: activeId,
+      chatMessages: messages,
     };
     persistSnapshot(next);
-    return { chatMessages: nextMessages };
+    return { chatThreads, activeThreadId: activeId, chatMessages: messages };
+  }),
+  setChatThreads: (threads) => set((state) => {
+    const activeThread = threads.find(t => t.id === state.activeThreadId) || threads[0];
+    const activeThreadId = activeThread ? activeThread.id : '';
+    const chatMessages = activeThread ? activeThread.messages : [];
+    const next = {
+      ...state,
+      chatThreads: threads,
+      activeThreadId,
+      chatMessages,
+    };
+    persistSnapshot(next);
+    return { chatThreads: threads, activeThreadId, chatMessages };
+  }),
+  setActiveThreadId: (id) => set((state) => {
+    const activeThread = state.chatThreads.find(t => t.id === id);
+    const chatMessages = activeThread ? activeThread.messages : [];
+    const next = {
+      ...state,
+      activeThreadId: id,
+      chatMessages,
+    };
+    persistSnapshot(next);
+    return { activeThreadId: id, chatMessages };
+  }),
+  createChatThread: (title) => {
+    const id = randomId();
+    const newThread: ChatThread = {
+      id,
+      title: title || 'New Conversation',
+      messages: [
+        {
+          id: 'greeting-' + id,
+          role: 'model',
+          content: "Hi. I'm your HumanBoard assistant. I can help refine ideas, suggest experiments, summarize notes, and connect thoughts across the app. What are we working on?",
+          createdAt: new Date().toISOString(),
+        }
+      ],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    set((state) => {
+      const chatThreads = [newThread, ...state.chatThreads];
+      const next = {
+        ...state,
+        chatThreads,
+        activeThreadId: id,
+        chatMessages: newThread.messages,
+      };
+      persistSnapshot(next);
+      return { chatThreads, activeThreadId: id, chatMessages: newThread.messages };
+    });
+    return id;
+  },
+  deleteChatThread: (id) => set((state) => {
+    const chatThreads = state.chatThreads.filter(t => t.id !== id);
+    let activeThreadId = state.activeThreadId;
+    if (activeThreadId === id) {
+      activeThreadId = chatThreads[0] ? chatThreads[0].id : '';
+    }
+    const activeThread = chatThreads.find(t => t.id === activeThreadId);
+    const chatMessages = activeThread ? activeThread.messages : [];
+    const next = {
+      ...state,
+      chatThreads,
+      activeThreadId,
+      chatMessages,
+    };
+    persistSnapshot(next);
+    return { chatThreads, activeThreadId, chatMessages };
+  }),
+  renameChatThread: (id, title) => set((state) => {
+    const chatThreads = state.chatThreads.map(t => t.id === id ? { ...t, title: title.trim() || 'Untitled', updatedAt: new Date().toISOString() } : t);
+    const next = {
+      ...state,
+      chatThreads,
+    };
+    persistSnapshot(next);
+    return { chatThreads };
   }),
   addNote: (content) => set((state) => {
     const nextNotes = [{ id: randomId(), content, createdAt: new Date().toISOString(), layer: 'raw' as const }, ...state.notes];
@@ -1494,8 +1610,16 @@ export async function hydrateAppStoreFromRepository() {
     signalEvents: finalSnapshot.signalEvents,
     capabilityTimelineEvents: finalSnapshot.capabilityTimelineEvents,
     isDarkMode: finalSnapshot.isDarkMode,
-    chatMessages: (Array.isArray(finalSnapshot.chatMessages) ? finalSnapshot.chatMessages : [])
-      .filter((m) => m && m.createdAt && m.createdAt >= chatCutoff),
+    chatThreads: finalSnapshot.chatThreads ?? [],
+    activeThreadId: finalSnapshot.activeThreadId ?? '',
+    chatMessages: (() => {
+      const threads = finalSnapshot.chatThreads ?? [];
+      const activeId = finalSnapshot.activeThreadId ?? '';
+      const activeThread = threads.find(t => t.id === activeId) || threads[0];
+      if (activeThread) return activeThread.messages;
+      return (Array.isArray(finalSnapshot.chatMessages) ? finalSnapshot.chatMessages : [])
+        .filter((m) => m && m.createdAt && m.createdAt >= chatCutoff);
+    })(),
     fusionItems: finalSnapshot.fusionItems ?? [],
     fusionSuggestions: finalSnapshot.fusionSuggestions ?? [],
     lastDailyFusionScan: finalSnapshot.lastDailyFusionScan ?? '',

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Bot, X, Send, Maximize2, Minimize2, BookmarkPlus, Check, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Bot, X, Send, Maximize2, Minimize2, BookmarkPlus, Check, Image as ImageIcon, Loader2, Plus, Trash2, Pencil, Search, Menu } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
@@ -63,6 +63,20 @@ export default function Chatbot() {
   
   const chatMessages = useAppStore((state) => state.chatMessages);
   const setChatMessages = useAppStore((state) => state.setChatMessages);
+
+  // Chat thread management store bindings
+  const chatThreads = useAppStore((state) => state.chatThreads);
+  const activeThreadId = useAppStore((state) => state.activeThreadId);
+  const setActiveThreadId = useAppStore((state) => state.setActiveThreadId);
+  const createChatThread = useAppStore((state) => state.createChatThread);
+  const deleteChatThread = useAppStore((state) => state.deleteChatThread);
+  const renameChatThread = useAppStore((state) => state.renameChatThread);
+
+  // Local component states for conversation threads
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
+  const [editTitleInput, setEditTitleInput] = useState('');
 
   const displayedMessages = useMemo<ChatMessage[]>(() => {
     if (!chatMessages || chatMessages.length === 0) {
@@ -913,6 +927,41 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
     }
   };
 
+  // Filter threads based on search query
+  const filteredThreads = useMemo(() => {
+    if (!searchQuery.trim()) return chatThreads;
+    const q = searchQuery.toLowerCase();
+    return chatThreads.filter(t => 
+      t.title.toLowerCase().includes(q) || 
+      t.messages.some(m => m.content.toLowerCase().includes(q))
+    );
+  }, [chatThreads, searchQuery]);
+
+  const handleStartRename = (id: string, title: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingThreadId(id);
+    setEditTitleInput(title);
+  };
+
+  const handleSaveRename = (id: string) => {
+    if (editTitleInput.trim()) {
+      renameChatThread(id, editTitleInput.trim());
+    }
+    setEditingThreadId(null);
+  };
+
+  const handleNewChat = () => {
+    const newId = createChatThread();
+    setActiveThreadId(newId);
+    setSearchQuery('');
+    if (!isExpanded) {
+      setIsSidebarOpen(false);
+    }
+  };
+
+  const activeThread = useMemo(() => chatThreads.find(t => t.id === activeThreadId), [chatThreads, activeThreadId]);
+  const activeTitle = activeThread ? activeThread.title : 'HumanBoard Assistant';
+
   if (!isOpen) {
     return (
       <div data-tour="tour-chatbot-button" className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-50 flex items-center gap-3 pointer-events-none">
@@ -964,185 +1013,363 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
   return (
     <div 
       className={cn(
-        "fixed z-50 bg-white border border-stone-200 shadow-2xl flex flex-col transition-all duration-300 ease-in-out overflow-hidden bottom-3 right-3 left-3 max-w-[calc(100vw-1.5rem)] md:left-auto md:bottom-6 md:right-6",
+        "fixed z-50 bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-850 shadow-2xl flex transition-all duration-300 ease-in-out overflow-hidden bottom-3 right-3 left-3 max-w-[calc(100vw-1.5rem)] md:left-auto md:bottom-6 md:right-6",
         isExpanded
-          ? "h-[85vh] md:w-[600px] md:h-[800px] rounded-xl"
-          : "w-full h-[70vh] md:w-[380px] md:h-[600px] rounded-2xl"
+          ? "h-[85vh] md:w-[760px] md:h-[800px] rounded-xl"
+          : "w-full h-[70vh] md:w-[400px] md:h-[600px] rounded-2xl"
       )}
     >
-      <div className="flex items-center justify-between p-4 border-b border-stone-100 bg-stone-50/50">
-        <div className="flex flex-col gap-1 text-stone-800 font-medium text-sm">
-          <div className="flex items-center gap-2">
-            <Bot className="w-4 h-4 text-blue-600" />
-            HumanBoard Assistant
-          </div>
-          <div className="text-[11px] text-stone-500">
-            AI: {runtime.model} · {runtime.local ? 'local runtime' : runtime.baseUrl}
-          </div>
+      {/* Sidebar Overlay Backdrop (compact mode only) */}
+      {!isExpanded && isSidebarOpen && (
+        <div 
+          className="absolute inset-0 bg-stone-950/40 backdrop-blur-sm z-30 transition-opacity cursor-pointer"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar Panel */}
+      <div 
+        className={cn(
+          "w-[240px] bg-stone-50 dark:bg-stone-950 border-r border-stone-150 dark:border-stone-850 flex flex-col h-full shrink-0 transition-all duration-300 ease-in-out z-40 select-none",
+          isExpanded 
+            ? "relative translate-x-0" 
+            : cn(
+                "absolute top-0 bottom-0 left-0 shadow-2xl",
+                isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+              )
+        )}
+      >
+        {/* Sidebar Header: "New Chat" and "Close" for drawer */}
+        <div className="p-3 border-b border-stone-150 dark:border-stone-850 flex items-center gap-2 justify-between">
           <button
             type="button"
-            role="switch"
-            aria-checked={autoDistill}
-            onClick={toggleAutoDistill}
-            className="mt-1 inline-flex w-fit items-center gap-2 text-[11px] font-medium text-stone-500 transition-colors hover:text-stone-800"
-            title="Selectively save durable insights as cleaned notes or ideas"
+            onClick={handleNewChat}
+            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-stone-900 hover:bg-stone-850 dark:bg-stone-100 dark:hover:bg-stone-200 text-white dark:text-stone-900 font-semibold text-xs rounded-xl transition-all shadow-sm active:scale-[0.98] cursor-pointer"
           >
-            <span className={cn("relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors", autoDistill ? "bg-emerald-500" : "bg-stone-300")}>
-              <span className={cn("absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-transform", autoDistill ? "translate-x-3.5" : "translate-x-0.5")} />
-            </span>
-            Auto-distill {autoDistill ? 'on' : 'off'}
+            <Plus className="w-3.5 h-3.5" />
+            New Chat
           </button>
-        </div>
-        <div className="flex items-center gap-1 text-stone-400">
-          <button onClick={() => setIsExpanded(!isExpanded)} className="p-1.5 hover:bg-stone-200 rounded-md transition-colors">
-            {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
-          <button onClick={() => setIsOpen(false)} className="p-1.5 hover:bg-stone-200 rounded-md transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {displayedMessages.map((msg) => (
-          <div key={msg.id} className={cn("flex", msg.role === 'user' ? "justify-end" : "justify-start")}>
-            <div className={cn(
-              "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
-              msg.role === 'user' 
-                ? "bg-stone-900 text-white rounded-br-sm" 
-                : "bg-stone-100 text-stone-800 rounded-bl-sm prose prose-sm prose-stone"
-            )}>
-              {msg.role === 'user' ? (
-                <div className="space-y-2">
-                  {msg.imageUrl && (
-                    <div className="max-w-[200px] rounded-lg overflow-hidden border border-stone-200 dark:border-stone-800 bg-white/5 shadow-md">
-                      <img src={msg.imageUrl} alt="User attachment" className="w-full h-auto object-cover max-h-[160px]" />
-                    </div>
-                  )}
-                  {msg.content && <p>{msg.content}</p>}
-                </div>
-              ) : (
-                <>
-                  <ReactMarkdown>{msg.content}</ReactMarkdown>
-                  <div className="mt-3 flex items-center justify-end">
-                    <button
-                      type="button"
-                      onClick={() => handleSaveMessage(msg)}
-                      disabled={savedMessageIds.includes(msg.id)}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-500 transition-colors hover:border-stone-400 hover:text-stone-800 disabled:cursor-default disabled:opacity-70"
-                    >
-                      {savedMessageIds.includes(msg.id) ? (
-                        <>
-                          <Check className="w-3 h-3" />
-                          Saved
-                        </>
-                      ) : (
-                        <>
-                          <BookmarkPlus className="w-3 h-3" />
-                          Save to board
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        ))}
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-stone-100 text-stone-500 rounded-2xl rounded-bl-sm px-4 py-3 text-sm flex items-center gap-2">
-              <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce" />
-              <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-              <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
-            </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      <div className="p-4 border-t border-stone-100 bg-white">
-        {pendingImagePreview && (
-          <div className="mb-3 flex items-center gap-3 bg-stone-50 p-2 rounded-xl border border-stone-200/60 relative">
-            <div className="relative h-12 w-12 rounded-lg overflow-hidden border border-stone-200 bg-white flex-shrink-0">
-              <img src={pendingImagePreview} alt="Pending attachment" className="h-full w-full object-cover" />
-              <button
-                type="button"
-                onClick={clearPendingImage}
-                className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-stone-950/60 hover:bg-stone-950 text-white transition-colors cursor-pointer"
-                aria-label="Remove image"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Pending Attachment</div>
-              <div className="text-xs text-stone-600 truncate">{pendingImage?.name}</div>
-            </div>
-            {isAnalyzingImage && (
-              <Loader2 className="w-4 h-4 animate-spin text-stone-500" />
-            )}
-          </div>
-        )}
-        {imageError && (
-          <div className="mb-3 px-3 py-2 border border-red-200 bg-red-50 text-xs text-red-700 rounded-xl flex items-center justify-between gap-2">
-            <span className="truncate">{imageError}</span>
-            <button type="button" onClick={() => setImageError(null)} className="text-red-400 hover:text-red-600">
-              <X className="w-3.5 h-3.5" />
+          {!isExpanded && (
+            <button
+              type="button"
+              onClick={() => setIsSidebarOpen(false)}
+              className="p-2 hover:bg-stone-200 dark:hover:bg-stone-850 text-stone-500 rounded-lg transition-colors cursor-pointer"
+              aria-label="Close sidebar"
+            >
+              <X className="w-4 h-4" />
             </button>
-          </div>
-        )}
-        {webReadingStatus && (
-          <div className="mb-3 px-3 py-2 border border-stone-200 bg-stone-50 text-xs text-stone-600 rounded-xl flex items-center gap-2">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            <span>{webReadingStatus}</span>
-          </div>
-        )}
+          )}
+        </div>
 
-        <form onSubmit={handleSubmit} className="relative flex items-center gap-2">
-          <label className="cursor-pointer p-2 rounded-full hover:bg-stone-100 text-stone-500 hover:text-stone-850 transition-colors flex-shrink-0">
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => stageImage(e.target.files?.[0])}
-              disabled={isAnalyzingImage || isLoading}
-            />
-            <ImageIcon className="w-4 h-4" />
-          </label>
-          <div className="relative flex-1">
+        {/* Sidebar Search */}
+        <div className="px-3 pt-3">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onPaste={(e) => {
-                const image = getClipboardImage(e.clipboardData);
-                if (image) {
-                  e.preventDefault();
-                  stageImage(image);
-                }
-              }}
-              placeholder="Ask anything, paste a URL, or paste image..."
-              autoCapitalize="sentences"
-              autoCorrect="on"
-              spellCheck
-              className="w-full bg-stone-50 border border-stone-200 rounded-full py-2.5 pl-4 pr-12 text-sm text-stone-900 caret-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900/10 focus:border-stone-400"
-              style={{ WebkitTextFillColor: '#1c1917' }}
-              disabled={isAnalyzingImage || isLoading}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search chats..."
+              className="w-full bg-stone-200/50 dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 rounded-xl py-1.5 pl-8 pr-7 text-xs text-stone-900 dark:text-stone-100 placeholder:text-stone-450 focus:outline-none focus:ring-1 focus:ring-stone-400"
             />
-            <button 
-              type="submit"
-              disabled={(!input.trim() && !pendingImage) || isAnalyzingImage || isLoading}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 bg-stone-900 text-white rounded-full hover:bg-stone-800 disabled:opacity-50 transition-colors"
-            >
-              {isAnalyzingImage || isLoading ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Send className="w-3.5 h-3.5" />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 p-0.5 rounded-full"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Sidebar Chat List */}
+        <div className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
+          {filteredThreads.length === 0 ? (
+            <div className="text-center py-8 text-xs text-stone-400">
+              {searchQuery ? 'No matching chats' : 'No chats yet'}
+            </div>
+          ) : (
+            filteredThreads.map((thread) => {
+              const isActive = thread.id === activeThreadId;
+              const isEditing = thread.id === editingThreadId;
+
+              return (
+                <div
+                  key={thread.id}
+                  onClick={() => {
+                    if (!isEditing) {
+                      setActiveThreadId(thread.id);
+                      if (!isExpanded) {
+                        setIsSidebarOpen(false);
+                      }
+                    }
+                  }}
+                  className={cn(
+                    "group relative flex items-center justify-between rounded-xl px-3 py-2 text-xs font-medium cursor-pointer transition-all duration-150 select-none",
+                    isActive
+                      ? "bg-stone-200/80 dark:bg-stone-850 text-stone-900 dark:text-stone-100 shadow-sm"
+                      : "text-stone-600 dark:text-stone-400 hover:bg-stone-150/60 dark:hover:bg-stone-900/40 hover:text-stone-900 dark:hover:text-stone-200"
+                  )}
+                >
+                  {isEditing ? (
+                    <div className="flex items-center gap-1 w-full" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        value={editTitleInput}
+                        onChange={(e) => setEditTitleInput(e.target.value)}
+                        onBlur={() => handleSaveRename(thread.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveRename(thread.id);
+                          if (e.key === 'Escape') setEditingThreadId(null);
+                        }}
+                        autoFocus
+                        className="flex-1 bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-700 rounded px-1.5 py-0.5 text-xs text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-1 focus:ring-stone-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleSaveRename(thread.id)}
+                        className="p-1 text-emerald-600 hover:text-emerald-700 dark:text-emerald-500"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="truncate pr-8 leading-snug">{thread.title}</span>
+                      
+                      {/* Hover actions */}
+                      <div 
+                        className={cn(
+                          "absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity pl-4 py-1.5 rounded-r-xl",
+                          isActive ? "bg-stone-200 dark:bg-stone-850" : "bg-stone-50 dark:bg-stone-950 group-hover:bg-stone-150/80 dark:group-hover:bg-stone-900"
+                        )}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          onClick={(e) => handleStartRename(thread.id, thread.title, e)}
+                          className="p-1 rounded hover:bg-stone-200/75 dark:hover:bg-stone-800 text-stone-450 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
+                          title="Rename thread"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm('Are you sure you want to delete this conversation?')) {
+                              deleteChatThread(thread.id);
+                            }
+                          }}
+                          className="p-1 rounded hover:bg-stone-250 dark:hover:bg-stone-800 text-stone-450 hover:text-red-650 dark:hover:text-red-400 transition-colors"
+                          title="Delete thread"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col min-w-0 h-full relative bg-white dark:bg-stone-900">
+        {/* Chat Header */}
+        <div className="flex items-center justify-between p-4 border-b border-stone-100 dark:border-stone-850 bg-stone-50/50 dark:bg-stone-950/20 select-none">
+          <div className="flex flex-col gap-1 text-stone-800 dark:text-stone-200 font-medium text-sm min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
+              {/* Menu icon to toggle sidebar in compact mode */}
+              {!isExpanded && (
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="p-1 hover:bg-stone-200 dark:hover:bg-stone-800 rounded-md transition-colors text-stone-500 cursor-pointer mr-1"
+                  aria-label="Toggle sidebar"
+                >
+                  <Menu className="w-4 h-4" />
+                </button>
               )}
+              <Bot className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+              <span className="truncate font-semibold tracking-tight leading-none" title={activeTitle}>
+                {activeTitle}
+              </span>
+            </div>
+            <div className="text-[11px] text-stone-500 dark:text-stone-400 truncate">
+              AI: {runtime.model} · {runtime.local ? 'local runtime' : runtime.baseUrl}
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={autoDistill}
+              onClick={toggleAutoDistill}
+              className="mt-1 inline-flex w-fit items-center gap-2 text-[11px] font-medium text-stone-500 dark:text-stone-400 transition-colors hover:text-stone-800 dark:hover:text-stone-250 cursor-pointer"
+              title="Selectively save durable insights as cleaned notes or ideas"
+            >
+              <span className={cn("relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors", autoDistill ? "bg-emerald-500" : "bg-stone-300 dark:bg-stone-700")}>
+                <span className={cn("absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-transform", autoDistill ? "translate-x-3.5" : "translate-x-0.5")} />
+              </span>
+              Auto-distill {autoDistill ? 'on' : 'off'}
             </button>
           </div>
-        </form>
+          <div className="flex items-center gap-1 text-stone-400">
+            <button type="button" onClick={() => setIsExpanded(!isExpanded)} className="p-1.5 hover:bg-stone-200 dark:hover:bg-stone-800 rounded-md transition-colors cursor-pointer">
+              {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+            <button type="button" onClick={() => setIsOpen(false)} className="p-1.5 hover:bg-stone-200 dark:hover:bg-stone-800 rounded-md transition-colors cursor-pointer">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Message List */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-white dark:bg-stone-900">
+          {displayedMessages.map((msg) => (
+            <div key={msg.id} className={cn("flex", msg.role === 'user' ? "justify-end" : "justify-start")}>
+              <div className={cn(
+                "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
+                msg.role === 'user' 
+                  ? "bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 rounded-br-sm" 
+                  : "bg-stone-100 dark:bg-stone-850 text-stone-800 dark:text-stone-200 rounded-bl-sm prose prose-sm prose-stone dark:prose-invert"
+              )}>
+                {msg.role === 'user' ? (
+                  <div className="space-y-2">
+                    {msg.imageUrl && (
+                      <div className="max-w-[200px] rounded-lg overflow-hidden border border-stone-200 dark:border-stone-800 bg-white/5 shadow-md">
+                        <img src={msg.imageUrl} alt="User attachment" className="w-full h-auto object-cover max-h-[160px]" />
+                      </div>
+                    )}
+                    {msg.content && <p className="whitespace-pre-wrap">{msg.content}</p>}
+                  </div>
+                ) : (
+                  <>
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    <div className="mt-3 flex items-center justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleSaveMessage(msg)}
+                        disabled={savedMessageIds.includes(msg.id)}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-stone-500 dark:text-stone-400 transition-colors hover:border-stone-400 dark:hover:border-stone-500 hover:text-stone-800 dark:hover:text-stone-200 disabled:cursor-default disabled:opacity-70 cursor-pointer"
+                      >
+                        {savedMessageIds.includes(msg.id) ? (
+                          <>
+                            <Check className="w-3 h-3" />
+                            Saved
+                          </>
+                        ) : (
+                          <>
+                            <BookmarkPlus className="w-3 h-3" />
+                            Save to board
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="bg-stone-100 dark:bg-stone-850 text-stone-500 dark:text-stone-400 rounded-2xl rounded-bl-sm px-4 py-3 text-sm flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-stone-400 dark:bg-stone-500 rounded-full animate-bounce" />
+                <div className="w-1.5 h-1.5 bg-stone-400 dark:bg-stone-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                <div className="w-1.5 h-1.5 bg-stone-400 dark:bg-stone-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input area */}
+        <div className="p-4 border-t border-stone-100 dark:border-stone-850 bg-white dark:bg-stone-900">
+          {pendingImagePreview && (
+            <div className="mb-3 flex items-center gap-3 bg-stone-50 dark:bg-stone-950 p-2 rounded-xl border border-stone-200/60 dark:border-stone-800/60 relative">
+              <div className="relative h-12 w-12 rounded-lg overflow-hidden border border-stone-200 dark:border-stone-850 bg-white dark:bg-stone-900 flex-shrink-0">
+                <img src={pendingImagePreview} alt="Pending attachment" className="h-full w-full object-cover" />
+                <button
+                  type="button"
+                  onClick={clearPendingImage}
+                  className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-stone-950/60 hover:bg-stone-950 text-white transition-colors cursor-pointer"
+                  aria-label="Remove image"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider">Pending Attachment</div>
+                <div className="text-xs text-stone-600 dark:text-stone-300 truncate">{pendingImage?.name}</div>
+              </div>
+              {isAnalyzingImage && (
+                <Loader2 className="w-4 h-4 animate-spin text-stone-500" />
+              )}
+            </div>
+          )}
+          {imageError && (
+            <div className="mb-3 px-3 py-2 border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-950/20 text-xs text-red-700 dark:text-red-400 rounded-xl flex items-center justify-between gap-2">
+              <span className="truncate">{imageError}</span>
+              <button type="button" onClick={() => setImageError(null)} className="text-red-400 hover:text-red-600">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+          {webReadingStatus && (
+            <div className="mb-3 px-3 py-2 border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950/30 text-xs text-stone-600 dark:text-stone-300 rounded-xl flex items-center gap-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <span>{webReadingStatus}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="relative flex items-center gap-2">
+            <label className="cursor-pointer p-2 rounded-full hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-500 hover:text-stone-850 dark:hover:text-stone-200 transition-colors flex-shrink-0">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => stageImage(e.target.files?.[0])}
+                disabled={isAnalyzingImage || isLoading}
+              />
+              <ImageIcon className="w-4 h-4" />
+            </label>
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onPaste={(e) => {
+                  const image = getClipboardImage(e.clipboardData);
+                  if (image) {
+                    e.preventDefault();
+                    stageImage(image);
+                  }
+                }}
+                placeholder="Ask anything, paste a URL, or paste image..."
+                autoCapitalize="sentences"
+                autoCorrect="on"
+                spellCheck
+                className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-800 rounded-full py-2.5 pl-4 pr-12 text-sm text-stone-900 dark:text-stone-100 caret-stone-900 dark:caret-stone-100 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900/10 dark:focus:ring-stone-100/10 focus:border-stone-400 dark:focus:border-stone-600"
+                style={{ WebkitTextFillColor: 'inherit' }}
+                disabled={isAnalyzingImage || isLoading}
+              />
+              <button 
+                type="submit"
+                disabled={(!input.trim() && !pendingImage) || isAnalyzingImage || isLoading}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 rounded-full hover:bg-stone-800 dark:hover:bg-stone-200 disabled:opacity-50 transition-colors cursor-pointer"
+              >
+                {isAnalyzingImage || isLoading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

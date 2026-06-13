@@ -8,6 +8,14 @@ export type ChatMessage = {
   createdAt: string;
 };
 
+export type ChatThread = {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: string;
+  updatedAt: string;
+};
+
 export interface AppSnapshot {
   notes: Note[];
   ideas: Idea[];
@@ -23,6 +31,8 @@ export interface AppSnapshot {
   fusionItems?: FusionItem[];
   fusionSuggestions?: FusionSuggestion[];
   lastDailyFusionScan?: string;
+  chatThreads?: ChatThread[];
+  activeThreadId?: string;
 }
 
 export interface StorageRepository {

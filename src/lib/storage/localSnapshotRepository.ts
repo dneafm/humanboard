@@ -41,6 +41,28 @@ async function fetchServerSnapshot(): Promise<AppSnapshot | null> {
       fusionItems: parsed.fusionItems ?? defaultSnapshot.fusionItems,
       fusionSuggestions: parsed.fusionSuggestions ?? defaultSnapshot.fusionSuggestions,
       lastDailyFusionScan: parsed.lastDailyFusionScan ?? defaultSnapshot.lastDailyFusionScan,
+      chatThreads: (() => {
+        const threads = parsed.chatThreads ?? [];
+        const msgs = parsed.chatMessages ?? [];
+        if (threads.length === 0 && msgs.length > 0) {
+          return [{
+            id: 'legacy-thread',
+            title: 'Legacy Chat',
+            messages: msgs,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }];
+        }
+        return threads;
+      })(),
+      activeThreadId: (() => {
+        const threads = parsed.chatThreads ?? [];
+        const msgs = parsed.chatMessages ?? [];
+        if (threads.length === 0 && msgs.length > 0) {
+          return 'legacy-thread';
+        }
+        return parsed.activeThreadId ?? defaultSnapshot.activeThreadId;
+      })(),
     };
   } catch {
     return null;
@@ -91,6 +113,28 @@ export class LocalSnapshotRepository implements StorageRepository {
         fusionItems: parsed.fusionItems ?? defaultSnapshot.fusionItems,
         fusionSuggestions: parsed.fusionSuggestions ?? defaultSnapshot.fusionSuggestions,
         lastDailyFusionScan: parsed.lastDailyFusionScan ?? defaultSnapshot.lastDailyFusionScan,
+        chatThreads: (() => {
+          const threads = parsed.chatThreads ?? [];
+          const msgs = parsed.chatMessages ?? [];
+          if (threads.length === 0 && msgs.length > 0) {
+            return [{
+              id: 'legacy-thread',
+              title: 'Legacy Chat',
+              messages: msgs,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            }];
+          }
+          return threads;
+        })(),
+        activeThreadId: (() => {
+          const threads = parsed.chatThreads ?? [];
+          const msgs = parsed.chatMessages ?? [];
+          if (threads.length === 0 && msgs.length > 0) {
+            return 'legacy-thread';
+          }
+          return parsed.activeThreadId ?? defaultSnapshot.activeThreadId;
+        })(),
       };
       return finalSnapshot;
     } catch {

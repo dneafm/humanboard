@@ -22,4 +22,6 @@ export const defaultSnapshot: AppSnapshot = {
   fusionItems: [],
   fusionSuggestions: [],
   lastDailyFusionScan: '',
+  chatThreads: [],
+  activeThreadId: '',
 };
