@@ -1002,7 +1002,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
               sessionStorage.setItem('hb_hide_cta', 'true');
             } catch {}
           }}
-          className="pointer-events-auto w-12 h-12 bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 rounded-full flex items-center justify-center shadow-lg hover:bg-stone-800 dark:hover:bg-stone-200 transition-transform hover:scale-105 cursor-pointer"
+          className="pointer-events-auto w-12 h-12 bg-stone-900 dark:bg-stone-800 text-white dark:text-stone-100 rounded-full flex items-center justify-center shadow-lg hover:bg-stone-700 dark:hover:bg-stone-700 transition-transform hover:scale-105 cursor-pointer"
         >
           <Bot className="w-5 h-5" />
         </button>
@@ -1234,8 +1234,8 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
               <div className={cn(
                 "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
                 msg.role === 'user' 
-                  ? "bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 rounded-br-sm" 
-                  : "bg-stone-100 dark:bg-stone-850 text-stone-800 dark:text-stone-200 rounded-bl-sm prose prose-sm prose-stone dark:prose-invert"
+                  ? "bg-stone-900 dark:bg-stone-800 text-white dark:text-white rounded-br-sm" 
+                  : "bg-stone-100 dark:bg-stone-800 text-stone-800 dark:text-stone-100 rounded-bl-sm prose prose-sm prose-stone dark:prose-invert"
               )}>
                 {msg.role === 'user' ? (
                   <div className="space-y-2">
@@ -1276,10 +1276,10 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
           ))}
           {isLoading && (
             <div className="flex justify-start">
-              <div className="bg-stone-100 dark:bg-stone-850 text-stone-500 dark:text-stone-400 rounded-2xl rounded-bl-sm px-4 py-3 text-sm flex items-center gap-2">
-                <div className="w-1.5 h-1.5 bg-stone-400 dark:bg-stone-500 rounded-full animate-bounce" />
-                <div className="w-1.5 h-1.5 bg-stone-400 dark:bg-stone-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                <div className="w-1.5 h-1.5 bg-stone-400 dark:bg-stone-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+              <div className="bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-300 rounded-2xl rounded-bl-sm px-4 py-3 text-sm flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-stone-400 dark:bg-stone-400 rounded-full animate-bounce" />
+                <div className="w-1.5 h-1.5 bg-stone-400 dark:bg-stone-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                <div className="w-1.5 h-1.5 bg-stone-400 dark:bg-stone-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
               </div>
             </div>
           )}
