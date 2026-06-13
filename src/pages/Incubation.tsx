@@ -20,6 +20,7 @@ import {
   X,
   Brain,
   Wand2,
+  SendHorizonal,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { askGemma } from '../lib/ai';
@@ -511,6 +512,102 @@ export default function IncubationPage() {
   const [justDumped, setJustDumped] = useState(false);
   const [showNewBetForm, setShowNewBetForm] = useState(false);
 
+  // Bet creation chat state
+  type BetChatMsg = { role: 'assistant' | 'user'; content: string };
+  const [betChatMessages, setBetChatMessages] = useState<BetChatMsg[]>([]);
+  const [betChatInput, setBetChatInput] = useState('');
+  const [isBetChatLoading, setIsBetChatLoading] = useState(false);
+  const [betChatMode, setBetChatMode] = useState<'create' | 'edit'>('create');
+  const [betChatParsed, setBetChatParsed] = useState<Partial<CapabilityBetDraft> | null>(null);
+  const [betChatSaving, setBetChatSaving] = useState(false);
+
+  const BET_CHAT_SYSTEM = `You are a strategic capability advisor helping a user define or refine a "capability bet" — a skill, domain, or strategic area worth patiently tracking.
+
+Your job is to gather the following information through friendly, concise conversation (one question at a time):
+1. Title (short, precise capability name)
+2. Thesis (2-3 sentences: why does this matter strategically?)
+3. Baseline conviction (0-100%: how convinced are they right now?)
+4. Commit threshold (0-100%: at what conviction level should they commit?)
+5. Keywords (comma-separated terms to match in notes)
+6. Unlock paths (concrete steps that would develop this capability)
+7. First use cases (real applications once they have it)
+8. Cost of not knowing (what risk or opportunity cost comes from ignoring this?)
+9. Decision rule (what condition should trigger full commitment?)
+10. Review cadence (how often to revisit: weekly, monthly, etc.)
+
+Rules:
+- Ask ONE question at a time, naturally
+- Be conversational, not clinical — like a smart advisor, not a form
+- Accept vague answers and help clarify
+- When you have enough for ALL fields (even rough values), output a summary and then the JSON block EXACTLY like this with no other text after it:
+
+<BET_JSON>
+{"title":"...","thesis":"...","baselineConviction":30,"thresholdToCommit":80,"keywordsText":"...","unlockPathsText":"...","firstUseCasesText":"...","costOfNotKnowing":"...","strategicNote":"...","reviewCadence":"..."}
+</BET_JSON>
+
+Do NOT output the JSON until you have collected enough for all fields. Output it only ONCE at the very end.`;
+
+  const openBetChat = (mode: 'create' | 'edit', existingBet?: CapabilityBet) => {
+    setBetChatMode(mode);
+    setBetChatParsed(null);
+    setBetChatInput('');
+    setShowNewBetForm(true);
+    if (mode === 'edit' && existingBet) {
+      setEditingBetId(existingBet.id);
+      setDraft(createCapabilityBetDraft(existingBet));
+      const context = `Existing bet to refine:\nTitle: ${existingBet.title}\nThesis: ${existingBet.thesis}\nKeywords: ${(existingBet.keywords ?? []).join(', ')}\nBaseline conviction: ${existingBet.baselineConviction}%\nCommit threshold: ${existingBet.thresholdToCommit}%\nReview cadence: ${existingBet.reviewCadence || 'not set'}\nDecision rule: ${existingBet.strategicNote || 'not set'}`;
+      setBetChatMessages([
+        { role: 'assistant', content: `I can see your bet on **${existingBet.title}**. What would you like to change or improve? You can tell me in plain language and I’ll update the fields for you.` },
+      ]);
+      void (async () => {
+        // no auto-call, wait for user
+      })();
+    } else {
+      resetEditor();
+      setEditorMode('create');
+      setEditingBetId(null);
+      setBetChatMessages([
+        { role: 'assistant', content: `Let’s define your new capability bet. What capability or domain do you want to start tracking? (e.g. “Learning Mandarin”, “AI agent product design”, “Physical asset business”)` },
+      ]);
+    }
+  };
+
+  const sendBetChatMessage = async () => {
+    const text = betChatInput.trim();
+    if (!text || isBetChatLoading) return;
+    setBetChatInput('');
+    const userMsg: BetChatMsg = { role: 'user', content: text };
+    const nextMessages = [...betChatMessages, userMsg];
+    setBetChatMessages(nextMessages);
+    setIsBetChatLoading(true);
+    try {
+      // Build prompt from history
+      const history = nextMessages.map(m => `${m.role === 'user' ? 'User' : 'Advisor'}: ${m.content}`).join('\n\n');
+      const raw = await askGemma(history, BET_CHAT_SYSTEM);
+
+      // Check for JSON extraction
+      const jsonMatch = raw.match(/<BET_JSON>([\s\S]*?)<\/BET_JSON>/);
+      let displayContent = raw.replace(/<BET_JSON>[\s\S]*?<\/BET_JSON>/, '').trim();
+
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[1].trim()) as Partial<CapabilityBetDraft>;
+          setBetChatParsed(parsed);
+          setDraft(prev => ({ ...prev, ...parsed }));
+          if (!displayContent) displayContent = `✓ I’ve filled in all the fields. Review the summary below and click **Save Bet** when ready, or tell me what to change.`;
+        } catch {
+          // parse failed, continue chat
+        }
+      }
+
+      setBetChatMessages(prev => [...prev, { role: 'assistant', content: displayContent || raw }]);
+    } catch (err) {
+      setBetChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong. Please try again.' }]);
+    } finally {
+      setIsBetChatLoading(false);
+    }
+  };
+
   // AI Bet Scout state
   type ScoutedBet = {
     id: string;
@@ -972,7 +1069,7 @@ Return the markdown report. Be direct, insightful, and clear.`;
             </div>
             <button
               type="button"
-              onClick={() => { resetEditor(); setShowNewBetForm(true); }}
+              onClick={() => openBetChat('create')}
               className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 shadow-sm transition-all hover:bg-emerald-100 hover:shadow dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300"
             >
               <Plus className="h-4 w-4" />
@@ -1167,116 +1264,102 @@ Return the markdown report. Be direct, insightful, and clear.`;
           </div>
         )}
 
-        {/* ── New Bet slide-in form ── */}
+        {/* ── Bet creation / editing chat ── */}
         {showNewBetForm && (
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5 dark:border-emerald-900/30 dark:bg-emerald-950/10 space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-                  <PenSquare className="h-3.5 w-3.5" />
-                  {editorMode === 'edit' ? 'Edit bet' : 'New capability bet'}
+          <div className="rounded-2xl border border-emerald-200 bg-white dark:bg-stone-900/60 dark:border-emerald-900/30 shadow-sm overflow-hidden">
+            {/* Chat header */}
+            <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-stone-100 dark:border-stone-800 bg-emerald-50/60 dark:bg-emerald-950/10">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                  <BrainCircuit className="h-4 w-4" />
                 </div>
-                <h3 className="mt-2 text-lg font-semibold tracking-tight text-stone-900 dark:text-stone-100">
-                  {editorMode === 'edit' ? draft.title || 'Edit selected bet' : 'Define a new capability to watch'}
-                </h3>
+                <div>
+                  <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+                    {betChatMode === 'edit' ? `Editing: ${draft.title || 'bet'}` : 'New Capability Bet'}
+                  </div>
+                  <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium uppercase tracking-wider">AI-guided conversation</div>
+                </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {editorMode === 'edit' && editingBetId && (
-                  <button type="button" onClick={archiveEditingBet}
-                    className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.22em] text-rose-600 hover:bg-rose-50 dark:border-rose-900/40 dark:bg-transparent dark:text-rose-400">
-                    <Archive className="h-3.5 w-3.5" /> Archive
+              <div className="flex items-center gap-2">
+                {betChatParsed && (
+                  <button type="button"
+                    disabled={betChatSaving}
+                    onClick={async () => { setBetChatSaving(true); saveCapabilityBet(); setShowNewBetForm(false); setBetChatMessages([]); setBetChatParsed(null); setBetChatSaving(false); }}
+                    className="inline-flex items-center gap-2 rounded-full bg-emerald-600 hover:bg-emerald-700 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.22em] text-white transition-colors disabled:opacity-60">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {betChatMode === 'edit' ? 'Save changes' : 'Save bet'}
                   </button>
                 )}
-                <button type="button" onClick={() => { setShowNewBetForm(false); if (editorMode === 'create') resetEditor(); }}
+                {betChatMode === 'edit' && editingBetId && (
+                  <button type="button" onClick={archiveEditingBet}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-rose-600 hover:bg-rose-50 dark:border-rose-900/30 dark:bg-transparent dark:text-rose-400">
+                    <Archive className="h-3 w-3" /> Archive
+                  </button>
+                )}
+                <button type="button"
+                  onClick={() => { setShowNewBetForm(false); setBetChatMessages([]); setBetChatParsed(null); if (betChatMode === 'create') resetEditor(); }}
                   className="p-1.5 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors">
                   <X className="h-4 w-4" />
                 </button>
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="block">
-                <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Title</span>
-                <input type="text" value={draft.title}
-                  onChange={(e) => setDraft(c => ({ ...c, title: e.target.value }))}
-                  className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
-                  placeholder="Learn Chinese" />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Review cadence</span>
-                <input type="text" value={draft.reviewCadence}
-                  onChange={(e) => setDraft(c => ({ ...c, reviewCadence: e.target.value }))}
-                  className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
-                  placeholder="monthly" />
-              </label>
+            {/* Parsed draft preview strip */}
+            {betChatParsed && (
+              <div className="px-5 py-3 bg-emerald-50/40 dark:bg-emerald-950/10 border-b border-emerald-100 dark:border-emerald-900/20 flex flex-wrap gap-3 text-xs">
+                {draft.title && <span className="font-semibold text-stone-900 dark:text-stone-100">{draft.title}</span>}
+                {betChatParsed.baselineConviction !== undefined && <span className="text-stone-500 dark:text-stone-400">Conviction: <b className="text-stone-700 dark:text-stone-300">{betChatParsed.baselineConviction}%</b></span>}
+                {betChatParsed.thresholdToCommit !== undefined && <span className="text-stone-500 dark:text-stone-400">Commit at: <b className="text-stone-700 dark:text-stone-300">{betChatParsed.thresholdToCommit}%</b></span>}
+                {betChatParsed.reviewCadence && <span className="text-stone-500 dark:text-stone-400">Cadence: <b className="text-stone-700 dark:text-stone-300">{betChatParsed.reviewCadence}</b></span>}
+                {betChatParsed.keywordsText && <span className="text-stone-500 dark:text-stone-400">Keywords: <b className="text-stone-700 dark:text-stone-300">{betChatParsed.keywordsText.slice(0, 40)}</b></span>}
+              </div>
+            )}
+
+            {/* Messages */}
+            <div className="flex flex-col gap-4 p-5 max-h-80 overflow-y-auto">
+              {betChatMessages.map((msg, i) => (
+                <div key={i} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+                  <div className={cn(
+                    'max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed',
+                    msg.role === 'user'
+                      ? 'bg-stone-900 dark:bg-stone-800 text-white rounded-br-sm'
+                      : 'bg-stone-100 dark:bg-stone-800 text-stone-800 dark:text-stone-100 rounded-bl-sm'
+                  )}>
+                    {msg.content.split('**').map((part, pi) =>
+                      pi % 2 === 1 ? <strong key={pi}>{part}</strong> : <span key={pi}>{part}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {isBetChatLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-stone-100 dark:bg-stone-800 rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce" />
+                    <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }} />
+                    <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
+                  </div>
+                </div>
+              )}
             </div>
 
-            <label className="block">
-              <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Thesis</span>
-              <textarea value={draft.thesis} rows={3}
-                onChange={(e) => setDraft(c => ({ ...c, thesis: e.target.value }))}
-                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 resize-none"
-                placeholder="Why is this capability worth watching?" />
-            </label>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="block">
-                <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Baseline conviction — {draft.baselineConviction}%</span>
-                <input type="range" min={0} max={100} value={draft.baselineConviction}
-                  onChange={(e) => setDraft(c => ({ ...c, baselineConviction: Number(e.target.value) }))}
-                  className="w-full accent-sky-500" />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Commit threshold — {draft.thresholdToCommit}%</span>
-                <input type="range" min={0} max={100} value={draft.thresholdToCommit}
-                  onChange={(e) => setDraft(c => ({ ...c, thresholdToCommit: Number(e.target.value) }))}
-                  className="w-full accent-emerald-500" />
-              </label>
-            </div>
-
-            <label className="block">
-              <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Keywords (comma-separated)</span>
-              <input type="text" value={draft.keywordsText}
-                onChange={(e) => setDraft(c => ({ ...c, keywordsText: e.target.value }))}
-                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100"
-                placeholder="chinese, mandarin, china" />
-            </label>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="block">
-                <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Unlock paths (one per line)</span>
-                <textarea value={draft.unlockPathsText} rows={3}
-                  onChange={(e) => setDraft(c => ({ ...c, unlockPathsText: e.target.value }))}
-                  className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 resize-none"
-                  placeholder={'direct market reading\nrelationship access'} />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">First use cases (one per line)</span>
-                <textarea value={draft.firstUseCasesText} rows={3}
-                  onChange={(e) => setDraft(c => ({ ...c, firstUseCasesText: e.target.value }))}
-                  className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 resize-none"
-                  placeholder={'read primary-source chatter\nnavigate docs'} />
-              </label>
-            </div>
-
-            <label className="block">
-              <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">Decision rule</span>
-              <textarea value={draft.strategicNote} rows={2}
-                onChange={(e) => setDraft(c => ({ ...c, strategicNote: e.target.value }))}
-                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 resize-none"
-                placeholder="What should be true before this becomes active commitment?" />
-            </label>
-
-            <div className="flex items-center gap-3">
-              <button type="button" onClick={() => { saveCapabilityBet(); setShowNewBetForm(false); }}
-                disabled={!draft.title.trim() || !draft.thesis.trim()}
-                className="inline-flex items-center gap-2 rounded-full bg-sky-600 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.22em] text-white hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                <CheckCircle2 className="h-4 w-4" />
-                {editorMode === 'edit' ? 'Save changes' : 'Create bet'}
-              </button>
-              <button type="button" onClick={() => { setShowNewBetForm(false); resetEditor(); }}
-                className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-[0.22em] text-stone-600 hover:border-stone-300 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 transition-colors">
-                Cancel
+            {/* Input */}
+            <div className="flex gap-2 px-5 pb-5">
+              <input
+                type="text"
+                value={betChatInput}
+                onChange={e => setBetChatInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendBetChatMessage(); } }}
+                placeholder="Type your answer…"
+                className="flex-1 rounded-xl border border-stone-200 bg-stone-50 dark:bg-stone-950 dark:border-stone-700 px-4 py-2.5 text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:focus:ring-emerald-500/20"
+                disabled={isBetChatLoading}
+              />
+              <button
+                type="button"
+                onClick={() => void sendBetChatMessage()}
+                disabled={!betChatInput.trim() || isBetChatLoading}
+                className="flex items-center justify-center rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2.5 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <SendHorizonal className="h-4 w-4" />
               </button>
             </div>
           </div>
@@ -1325,7 +1408,7 @@ Return the markdown report. Be direct, insightful, and clear.`;
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <button type="button"
-                    onClick={() => { setEditorMode('edit'); setEditingBetId(bet.id); setDraft(createCapabilityBetDraft(bet)); setShowNewBetForm(true); }}
+                    onClick={() => openBetChat('edit', bet)}
                     className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-600 hover:border-stone-300 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 transition-colors">
                     <PenSquare className="h-3 w-3" /> Edit
                   </button>
