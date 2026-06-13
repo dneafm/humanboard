@@ -875,6 +875,103 @@ Return the markdown report. Be direct, insightful, and clear.`;
           </div>
         </div>
 
+        {/* ── All bets overview cards ── */}
+        {capabilityBets.length > 0 && (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {capabilityBets
+              .slice()
+              .sort((a, b) => {
+                if (!!a.archivedAt !== !!b.archivedAt) return a.archivedAt ? 1 : -1;
+                return b.conviction - a.conviction;
+              })
+              .map((bet) => {
+                const isArchived = !!bet.archivedAt;
+                const isSelected = selectedCapabilityBet?.id === bet.id;
+                const overdue = !isArchived && isReviewOverdue(bet.lastReviewed, bet.reviewCadence);
+                const supportCount = bet.supportingSignalIds.length;
+                const contradictCount = bet.contradictingSignalIds.length;
+
+                return (
+                  <button
+                    key={bet.id}
+                    type="button"
+                    onClick={() => !isArchived && selectCapabilityBet(bet.id)}
+                    className={cn(
+                      'group text-left rounded-2xl border p-4 transition-all duration-150 focus:outline-none',
+                      isArchived
+                        ? 'border-stone-200 bg-stone-50/60 opacity-60 cursor-default dark:border-stone-800 dark:bg-stone-900/20'
+                        : isSelected
+                        ? 'border-sky-400 bg-sky-50 shadow-md dark:border-sky-500 dark:bg-sky-950/20'
+                        : 'border-stone-200 bg-white hover:border-sky-300 hover:shadow-sm dark:border-stone-800 dark:bg-stone-900/40 dark:hover:border-sky-700',
+                    )}
+                  >
+                    {/* Header row */}
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <span
+                        className={cn(
+                          'inline-flex rounded-full border px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em] shrink-0',
+                          isArchived
+                            ? 'bg-stone-100 text-stone-500 border-stone-200 dark:bg-stone-900 dark:text-stone-400 dark:border-stone-700'
+                            : BET_STATUS_STYLE[bet.status],
+                        )}
+                      >
+                        {isArchived ? 'archived' : bet.status}
+                      </span>
+                      {overdue && (
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500 mt-0.5" title="Review overdue" />
+                      )}
+                    </div>
+
+                    {/* Title */}
+                    <div className="text-sm font-semibold text-stone-900 dark:text-stone-100 leading-snug line-clamp-2 mb-3">
+                      {bet.title}
+                    </div>
+
+                    {/* Conviction bar */}
+                    <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500">
+                      <span>Conviction</span>
+                      <span className="text-stone-600 dark:text-stone-300">{bet.conviction}%</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden mb-3">
+                      <div
+                        className={cn(
+                          'h-full rounded-full transition-all',
+                          bet.conviction >= bet.thresholdToCommit
+                            ? 'bg-emerald-500'
+                            : bet.conviction >= 60
+                            ? 'bg-sky-500'
+                            : bet.conviction >= 40
+                            ? 'bg-amber-400'
+                            : 'bg-stone-400',
+                        )}
+                        style={{ width: `${bet.conviction}%` }}
+                      />
+                    </div>
+
+                    {/* Signal counts */}
+                    <div className="flex items-center gap-3 text-[10px] text-stone-500 dark:text-stone-400">
+                      {supportCount > 0 && (
+                        <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
+                          <CheckCircle2 className="h-3 w-3" />
+                          {supportCount}
+                        </span>
+                      )}
+                      {contradictCount > 0 && (
+                        <span className="flex items-center gap-1 text-rose-500 dark:text-rose-400 font-semibold">
+                          <AlertTriangle className="h-3 w-3" />
+                          {contradictCount}
+                        </span>
+                      )}
+                      <span className="ml-auto truncate">
+                        {formatDistanceToNow(new Date(bet.lastReviewed), { addSuffix: true })}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+          </div>
+        )}
+
         <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
           <div className="space-y-5">
             <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm dark:border-stone-800 dark:bg-stone-900/40">
