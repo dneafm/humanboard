@@ -1036,6 +1036,41 @@ app.all(['/api/ai/*', '/api/gemma/*'], express.raw({ type: '*/*', limit: '25mb' 
   }
 });
 
+function escapeHtml(unsafe) {
+  if (!unsafe) return '';
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+async function getPublicFusionData(fusionId) {
+  if (!existsSync(USER_DATA_DIR)) return null;
+  try {
+    const entries = await fs.readdir(USER_DATA_DIR, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const snapshotPath = path.join(USER_DATA_DIR, entry.name, 'snapshot.json');
+        if (existsSync(snapshotPath)) {
+          try {
+            const raw = await fs.readFile(snapshotPath, 'utf-8');
+            const parsed = JSON.parse(raw);
+            const foundItem = (parsed.fusionItems || []).find(item => item.id === fusionId);
+            if (foundItem && foundItem.isPublic) {
+              return foundItem;
+            }
+          } catch (e) {}
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error scanning for public fusion data:', err);
+  }
+  return null;
+}
+
 app.use(async (req, res, next) => {
   if (req.path.startsWith('/api/')) {
     return next();
@@ -1045,6 +1080,62 @@ app.use(async (req, res, next) => {
   if (!existsSync(indexPath)) {
     res.status(503).type('text/plain').send('HumanBoard production build is missing. Run `npm run build:prod` first.');
     return;
+  }
+
+  const isSharedFusion = req.path.startsWith('/shared/fusion/');
+  if (isSharedFusion) {
+    const fusionId = req.path.split('/').pop();
+    const fusion = await getPublicFusionData(fusionId);
+    if (fusion) {
+      try {
+        let html = await fs.readFile(indexPath, 'utf-8');
+        const title = `${escapeHtml(fusion.title)} - HumanBoard Publication`;
+        const description = escapeHtml(fusion.summary || 'Strategic research publication.');
+        const canonicalUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+        const author = escapeHtml(fusion.authorName || 'HumanBoard Creator');
+        const publishedDate = fusion.createdAt || new Date().toISOString();
+
+        const seoTags = `
+  <title>${title}</title>
+  <meta name="description" content="${description}" />
+  <link rel="canonical" href="${canonicalUrl}" />
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="${canonicalUrl}" />
+  <meta property="og:title" content="${title}" />
+  <meta property="og:description" content="${description}" />
+  
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary" />
+  <meta property="twitter:url" content="${canonicalUrl}" />
+  <meta property="twitter:title" content="${title}" />
+  <meta property="twitter:description" content="${description}" />
+  
+  <!-- JSON-LD Article Schema -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "${title}",
+      "description": "${description}",
+      "author": {
+        "@type": "Person",
+        "name": "${author}"
+      },
+      "datePublished": "${publishedDate}"
+    }
+  </script>
+`;
+
+        html = html.replace('</head>', `${seoTags}</head>`);
+        html = html.replace(/<title>.*?<\/title>/gi, '');
+        res.type('text/html').send(html);
+        return;
+      } catch (err) {
+        console.error('Error serving server-injected shared fusion:', err);
+      }
+    }
   }
 
   res.sendFile(indexPath);

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /shared/fusion/
+Allow: /assets/
+Disallow: /
