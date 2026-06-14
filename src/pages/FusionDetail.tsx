@@ -202,7 +202,7 @@ export default function FusionDetailPage() {
             <div className="pt-5 border-t border-stone-100 dark:border-stone-850 space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-450 dark:text-stone-500 mb-2">Author Name</label>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-2">Author Name</label>
                   <input
                     type="text"
                     placeholder="Enter author name..."
@@ -212,7 +212,7 @@ export default function FusionDetailPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-455 dark:text-stone-500 mb-2">Author Bio / Profile</label>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 mb-2">Author Bio / Profile</label>
                   <input
                     type="text"
                     placeholder="E.g., Tech researcher and strategic builder..."
@@ -236,7 +236,7 @@ export default function FusionDetailPage() {
                       setLinkCopied(true);
                       setTimeout(() => setLinkCopied(false), 2000);
                     }}
-                    className="bg-white hover:bg-stone-55 dark:bg-stone-900 dark:hover:bg-stone-850 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-800 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-sm transition active:scale-95 cursor-pointer"
+                    className="bg-white hover:bg-stone-50 dark:bg-stone-900 dark:hover:bg-stone-850 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-800 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-sm transition active:scale-95 cursor-pointer"
                   >
                     {linkCopied ? 'Copied!' : 'Copy Link'}
                   </button>
@@ -1198,7 +1198,7 @@ function NotionBlockEditor({
                       block.type === 'h1' && "text-2xl font-bold text-stone-900 dark:text-stone-100 tracking-tight",
                       block.type === 'h2' && "text-xl font-semibold text-stone-900 dark:text-stone-100 tracking-tight",
                       block.type === 'h3' && "text-lg font-medium text-stone-900 dark:text-stone-100 tracking-tight",
-                      block.type === 'text' && "text-sm text-stone-800 dark:text-stone-100 placeholder-stone-450 dark:placeholder-stone-650"
+                      block.type === 'text' && "text-sm text-stone-800 dark:text-stone-100 placeholder-stone-400 dark:placeholder-stone-650"
                     )}
                   />
                 )}

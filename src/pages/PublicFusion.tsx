@@ -156,7 +156,7 @@ export default function PublicFusionPage() {
         </div>
 
         {/* Title */}
-        <h1 className="font-serif text-3xl md:text-5xl font-bold text-stone-950 dark:text-stone-55 mb-6 leading-[1.15] tracking-tight">
+        <h1 className="font-serif text-3xl md:text-5xl font-bold text-stone-950 dark:text-stone-50 mb-6 leading-[1.15] tracking-tight">
           {fusion.title}
         </h1>
 
@@ -263,7 +263,7 @@ export default function PublicFusionPage() {
                   <h5 className="font-serif font-bold text-stone-900 dark:text-stone-100 leading-tight group-hover:text-stone-950 dark:group-hover:text-white transition-colors mb-2 line-clamp-2">
                     {item.title}
                   </h5>
-                  <p className="text-xs text-stone-500 dark:text-stone-450 leading-relaxed mb-4 line-clamp-3 flex-1">
+                  <p className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed mb-4 line-clamp-3 flex-1">
                     {item.summary}
                   </p>
                   <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-stone-900 dark:text-stone-100 group-hover:translate-x-1 transition-transform mt-auto">
@@ -277,7 +277,7 @@ export default function PublicFusionPage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-stone-200/60 dark:border-stone-900/60 py-12 text-center text-xs text-stone-450 dark:text-stone-600">
+      <footer className="border-t border-stone-200/60 dark:border-stone-900/60 py-12 text-center text-xs text-stone-500 dark:text-stone-600">
         <p>© {new Date().getFullYear()} HumanBoard Publication. All rights reserved.</p>
         <p className="mt-2">
           Powered by <a href="/" className="underline hover:text-stone-700 dark:hover:text-stone-300">HumanBoard Workspace</a>

@@ -1070,7 +1070,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search chats..."
-              className="w-full bg-stone-200/50 dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 rounded-xl py-1.5 pl-8 pr-7 text-xs text-stone-900 dark:text-stone-100 placeholder:text-stone-450 focus:outline-none focus:ring-1 focus:ring-stone-400"
+              className="w-full bg-stone-200/50 dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 rounded-xl py-1.5 pl-8 pr-7 text-xs text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-400"
             />
             {searchQuery && (
               <button
@@ -1150,7 +1150,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
                         <button
                           type="button"
                           onClick={(e) => handleStartRename(thread.id, thread.title, e)}
-                          className="p-1 rounded hover:bg-stone-200/75 dark:hover:bg-stone-800 text-stone-450 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
+                          className="p-1 rounded hover:bg-stone-200/75 dark:hover:bg-stone-800 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
                           title="Rename thread"
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -1163,7 +1163,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
                               deleteChatThread(thread.id);
                             }
                           }}
-                          className="p-1 rounded hover:bg-stone-250 dark:hover:bg-stone-800 text-stone-450 hover:text-red-650 dark:hover:text-red-400 transition-colors"
+                          className="p-1 rounded hover:bg-stone-200 dark:hover:bg-stone-800 text-stone-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                           title="Delete thread"
                         >
                           <Trash2 className="w-3.5 h-3.5" />

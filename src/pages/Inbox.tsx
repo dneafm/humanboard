@@ -1088,7 +1088,7 @@ export default function InboxPage() {
                 </div>
                 
                 <div className="w-full md:w-auto shrink-0 md:max-w-xs space-y-2">
-                  <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-stone-500 dark:text-stone-450 block">
+                  <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-stone-500 dark:text-stone-400 block">
                     Catalyst Prompts (click to write)
                   </span>
                   <div className="flex flex-col gap-1.5">
