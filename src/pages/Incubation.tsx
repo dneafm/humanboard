@@ -1133,7 +1133,9 @@ Return the markdown report. Be direct, insightful, and clear.`;
                         {isArchived ? 'archived' : bet.status}
                       </span>
                       {overdue && (
-                        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500 mt-0.5" title="Review overdue" />
+                        <span title="Review overdue">
+                          <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500 mt-0.5" />
+                        </span>
                       )}
                     </div>
 
@@ -1425,193 +1427,196 @@ Return the markdown report. Be direct, insightful, and clear.`;
                 </div>
               </div>
 
-              <div className="p-5 grid gap-5 lg:grid-cols-[1fr_300px]">
-                {/* Main content column */}
-                <div className="space-y-5">
-                  {/* Metrics */}
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                    <Metric icon={Target} label="Conviction" value={bet.conviction} />
-                    <Metric icon={Radar} label="Salience" value={bet.salience} />
-                    <Metric icon={CheckCircle2} label="Supporting" value={bet.supportingSignalIds.length ? Math.min(100, bet.supportingSignalIds.length * 20) : 0} />
-                    <Metric icon={AlertTriangle} label="Contrary" value={bet.contradictingSignalIds.length ? Math.min(100, bet.contradictingSignalIds.length * 25) : 0} />
-                  </div>
-
-                  {/* Conviction bar */}
-                  <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
-                    <div className="mb-1.5 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500">
-                      <span>Progress to commit</span>
-                      <span className="text-stone-600 dark:text-stone-300">{bet.conviction}% / {bet.thresholdToCommit}%</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-stone-200 dark:bg-stone-800 overflow-hidden">
-                      <div className={cn('h-full rounded-full transition-all', bet.conviction >= bet.thresholdToCommit ? 'bg-emerald-500' : bet.conviction >= 60 ? 'bg-sky-500' : bet.conviction >= 40 ? 'bg-amber-400' : 'bg-stone-400')}
-                        style={{ width: `${Math.min(100, (bet.conviction / bet.thresholdToCommit) * 100)}%` }} />
-                    </div>
-                    <div className="mt-3 grid gap-2 grid-cols-2 md:grid-cols-4 text-xs text-stone-500 dark:text-stone-400">
-                      <div><span className="font-semibold text-stone-700 dark:text-stone-300">Baseline:</span> {bet.baselineConviction}%</div>
-                      <div><span className="font-semibold text-stone-700 dark:text-stone-300">Cadence:</span> {bet.reviewCadence || 'not set'}</div>
-                      <div><span className="font-semibold text-stone-700 dark:text-stone-300">Last reviewed:</span> {formatDistanceToNow(new Date(bet.lastReviewed), { addSuffix: true })}</div>
-                      <div><span className="font-semibold text-stone-700 dark:text-stone-300">Cost of skip:</span> {bet.costOfNotKnowing || 'n/a'}</div>
-                    </div>
-                  </div>
-
-                  {/* Overdue action */}
-                  {isReviewOverdue(bet.lastReviewed, bet.reviewCadence) && (
-                    <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/30 dark:bg-amber-950/20 dark:text-amber-300">
-                      <div className="flex items-center gap-2 font-medium">
-                        <AlertTriangle className="h-4 w-4 shrink-0" />
-                        Review overdue — {formatDistanceToNow(new Date(bet.lastReviewed), { addSuffix: true })}
-                      </div>
-                      <button type="button" onClick={() => updateCapabilityBet(bet.id, { lastReviewed: new Date().toISOString() })}
-                        className="rounded-xl bg-amber-600 hover:bg-amber-700 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white transition-colors shrink-0">
-                        Mark Reviewed
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Auto-connected notes */}
-                  {autoConnectedNotes.length > 0 && (
-                    <div className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4 dark:border-sky-900/30 dark:bg-sky-950/10">
-                      <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-sky-600 dark:text-sky-400">
-                        <BrainCircuit className="h-3.5 w-3.5" />
-                        Auto-connected notes ({autoConnectedNotes.length}) — matched by keywords
-                      </div>
-                      <div className="space-y-2">
-                        {autoConnectedNotes.map(note => (
-                          <Link key={note.id} to={`/inbox?note=${note.id}`}
-                            className="flex items-start gap-2 rounded-xl border border-sky-100 bg-white/80 px-3 py-2 text-xs text-stone-700 hover:border-sky-300 hover:shadow-sm transition-all dark:border-sky-900/20 dark:bg-stone-900/40 dark:text-stone-300">
-                            <ArrowRight className="h-3 w-3 mt-0.5 text-sky-500 shrink-0" />
-                            <span className="line-clamp-2">{note.content.split('\n')[0].slice(0, 120)}</span>
-                            <span className="ml-auto shrink-0 text-stone-400">{formatDistanceToNow(new Date(note.createdAt), { addSuffix: true })}</span>
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Signal events */}
-                  {betSignalEvents.length > 0 && (
-                    <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
-                      <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">
-                        <GitBranch className="h-3.5 w-3.5" />
-                        Linked evidence ({betSignalEvents.length})
-                      </div>
-                      <div className="space-y-2">
-                        {betSignalEvents.slice(0, 5).map(event => (
-                          <div key={event.id} className="flex items-start gap-3 rounded-xl border border-stone-200 bg-white/80 px-3 py-2.5 dark:border-stone-700 dark:bg-stone-900/40">
-                            <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider mt-0.5',
-                              event.polarity === 'supports' ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-emerald-300'
-                              : event.polarity === 'contradicts' ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/30 dark:bg-rose-950/20 dark:text-rose-300'
-                              : 'border-stone-200 bg-stone-100 text-stone-600 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300')}>
-                              {event.polarity}
-                            </span>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs text-stone-700 dark:text-stone-300 leading-relaxed line-clamp-2">{event.summary}</p>
-                              <div className="mt-1 text-[10px] text-stone-400 dark:text-stone-500">weight {event.weight} · {formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Conviction history */}
-                  <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
-                    <div className="mb-3 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">
-                      <span className="flex items-center gap-2"><History className="h-3.5 w-3.5" /> Conviction history</span>
-                      <span>{betHistory.length} event{betHistory.length === 1 ? '' : 's'}</span>
-                    </div>
-                    <Sparkline values={betHistory.map(e => e.conviction)} />
-                    <div className="mt-4 space-y-2">
-                      {betHistory.slice(-4).reverse().map((event: CapabilityTimelineEvent) => {
-                        const noteLinks = event.evidenceIds
-                          .map(id => id.split(':').slice(1).join(':'))
-                          .map(nid => notes.find(n => n.id === nid))
-                          .filter(Boolean) as Note[];
-                        return (
-                          <div key={event.id} className="rounded-xl border border-stone-200 bg-white/90 px-3 py-2.5 dark:border-stone-700 dark:bg-stone-900/60">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider', getTimelineColor(event.delta))}>
-                                  {event.delta > 0 ? '+' : ''}{event.delta}
-                                </span>
-                                <span className="text-xs text-stone-500 dark:text-stone-400">{event.reason}</span>
-                              </div>
-                              <span className="text-[10px] text-stone-400 dark:text-stone-500">{formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}</span>
-                            </div>
-                            <p className="mt-1.5 text-xs leading-relaxed text-stone-600 dark:text-stone-400">{event.summary}</p>
-                            {noteLinks.length > 0 && (
-                              <div className="mt-2 flex flex-wrap gap-1.5">
-                                {noteLinks.slice(0, 3).map(note => (
-                                  <Link key={note.id} to={`/inbox?note=${note.id}`}
-                                    className="rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-[10px] text-stone-600 hover:border-stone-300 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300">
-                                    {note.content.split('\n')[0].slice(0, 24)}…
-                                  </Link>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+              <div className="p-5 space-y-5">
+                {/* ── Row 1: 4 metrics ── */}
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                  <Metric icon={Target} label="Conviction" value={bet.conviction} />
+                  <Metric icon={Radar} label="Salience" value={bet.salience} />
+                  <Metric icon={CheckCircle2} label="Supporting" value={bet.supportingSignalIds.length ? Math.min(100, bet.supportingSignalIds.length * 20) : 0} />
+                  <Metric icon={AlertTriangle} label="Contrary" value={bet.contradictingSignalIds.length ? Math.min(100, bet.contradictingSignalIds.length * 25) : 0} />
                 </div>
 
-                {/* Right sidebar */}
-                <div className="space-y-4">
-                  {/* Decision rule */}
-                  <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
-                    <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500 mb-2">Decision rule</div>
-                    <p className="text-sm leading-relaxed text-stone-700 dark:text-stone-300">
-                      {bet.strategicNote || 'Commit only when repeated signals make this economically or strategically real.'}
-                    </p>
-                    <div className="mt-4 space-y-2">
-                      <ActionLabel icon={Radar} text={bet.status === 'committed' ? 'Move into active execution' : 'Keep passively monitoring notes'} />
-                      <ActionLabel icon={Target} text={bet.status === 'preparing' ? 'Set up study system and first use case' : 'Wait for stronger repeated signals'} />
-                      <ActionLabel icon={Sparkles} text={bet.status === 'exploring' ? 'Collect higher-quality evidence' : 'Let weak signals accumulate naturally'} />
-                    </div>
-                  </div>
-
-                  {/* Keywords */}
-                  {(bet.keywords ?? []).length > 0 && (
+                {/* ── Row 2: Balanced Grid layout ── */}
+                <div className="grid gap-5 lg:grid-cols-2">
+                  {/* Left Column: Conviction bar + Overdue action + History + Signals + Auto-notes */}
+                  <div className="space-y-4">
+                    {/* Conviction bar */}
                     <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500 mb-2">Keywords</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {bet.keywords.map(k => (
-                          <span key={k} className="rounded-full border border-stone-200 bg-white px-2.5 py-0.5 text-xs text-stone-600 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300">{k}</span>
-                        ))}
+                      <div className="mb-1.5 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500">
+                        <span>Progress to commit</span>
+                        <span className="text-stone-600 dark:text-stone-300">{bet.conviction}% / {bet.thresholdToCommit}%</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-stone-200 dark:bg-stone-800 overflow-hidden">
+                        <div className={cn('h-full rounded-full transition-all', bet.conviction >= bet.thresholdToCommit ? 'bg-emerald-500' : bet.conviction >= 60 ? 'bg-sky-500' : bet.conviction >= 40 ? 'bg-amber-400' : 'bg-stone-400')}
+                          style={{ width: `${Math.min(100, (bet.conviction / bet.thresholdToCommit) * 100)}%` }} />
+                      </div>
+                      <div className="mt-3 grid gap-2 grid-cols-2 md:grid-cols-4 text-xs text-stone-500 dark:text-stone-400">
+                        <div><span className="font-semibold text-stone-700 dark:text-stone-300">Baseline:</span> {bet.baselineConviction}%</div>
+                        <div><span className="font-semibold text-stone-700 dark:text-stone-300">Cadence:</span> {bet.reviewCadence || 'not set'}</div>
+                        <div><span className="font-semibold text-stone-700 dark:text-stone-300">Last reviewed:</span> {formatDistanceToNow(new Date(bet.lastReviewed), { addSuffix: true })}</div>
+                        <div><span className="font-semibold text-stone-700 dark:text-stone-300">Cost of skip:</span> {bet.costOfNotKnowing || 'n/a'}</div>
                       </div>
                     </div>
-                  )}
 
-                  {/* Unlock paths */}
-                  {(bet.unlockPaths ?? []).length > 0 && (
+                    {/* Overdue action */}
+                    {isReviewOverdue(bet.lastReviewed, bet.reviewCadence) && (
+                      <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/30 dark:bg-amber-950/20 dark:text-amber-300">
+                        <div className="flex items-center gap-2 font-medium">
+                          <AlertTriangle className="h-4 w-4 shrink-0" />
+                          Review overdue — {formatDistanceToNow(new Date(bet.lastReviewed), { addSuffix: true })}
+                        </div>
+                        <button type="button" onClick={() => updateCapabilityBet(bet.id, { lastReviewed: new Date().toISOString() })}
+                          className="rounded-xl bg-amber-600 hover:bg-amber-700 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white transition-colors shrink-0">
+                          Mark Reviewed
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Conviction history */}
                     <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500 mb-2">Unlock paths</div>
-                      <ul className="space-y-1.5">
-                        {bet.unlockPaths.map(item => <li key={item} className="text-xs text-stone-700 dark:text-stone-300 flex items-start gap-1.5"><span className="text-stone-400 mt-0.5">–</span>{item}</li>)}
-                      </ul>
+                      <div className="mb-3 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500">
+                        <span className="flex items-center gap-2"><History className="h-3.5 w-3.5" /> Conviction history</span>
+                        <span>{betHistory.length} event{betHistory.length === 1 ? '' : 's'}</span>
+                      </div>
+                      <Sparkline values={betHistory.map(e => e.conviction)} />
+                      <div className="mt-4 space-y-2">
+                        {betHistory.slice(-4).reverse().map((event: CapabilityTimelineEvent) => {
+                          const noteLinks = event.evidenceIds
+                            .map(id => id.split(':').slice(1).join(':'))
+                            .map(nid => notes.find(n => n.id === nid))
+                            .filter(Boolean) as Note[];
+                          return (
+                            <div key={event.id} className="rounded-xl border border-stone-200 bg-white/90 px-3 py-2.5 dark:border-stone-700 dark:bg-stone-900/60">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <span className={cn('inline-flex rounded-full border px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider', getTimelineColor(event.delta))}>
+                                    {event.delta > 0 ? '+' : ''}{event.delta}
+                                  </span>
+                                  <span className="text-xs text-stone-500 dark:text-stone-400">{event.reason}</span>
+                                </div>
+                                <span className="text-[10px] text-stone-400 dark:text-stone-500">{formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}</span>
+                              </div>
+                              <p className="mt-1.5 text-xs leading-relaxed text-stone-600 dark:text-stone-400">{event.summary}</p>
+                              {noteLinks.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                  {noteLinks.slice(0, 3).map(note => (
+                                    <Link key={note.id} to={`/inbox?note=${note.id}`}
+                                      className="rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-[10px] text-stone-600 hover:border-stone-300 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300">
+                                      {note.content.split('\n')[0].slice(0, 24)}…
+                                    </Link>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  )}
 
-                  {/* First use cases */}
-                  {(bet.firstUseCases ?? []).length > 0 && (
+                    {/* Linked evidence */}
+                    {betSignalEvents.length > 0 && (
+                      <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
+                        <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400">
+                          <GitBranch className="h-3.5 w-3.5" />
+                          Linked evidence ({betSignalEvents.length})
+                        </div>
+                        <div className="space-y-2">
+                          {betSignalEvents.slice(0, 5).map(event => (
+                            <div key={event.id} className="flex items-start gap-3 rounded-xl border border-stone-200 bg-white/80 px-3 py-2.5 dark:border-stone-700 dark:bg-stone-900/40">
+                              <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider mt-0.5',
+                                event.polarity === 'supports' ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-emerald-300'
+                                : event.polarity === 'contradicts' ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/30 dark:bg-rose-950/20 dark:text-rose-300'
+                                : 'border-stone-200 bg-stone-100 text-stone-600 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300')}>
+                                {event.polarity}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs text-stone-700 dark:text-stone-300 leading-relaxed line-clamp-2">{event.summary}</p>
+                                <div className="mt-1 text-[10px] text-stone-400 dark:text-stone-500">weight {event.weight} · {formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Auto-connected notes */}
+                    {autoConnectedNotes.length > 0 && (
+                      <div className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4 dark:border-sky-900/30 dark:bg-sky-950/10">
+                        <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-sky-600 dark:text-sky-400">
+                          <BrainCircuit className="h-3.5 w-3.5" />
+                          Auto-connected notes ({autoConnectedNotes.length}) — matched by keywords
+                        </div>
+                        <div className="space-y-2">
+                          {autoConnectedNotes.map(note => (
+                            <Link key={note.id} to={`/inbox?note=${note.id}`}
+                              className="flex items-start gap-2 rounded-xl border border-sky-100 bg-white/80 px-3 py-2 text-xs text-stone-700 hover:border-sky-300 hover:shadow-sm transition-all dark:border-sky-900/20 dark:bg-stone-900/40 dark:text-stone-300">
+                              <ArrowRight className="h-3 w-3 mt-0.5 text-sky-500 shrink-0" />
+                              <span className="line-clamp-2">{note.content.split('\n')[0].slice(0, 120)}</span>
+                              <span className="ml-auto shrink-0 text-stone-400">{formatDistanceToNow(new Date(note.createdAt), { addSuffix: true })}</span>
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Column: Decision rule + Keywords + Unlock paths + First use cases + Graph view */}
+                  <div className="space-y-4">
+                    {/* Decision rule */}
                     <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500 mb-2">First use cases</div>
-                      <ul className="space-y-1.5">
-                        {bet.firstUseCases.map(item => <li key={item} className="text-xs text-stone-700 dark:text-stone-300 flex items-start gap-1.5"><span className="text-stone-400 mt-0.5">–</span>{item}</li>)}
-                      </ul>
+                      <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500 mb-2">Decision rule</div>
+                      <p className="text-sm leading-relaxed text-stone-700 dark:text-stone-300">
+                        {bet.strategicNote || 'Commit only when repeated signals make this economically or strategically real.'}
+                      </p>
+                      <div className="mt-4 space-y-2">
+                        <ActionLabel icon={Radar} text={bet.status === 'committed' ? 'Move into active execution' : 'Keep passively monitoring notes'} />
+                        <ActionLabel icon={Target} text={bet.status === 'preparing' ? 'Set up study system and first use case' : 'Wait for stronger repeated signals'} />
+                        <ActionLabel icon={Sparkles} text={bet.status === 'exploring' ? 'Collect higher-quality evidence' : 'Let weak signals accumulate naturally'} />
+                      </div>
                     </div>
-                  )}
 
-                  {/* Graph view mini */}
-                  <CapabilityGraphView
-                    bet={bet}
-                    noteNodes={betGraphData.noteNodes}
-                    ideaNodes={betGraphData.ideaNodes}
-                    edges={betGraphData.edges}
-                    focusNoteId={focusNoteId}
-                    focusIdeaId={focusIdeaId}
-                  />
+                    {/* Keywords */}
+                    {(bet.keywords ?? []).length > 0 && (
+                      <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500 mb-2">Keywords</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {bet.keywords.map(k => (
+                            <span key={k} className="rounded-full border border-stone-200 bg-white px-2.5 py-0.5 text-xs text-stone-600 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300">{k}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Unlock paths */}
+                    {(bet.unlockPaths ?? []).length > 0 && (
+                      <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500 mb-2">Unlock paths</div>
+                        <ul className="space-y-1.5">
+                          {bet.unlockPaths.map(item => <li key={item} className="text-xs text-stone-700 dark:text-stone-300 flex items-start gap-1.5"><span className="text-stone-400 mt-0.5">–</span>{item}</li>)}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* First use cases */}
+                    {(bet.firstUseCases ?? []).length > 0 && (
+                      <div className="rounded-2xl border border-stone-100 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-950/40">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-400 dark:text-stone-500 mb-2">First use cases</div>
+                        <ul className="space-y-1.5">
+                          {bet.firstUseCases.map(item => <li key={item} className="text-xs text-stone-700 dark:text-stone-300 flex items-start gap-1.5"><span className="text-stone-400 mt-0.5">–</span>{item}</li>)}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Graph view */}
+                    <CapabilityGraphView
+                      bet={bet}
+                      noteNodes={betGraphData.noteNodes}
+                      ideaNodes={betGraphData.ideaNodes}
+                      edges={betGraphData.edges}
+                      focusNoteId={focusNoteId}
+                      focusIdeaId={focusIdeaId}
+                    />
+                  </div>
                 </div>
               </div>
             </div>

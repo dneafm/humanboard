@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppStore, getReadinessScore, getReadinessState, type StrategicRole } from '../store';
-import { ArrowLeft, Sparkles, Volume2, Image as ImageIcon, GitBranch, FlaskConical, CheckCircle2, Folder, Scale, Wand2, Type, AlignLeft, Zap, RefreshCw, Check, X, MessageSquare, ChevronDown, Sprout } from 'lucide-react';
+import { ArrowLeft, Sparkles, Volume2, Image as ImageIcon, GitBranch, FlaskConical, CheckCircle2, Folder, Scale, Wand2, Type, AlignLeft, Zap, RefreshCw, Check, X, MessageSquare, ChevronDown, Sprout, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { performAIAction, AIAction } from '../lib/ai';
@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'motion/react';
 export default function IdeaDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { ideas, sections, notes, updateIdea } = useAppStore();
+  const { ideas, sections, notes, updateIdea, deleteIdea } = useAppStore();
   const idea = ideas.find(i => i.id === id);
   const section = sections.find(s => s.id === idea?.sectionId);
   const relatedIdeas = ideas.filter(i => idea?.relatedIdeaIds?.includes(i.id));
@@ -215,13 +215,27 @@ export default function IdeaDetailPage() {
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto border-r border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950">
         <div className="max-w-3xl mx-auto w-full p-10">
-          <button 
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-sm font-medium text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 mb-10 transition-colors group"
-          >
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            Back to Garden
-          </button>
+          <div className="flex items-center justify-between mb-10">
+            <button 
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-2 text-sm font-medium text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors group"
+            >
+              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+              Back to Garden
+            </button>
+            <button
+              onClick={() => {
+                if (confirm('Are you sure you want to delete this idea?')) {
+                  deleteIdea(idea.id);
+                  navigate('/ideas');
+                }
+              }}
+              className="flex items-center gap-2 text-sm font-medium text-stone-400 dark:text-stone-500 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete Idea
+            </button>
+          </div>
 
           {idea.coverImage && (
             <div className="w-full h-80 bg-stone-100 dark:bg-stone-900 rounded-3xl mb-12 overflow-hidden border border-stone-200 dark:border-stone-800 shadow-2xl shadow-stone-900/5 dark:shadow-black/40">

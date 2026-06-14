@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAppStore, type CapabilityBet, type EvidencePolarity, type IdeaType, type Note, type SignalAssessment } from '../store';
 import { formatDistanceToNow } from 'date-fns';
-import { Plus, Archive, Lightbulb, Scale, Sparkles, Check, X, ImagePlus, Loader2, Brain, HelpCircle, Dices, ArrowRight, Target, FileText, Upload, GitMerge, Replace } from 'lucide-react';
+import { Plus, Archive, Lightbulb, Scale, Sparkles, Check, X, ImagePlus, Loader2, Brain, HelpCircle, Dices, ArrowRight, Target, FileText, Upload, GitMerge, Replace, Trash2 } from 'lucide-react';
 import { compileRawNoteToKnowledge, extractCapabilityEvidenceReview } from '../lib/ai';
 import { Link, useSearchParams } from 'react-router-dom';
 import { shouldTreatAsMeaningfulNote } from '../lib/noteQuality';
@@ -1591,11 +1591,15 @@ export default function InboxPage() {
                         Principle
                       </button>
                       <button 
-                        onClick={() => deleteNote(note.id)}
+                        onClick={() => {
+                          if (confirm('Are you sure you want to delete this note?')) {
+                            deleteNote(note.id);
+                          }
+                        }}
                         className="text-[10px] font-bold uppercase tracking-wider text-stone-400 hover:text-red-600 dark:hover:text-red-400 flex items-center gap-1.5 px-3 py-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                       >
-                        <Archive className="w-3 h-3" />
-                        Archive
+                        <Trash2 className="w-3 h-3" />
+                        Delete
                       </button>
                     </div>
                   </div>

@@ -15,6 +15,7 @@ import IncubationPage from './pages/Incubation';
 import CommandCenterPage from './pages/CommandCenter';
 import FusionPage from './pages/Fusion';
 import FusionDetailPage from './pages/FusionDetail';
+import PublicFusionPage from './pages/PublicFusion';
 import Chatbot from './components/Chatbot';
 import { hydrateAppStoreFromRepository, useAppStore } from './store';
 import { useEffect, useLayoutEffect, useState } from 'react';
@@ -1216,6 +1217,19 @@ export default function App() {
     setIsSpotlightTourOpen(false);
   };
 
+  const isPublicRoute = window.location.pathname.startsWith('/shared/fusion/');
+
+  if (isPublicRoute) {
+    return (
+      <BrowserRouter>
+        <Routes>
+          <Route path="/shared/fusion/:id" element={<PublicFusionPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    );
+  }
+
   if (isLocalCommandCenter && isAuthReady && !userId) {
     return (
       <BrowserRouter>
@@ -1294,6 +1308,7 @@ export default function App() {
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/fusion" element={<FusionPage />} />
             <Route path="/fusion/:id" element={<FusionDetailPage />} />
+            <Route path="/shared/fusion/:id" element={<PublicFusionPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

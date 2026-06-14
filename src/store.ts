@@ -287,6 +287,9 @@ export type FusionItem = {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
+  isPublic?: boolean;
+  authorName?: string;
+  authorBio?: string;
 };
 
 export type FusionSuggestion = {
@@ -447,6 +450,7 @@ interface AppState {
   deleteNote: (id: string) => void;
   addIdea: (idea: Omit<Idea, 'id' | 'lastReviewed' | 'layer'>) => void;
   updateIdea: (id: string, updates: Partial<Idea>) => void;
+  deleteIdea: (id: string) => void;
   addProject: (project: Omit<Project, 'id' | 'createdAt' | 'lastUpdatedAt' | 'linkedNoteIds' | 'linkedIdeaIds' | 'linkedGoalIds' | 'tasks' | 'updates' | 'experiments'> & Partial<Pick<Project, 'createdAt' | 'lastUpdatedAt' | 'linkedNoteIds' | 'linkedIdeaIds' | 'linkedGoalIds' | 'tasks' | 'updates' | 'experiments'>>) => void;
   updateProject: (id: string, updates: Partial<Project>) => void;
   deleteProject: (id: string) => void;
@@ -1211,6 +1215,16 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const updatedIdeas = state.ideas.map(i => i.id === id ? { ...i, ...mergedUpdates } : i);
     const derivedIdeas = deriveStrategicIdeaFields(updatedIdeas, state.notes);
+    const next = {
+      ...state,
+      ideas: derivedIdeas,
+    };
+    persistSnapshot(next);
+    return { ideas: next.ideas };
+  }),
+  deleteIdea: (id) => set((state) => {
+    const nextIdeas = state.ideas.filter(i => i.id !== id);
+    const derivedIdeas = deriveStrategicIdeaFields(nextIdeas, state.notes);
     const next = {
       ...state,
       ideas: derivedIdeas,

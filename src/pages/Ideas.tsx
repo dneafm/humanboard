@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAppStore, IdeaType, Idea, getReadinessScore, getReadinessState } from '../store';
 import { Link } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-import { LayoutGrid, List, Plus, Folder, Lightbulb, Scale, BookOpen, Search, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { LayoutGrid, List, Plus, Folder, Lightbulb, Scale, BookOpen, Search, ChevronDown, ChevronUp, ExternalLink, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
@@ -115,6 +115,7 @@ export default function IdeasPage() {
 }
 
 function IdeaCard({ idea, section, compact }: { idea: Idea, section?: any, compact?: boolean }) {
+  const { deleteIdea } = useAppStore();
   const [isExpanded, setIsExpanded] = useState(false);
   const isPrinciple = idea.type === 'Principle';
   const isProjectIdea = idea.type === 'Project';
@@ -207,6 +208,17 @@ function IdeaCard({ idea, section, compact }: { idea: Idea, section?: any, compa
             >
               <ExternalLink className="w-4 h-4" />
             </Link>
+            <button
+              onClick={() => {
+                if (confirm('Are you sure you want to delete this idea?')) {
+                  deleteIdea(idea.id);
+                }
+              }}
+              className="p-2 text-stone-300 hover:text-rose-600 dark:text-stone-700 dark:hover:text-rose-400 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-all"
+              title="Delete Idea"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           </div>
         </div>
         

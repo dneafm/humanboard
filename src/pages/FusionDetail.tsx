@@ -1,8 +1,9 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, FileText, Link2, Minus, Plus, Sparkles, GripVertical, Columns2, Columns3, Heading1, Heading2, Heading3, Loader2, Trash2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, FileText, Link2, Minus, Plus, Sparkles, GripVertical, Columns2, Columns3, Heading1, Heading2, Heading3, Loader2, Trash2, Globe, ArrowUpRight } from 'lucide-react';
 import { generateFusionArtifact } from '../lib/ai';
 import { useAppStore, type FusionAudience, type FusionStatus, type FusionType, type FusionSuggestion } from '../store';
+import { useAuthStore } from '../stores/authStore';
 import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -28,6 +29,11 @@ export default function FusionDetailPage() {
   const [isGenerating, setIsGenerating] = useState<'summary' | 'conclusion' | 'full' | null>(null);
   const [uiError, setUiError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
+  const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const { user } = useAuthStore();
+  const defaultAuthorName = user?.displayName || 'HumanBoard Creator';
+  const publicLink = window.location.origin + '/shared/fusion/' + item.id;
 
   const linkedNotes = useMemo(() => notes.filter((note) => item?.linkedNoteIds.includes(note.id)), [item?.linkedNoteIds, notes]);
   const linkedIdeas = useMemo(() => ideas.filter((idea) => item?.linkedIdeaIds.includes(idea.id)), [ideas, item?.linkedIdeaIds]);
@@ -137,6 +143,20 @@ export default function FusionDetailPage() {
 
           <button
             type="button"
+            onClick={() => setIsSharePanelOpen(!isSharePanelOpen)}
+            className={cn(
+              "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition cursor-pointer",
+              item.isPublic
+                ? "border-emerald-250 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-emerald-300"
+                : "border-stone-200 bg-white text-stone-700 hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-850"
+            )}
+          >
+            <Globe className="h-4 w-4" />
+            {item.isPublic ? 'Public' : 'Publish'}
+          </button>
+
+          <button
+            type="button"
             onClick={() => navigate('/fusion')}
             className="inline-flex items-center gap-2 rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200 cursor-pointer"
           >
@@ -144,6 +164,96 @@ export default function FusionDetailPage() {
           </button>
         </div>
       </div>
+
+      {isSharePanelOpen && (
+        <div className="mb-6 p-6 rounded-3xl border border-stone-200 bg-white shadow-sm dark:border-stone-800 dark:bg-stone-900/40 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h4 className="text-sm font-semibold text-stone-900 dark:text-stone-100">Publish to Web</h4>
+              <p className="text-xs text-stone-500 dark:text-stone-500 mt-1">Make this fusion readable by anyone like a Substack post.</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold text-stone-600 dark:text-stone-400">Public Access</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const nextPublic = !item.isPublic;
+                  updateFusionItem(item.id, { 
+                    isPublic: nextPublic,
+                    authorName: item.authorName || defaultAuthorName
+                  });
+                }}
+                className={cn(
+                  "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                  item.isPublic ? "bg-emerald-600" : "bg-stone-200 dark:bg-stone-800"
+                )}
+              >
+                <span
+                  className={cn(
+                    "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                    item.isPublic ? "translate-x-5" : "translate-x-0"
+                  )}
+                />
+              </button>
+            </div>
+          </div>
+
+          {item.isPublic && (
+            <div className="pt-5 border-t border-stone-100 dark:border-stone-850 space-y-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-450 dark:text-stone-500 mb-2">Author Name</label>
+                  <input
+                    type="text"
+                    placeholder="Enter author name..."
+                    value={item.authorName || ''}
+                    onChange={(e) => updateFusionItem(item.id, { authorName: e.target.value })}
+                    className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-850 rounded-xl px-3.5 py-2 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-400 dark:focus:border-stone-700 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-455 dark:text-stone-500 mb-2">Author Bio / Profile</label>
+                  <input
+                    type="text"
+                    placeholder="E.g., Tech researcher and strategic builder..."
+                    value={item.authorBio || ''}
+                    onChange={(e) => updateFusionItem(item.id, { authorBio: e.target.value })}
+                    className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-850 rounded-xl px-3.5 py-2 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-400 dark:focus:border-stone-700 transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-stone-50 dark:bg-stone-950 p-4 rounded-2xl border border-stone-200/50 dark:border-stone-850/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1">Public Shareable Link</div>
+                  <div className="text-xs text-stone-600 dark:text-stone-400 truncate select-all">{publicLink}</div>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(publicLink);
+                      setLinkCopied(true);
+                      setTimeout(() => setLinkCopied(false), 2000);
+                    }}
+                    className="bg-white hover:bg-stone-55 dark:bg-stone-900 dark:hover:bg-stone-850 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-800 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-sm transition active:scale-95 cursor-pointer"
+                  >
+                    {linkCopied ? 'Copied!' : 'Copy Link'}
+                  </button>
+                  <a
+                    href={`/shared/fusion/${item.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-stone-900 hover:bg-stone-800 dark:bg-stone-100 dark:hover:bg-stone-200 text-white dark:text-stone-950 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-sm transition flex items-center gap-1 active:scale-95 cursor-pointer"
+                  >
+                    View Page <ArrowUpRight className="h-3.5 w-3.5" />
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {uiError && (
         <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">

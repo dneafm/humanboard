@@ -747,6 +747,60 @@ app.post('/api/snapshot/reset', async (req, res) => {
   }
 });
 
+app.get('/api/public/fusion/:id', async (req, res) => {
+  const fusionId = req.params.id;
+  try {
+    if (!existsSync(USER_DATA_DIR)) {
+      return res.status(404).json({ error: 'No user directory found' });
+    }
+
+    const entries = await fs.readdir(USER_DATA_DIR, { withFileTypes: true });
+    
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const safeUserId = entry.name;
+        const snapshotPath = path.join(USER_DATA_DIR, safeUserId, 'snapshot.json');
+        
+        if (existsSync(snapshotPath)) {
+          try {
+            const raw = await fs.readFile(snapshotPath, 'utf-8');
+            const parsed = JSON.parse(raw);
+            const fusionItems = parsed.fusionItems || [];
+            
+            const foundItem = fusionItems.find(item => item.id === fusionId);
+            if (foundItem) {
+              if (!foundItem.isPublic) {
+                return res.status(403).json({ error: 'This fusion is private' });
+              }
+              
+              const otherFusions = fusionItems
+                .filter(item => item.id !== fusionId && item.isPublic === true)
+                .map(item => ({
+                  id: item.id,
+                  title: item.title,
+                  summary: item.summary,
+                  createdAt: item.createdAt,
+                  type: item.type
+                }));
+                
+              return res.json({
+                fusion: foundItem,
+                otherFusions
+              });
+            }
+          } catch (e) {
+            console.error(`Error reading snapshot for user ${safeUserId} in public scan:`, e);
+          }
+        }
+      }
+    }
+    
+    return res.status(404).json({ error: 'Fusion not found' });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
 app.get('/api/snapshot', async (req, res) => {
   const userId = await requireUserId(req, res);
   if (!userId) return;
