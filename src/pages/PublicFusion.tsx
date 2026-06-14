@@ -78,7 +78,7 @@ export default function PublicFusionPage() {
         canonicalLink.rel = 'canonical';
         document.head.appendChild(canonicalLink);
       }
-      canonicalLink.href = window.location.href;
+      canonicalLink.href = window.location.href.replace(/^http:/, 'https:');
 
       // Dynamic meta description
       let metaDescription = document.querySelector('meta[name="description"]') as HTMLMetaElement | null;

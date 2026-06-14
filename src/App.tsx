@@ -630,7 +630,7 @@ function AuthScreen() {
       canonicalLink.rel = 'canonical';
       document.head.appendChild(canonicalLink);
     }
-    canonicalLink.href = window.location.origin + '/';
+    canonicalLink.href = window.location.origin.replace(/^http:/, 'https:') + '/';
 
     // Dynamic meta description
     let metaDescription = document.querySelector('meta[name="description"]') as HTMLMetaElement | null;
