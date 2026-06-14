@@ -67,6 +67,30 @@ export default function PublicFusionPage() {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (data?.fusion) {
+      document.title = `${data.fusion.title} - HumanBoard Publication`;
+      
+      // Dynamic canonical tag
+      let canonicalLink = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+      if (!canonicalLink) {
+        canonicalLink = document.createElement('link');
+        canonicalLink.rel = 'canonical';
+        document.head.appendChild(canonicalLink);
+      }
+      canonicalLink.href = window.location.href;
+
+      // Dynamic meta description
+      let metaDescription = document.querySelector('meta[name="description"]') as HTMLMetaElement | null;
+      if (!metaDescription) {
+        metaDescription = document.createElement('meta');
+        metaDescription.name = 'description';
+        document.head.appendChild(metaDescription);
+      }
+      metaDescription.content = data.fusion.summary || 'Strategic research publication.';
+    }
+  }, [data]);
+
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
     if (email.trim()) {
