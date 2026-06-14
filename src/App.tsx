@@ -620,6 +620,28 @@ function AuthScreen() {
   const [error, setError] = useState<string | null>(null);
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
 
+  useEffect(() => {
+    document.title = "HumanBoard - Turn scattered thoughts into direction";
+    
+    // Dynamic canonical tag for landing page
+    let canonicalLink = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+    if (!canonicalLink) {
+      canonicalLink = document.createElement('link');
+      canonicalLink.rel = 'canonical';
+      document.head.appendChild(canonicalLink);
+    }
+    canonicalLink.href = window.location.origin + '/';
+
+    // Dynamic meta description
+    let metaDescription = document.querySelector('meta[name="description"]') as HTMLMetaElement | null;
+    if (!metaDescription) {
+      metaDescription = document.createElement('meta');
+      metaDescription.name = 'description';
+      document.head.appendChild(metaDescription);
+    }
+    metaDescription.content = "HumanBoard is your personal thinking workspace. Capture raw thoughts, links, and fragments, selectively distill key insights, and connect them to your goals and projects.";
+  }, []);
+
   const handleSignIn = async () => {
     try {
       setError(null);

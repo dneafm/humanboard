@@ -1,4 +1,22 @@
 User-agent: *
+
+# Allow landing/login page at root
+Allow: /$
+
+# Allow public fusions and assets
 Allow: /shared/fusion/
 Allow: /assets/
-Disallow: /
+
+# Disallow private app routes
+Disallow: /ideas
+Disallow: /goals
+Disallow: /incubation
+Disallow: /map
+Disallow: /review
+Disallow: /projects
+Disallow: /fusion
+Disallow: /search
+Disallow: /api/
+
+# Disallow any other deep links/subpaths
+Disallow: /*
