@@ -56,6 +56,8 @@ export default function Chatbot() {
   const updateGoal = useAppStore((state) => state.updateGoal);
   const deleteProject = useAppStore((state) => state.deleteProject);
   const addFusionItem = useAppStore((state) => state.addFusionItem);
+  const addCapabilityBet = useAppStore((state) => state.addCapabilityBet);
+  const updateCapabilityBet = useAppStore((state) => state.updateCapabilityBet);
   const userId = useAuthStore((state) => state.userId);
   const [isExpanded, setIsExpanded] = useState(false);
   const [autoDistill, setAutoDistill] = useState(false);
@@ -192,6 +194,12 @@ export default function Chatbot() {
     const normalized = normalizeText(value);
     if (!normalized) return undefined;
     return projects.find((project) => normalizeText(project.id) === normalized || normalizeText(project.title) === normalized);
+  };
+
+  const findCapabilityBetByReference = (value?: string) => {
+    const normalized = normalizeText(value);
+    if (!normalized) return undefined;
+    return capabilityBets.find((bet) => normalizeText(bet.id) === normalized || normalizeText(bet.title) === normalized);
   };
 
   const findRelatedIdeaIds = (values?: string[]) => {
@@ -559,7 +567,7 @@ Only save content that belongs in the HumanBoard database. Do NOT save operation
 Tool 1: Create an inbox note. Use this to save an episodic memory, raw thought, or quick fact.
 <toolcall_create_note>The text of the note goes here</toolcall_create_note>
 
-Tool 2: Create a knowledge Idea node. Use this when the user wants a new idea node on the board or map.
+Tool 2: Create a knowledge Idea node. Use this when the user wants a new idea node on the board or map. If this is an incubation candidate, optional incubation fields can be supplied.
 <toolcall_create_idea>
 {
   "title": "Short title",
@@ -571,11 +579,13 @@ Tool 2: Create a knowledge Idea node. Use this when the user wants a new idea no
   "section": "optional section name or id",
   "confidence": 7,
   "maturity": 50,
-  "relatedIdeas": ["optional existing idea title or id"]
+  "relatedIdeas": ["optional existing idea title or id"],
+  "incubationDecision": "optional decision string (e.g. Keep Watching, Warm Up / Explore, Parked / Defer, Ready to Activate)",
+  "reviewCadence": "optional review schedule (e.g. weekly, bi-weekly, monthly)"
 }
 </toolcall_create_idea>
 
-Tool 3: Update an existing Idea node. Use this to manage an existing map node by changing its title, summary, content, type, stage, next action, section, confidence, maturity, or related ideas.
+Tool 3: Update an existing Idea node. Use this to manage an existing map node by changing its properties, including moving it in or out of incubation.
 <toolcall_update_idea>
 {
   "target": "existing idea title or id",
@@ -588,7 +598,9 @@ Tool 3: Update an existing Idea node. Use this to manage an existing map node by
   "section": "optional section name or id",
   "confidence": 8,
   "maturity": 65,
-  "relatedIdeas": ["optional existing idea title or id"]
+  "relatedIdeas": ["optional existing idea title or id"],
+  "incubationDecision": "optional decision string (e.g. Keep Watching, Warm Up / Explore, Parked / Defer, Ready to Activate)",
+  "reviewCadence": "optional review schedule (e.g. weekly, bi-weekly, monthly)"
 }
 </toolcall_update_idea>
 
@@ -651,6 +663,42 @@ Tool 8: Create a Fusion item. Use this when the user explicitly requests to synt
   "linkedProjects": ["optional project title or id"]
 }
 </toolcall_create_fusion>
+
+Tool 9: Create a Capability Bet (Incubation). Use this when the user asks you to track, monitor, or create a strategic capability bet on the incubation board.
+<toolcall_create_capability_bet>
+{
+  "title": "Strategic bet title",
+  "thesis": "Strategic thesis statement",
+  "baselineConviction": 50,
+  "thresholdToCommit": 80,
+  "keywords": ["tag1", "tag2"],
+  "unlockPaths": ["unlock milestone 1", "unlock milestone 2"],
+  "firstUseCases": ["use case 1", "use case 2"],
+  "costOfNotKnowing": "What happens if we do not build this?",
+  "reviewCadence": "weekly|bi-weekly|monthly",
+  "strategicNote": "strategic focus details"
+}
+</toolcall_create_capability_bet>
+
+Tool 10: Update a Capability Bet (Incubation). Use this to update properties of a capability bet in incubation (like conviction, status, review cadence, thesis).
+<toolcall_update_capability_bet>
+{
+  "target": "existing capability bet title or id",
+  "updates": {
+    "title": "optional new title",
+    "thesis": "optional new thesis",
+    "baselineConviction": 60,
+    "status": "watching|exploring|preparing|committed",
+    "thresholdToCommit": 85,
+    "keywords": ["newtag1"],
+    "unlockPaths": ["updated milestones"],
+    "firstUseCases": ["updated use cases"],
+    "costOfNotKnowing": "updated cost description",
+    "reviewCadence": "weekly|bi-weekly|monthly",
+    "strategicNote": "updated strategic notes"
+  }
+}
+</toolcall_update_capability_bet>
 
 When the user asks to create or manage a map idea node, prefer toolcall_create_idea or toolcall_update_idea instead of only describing what to do.
 When the user asks to create or edit a goal or roadmap panel, use toolcall_create_goal or toolcall_update_goal instead of only describing what to do.
@@ -716,6 +764,8 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
             nextAction: ideaData.nextAction || '',
             linkedNoteIds: [],
             relatedIdeaIds: findRelatedIdeaIds(ideaData.relatedIdeas),
+            incubationDecision: ideaData.incubationDecision,
+            reviewCadence: ideaData.reviewCadence,
           });
         } catch (err) {
           console.error("Failed to parse create_idea toolcall JSON:", err);
@@ -746,6 +796,8 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
             maturity: Number.isFinite(ideaData.maturity) ? Math.max(0, Math.min(100, Number(ideaData.maturity))) : targetIdea.maturity,
             nextAction: ideaData.nextAction ?? targetIdea.nextAction,
             relatedIdeaIds: Array.isArray(ideaData.relatedIdeas) ? findRelatedIdeaIds(ideaData.relatedIdeas) : targetIdea.relatedIdeaIds,
+            incubationDecision: ideaData.incubationDecision ?? targetIdea.incubationDecision,
+            reviewCadence: ideaData.reviewCadence ?? targetIdea.reviewCadence,
           });
         } catch (err) {
           console.error("Failed to parse update_idea toolcall JSON:", err);
@@ -889,8 +941,73 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       }
       cleanText = cleanText.replace(fusionRegex, '').trim();
 
+      // Extract Create Capability Bet tool calls
+      const createBetRegex = /<toolcall_create_capability_bet>([\s\S]*?)<\/toolcall_create_capability_bet>/gi;
+      let createBetMatch;
+      let matchedCapabilityBet = false;
+      while ((createBetMatch = createBetRegex.exec(responseText)) !== null) {
+        try {
+          const jsonStr = createBetMatch[1].trim();
+          const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+          const data = JSON.parse(cleanJsonStr);
+          if (!allowNoteIdeaWrites) {
+            blockedInferredWrite = true;
+            continue;
+          }
+          matchedCapabilityBet = true;
+          addCapabilityBet({
+            title: data.title || 'Untitled Capability Bet',
+            thesis: data.thesis || '',
+            baselineConviction: Number.isFinite(data.baselineConviction) ? Number(data.baselineConviction) : 50,
+            thresholdToCommit: Number.isFinite(data.thresholdToCommit) ? Number(data.thresholdToCommit) : 80,
+            keywords: Array.isArray(data.keywords) ? data.keywords.map(String) : [],
+            unlockPaths: Array.isArray(data.unlockPaths) ? data.unlockPaths.map(String) : [],
+            firstUseCases: Array.isArray(data.firstUseCases) ? data.firstUseCases.map(String) : [],
+            costOfNotKnowing: data.costOfNotKnowing || '',
+            reviewCadence: data.reviewCadence || '',
+            strategicNote: data.strategicNote || '',
+          });
+        } catch (err) {
+          console.error("Failed to parse create_capability_bet toolcall JSON:", err);
+        }
+      }
+      cleanText = cleanText.replace(createBetRegex, '').trim();
+
+      // Extract Update Capability Bet tool calls
+      const updateBetRegex = /<toolcall_update_capability_bet>([\s\S]*?)<\/toolcall_update_capability_bet>/gi;
+      let updateBetMatch;
+      let matchedCapabilityBetUpdate = false;
+      while ((updateBetMatch = updateBetRegex.exec(responseText)) !== null) {
+        try {
+          const jsonStr = updateBetMatch[1].trim();
+          const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+          const data = JSON.parse(cleanJsonStr);
+          if (!explicitBoardWrite) continue;
+          const targetBet = findCapabilityBetByReference(data.target);
+          if (!targetBet) continue;
+          matchedCapabilityBetUpdate = true;
+          const updates = data.updates || {};
+          updateCapabilityBet(targetBet.id, {
+            title: updates.title || targetBet.title,
+            thesis: updates.thesis || targetBet.thesis,
+            baselineConviction: Number.isFinite(updates.baselineConviction) ? Number(updates.baselineConviction) : targetBet.baselineConviction,
+            status: updates.status || targetBet.status,
+            thresholdToCommit: Number.isFinite(updates.thresholdToCommit) ? Number(updates.thresholdToCommit) : targetBet.thresholdToCommit,
+            keywords: Array.isArray(updates.keywords) ? updates.keywords.map(String) : targetBet.keywords,
+            unlockPaths: Array.isArray(updates.unlockPaths) ? updates.unlockPaths.map(String) : targetBet.unlockPaths,
+            firstUseCases: Array.isArray(updates.firstUseCases) ? updates.firstUseCases.map(String) : targetBet.firstUseCases,
+            costOfNotKnowing: updates.costOfNotKnowing !== undefined ? updates.costOfNotKnowing : targetBet.costOfNotKnowing,
+            reviewCadence: updates.reviewCadence !== undefined ? updates.reviewCadence : targetBet.reviewCadence,
+            strategicNote: updates.strategicNote !== undefined ? updates.strategicNote : targetBet.strategicNote,
+          });
+        } catch (err) {
+          console.error("Failed to parse update_capability_bet toolcall JSON:", err);
+        }
+      }
+      cleanText = cleanText.replace(updateBetRegex, '').trim();
+
       let actionMessage = '';
-      if (matchedNote || matchedIdea || matchedIdeaUpdate || matchedPersona || matchedGoal || matchedGoalUpdate || matchedProjectDelete || matchedFusion) {
+      if (matchedNote || matchedIdea || matchedIdeaUpdate || matchedPersona || matchedGoal || matchedGoalUpdate || matchedProjectDelete || matchedFusion || matchedCapabilityBet || matchedCapabilityBetUpdate) {
         actionMessage = "\n\n*(AI: ";
         const acts = [];
         if (matchedNote) acts.push("added to Inbox");
@@ -901,6 +1018,8 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
         if (matchedGoalUpdate) acts.push("updated Goal panel");
         if (matchedProjectDelete) acts.push("deleted Project");
         if (matchedFusion) acts.push("created Fusion item");
+        if (matchedCapabilityBet) acts.push("created Capability Bet");
+        if (matchedCapabilityBetUpdate) acts.push("updated Capability Bet");
         actionMessage += acts.join(", ") + ")*";
       }
 
