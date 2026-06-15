@@ -50,12 +50,14 @@ export default function Chatbot() {
   const sections = useAppStore((state) => state.sections);
   const addIdea = useAppStore((state) => state.addIdea);
   const addNote = useAppStore((state) => state.addNote);
+  const updateNote = useAppStore((state) => state.updateNote);
   const addGoal = useAppStore((state) => state.addGoal);
   const addSection = useAppStore((state) => state.addSection);
   const updateIdea = useAppStore((state) => state.updateIdea);
   const updateGoal = useAppStore((state) => state.updateGoal);
   const deleteProject = useAppStore((state) => state.deleteProject);
   const addFusionItem = useAppStore((state) => state.addFusionItem);
+  const updateFusionItem = useAppStore((state) => state.updateFusionItem);
   const addCapabilityBet = useAppStore((state) => state.addCapabilityBet);
   const updateCapabilityBet = useAppStore((state) => state.updateCapabilityBet);
   const userId = useAuthStore((state) => state.userId);
@@ -200,6 +202,12 @@ export default function Chatbot() {
     const normalized = normalizeText(value);
     if (!normalized) return undefined;
     return capabilityBets.find((bet) => normalizeText(bet.id) === normalized || normalizeText(bet.title) === normalized);
+  };
+
+  const findFusionByReference = (value?: string) => {
+    const normalized = normalizeText(value);
+    if (!normalized) return undefined;
+    return fusionItems.find((item) => normalizeText(item.id) === normalized || normalizeText(item.title) === normalized);
   };
 
   const findRelatedIdeaIds = (values?: string[]) => {
@@ -664,7 +672,27 @@ Tool 8: Create a Fusion item. Use this when the user explicitly requests to synt
 }
 </toolcall_create_fusion>
 
-Tool 9: Create a Capability Bet (Incubation). Use this when the user asks you to track, monitor, or create a strategic capability bet on the incubation board.
+Tool 9: Update an existing Fusion item. Use this when the user asks to edit, revise, expand, retitle, mark ready/completed, or link material to an existing fusion.
+<toolcall_update_fusion>
+{
+  "target": "existing fusion title or id",
+  "updates": {
+    "title": "optional new title",
+    "type": "Post|Writing|Thesis|Report",
+    "status": "Draft|Synthesizing|Ready|Completed",
+    "summary": "optional replacement summary",
+    "centralConclusion": "optional replacement conclusion",
+    "body": "optional replacement body",
+    "audience": "Personal|Team|Public|Client",
+    "linkedNotes": ["complete replacement note refs when changing note links"],
+    "linkedIdeas": ["complete replacement idea refs when changing idea links"],
+    "linkedGoals": ["complete replacement goal refs when changing goal links"],
+    "linkedProjects": ["complete replacement project refs when changing project links"]
+  }
+}
+</toolcall_update_fusion>
+
+Tool 10: Create a Capability Bet (Incubation). Use this when the user asks you to track, monitor, or create a strategic capability bet on the incubation board.
 <toolcall_create_capability_bet>
 {
   "title": "Strategic bet title",
@@ -680,7 +708,7 @@ Tool 9: Create a Capability Bet (Incubation). Use this when the user asks you to
 }
 </toolcall_create_capability_bet>
 
-Tool 10: Update a Capability Bet (Incubation). Use this to update properties of a capability bet in incubation (like conviction, status, review cadence, thesis).
+Tool 11: Update a Capability Bet (Incubation). Use this to update properties of a capability bet in incubation (like conviction, status, review cadence, thesis).
 <toolcall_update_capability_bet>
 {
   "target": "existing capability bet title or id",
@@ -700,10 +728,22 @@ Tool 10: Update a Capability Bet (Incubation). Use this to update properties of 
 }
 </toolcall_update_capability_bet>
 
+Tool 12: Link existing notes to a Capability Bet. Use this when the user asks to connect, attach, or link inbox notes/signals/evidence to a bet. This creates/updates note evidence links; HumanBoard derives the bet signal counts from those notes.
+<toolcall_link_notes_to_bet>
+{
+  "target": "existing capability bet title or id",
+  "notes": ["note id or distinctive content snippet"],
+  "polarity": "supports|contradicts|complicates",
+  "summary": "optional evidence summary to store on the linked notes"
+}
+</toolcall_link_notes_to_bet>
+
 When the user asks to create or manage a map idea node, prefer toolcall_create_idea or toolcall_update_idea instead of only describing what to do.
 When the user asks to create or edit a goal or roadmap panel, use toolcall_create_goal or toolcall_update_goal instead of only describing what to do.
 When the user explicitly asks to remove a project, use toolcall_delete_project instead of only describing what to do.
 When the user asks to create, synthesize, or write a fusion, post, report, or thesis, use toolcall_create_fusion instead of only describing what to do or creating a regular idea.
+When the user asks to edit an existing fusion, use toolcall_update_fusion.
+When the user asks to link notes or evidence to a capability bet, use toolcall_link_notes_to_bet.
 Include the toolcall anywhere in your response. You can use multiple toolcalls if needed.`);
 
       const userPrompt = imageAnalysisResult
@@ -723,8 +763,10 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       let matchedGoalUpdate = false;
       let matchedProjectDelete = false;
       let matchedFusion = false;
+      let matchedFusionUpdate = false;
       const allowNoteIdeaWrites = (autoDistill && autoDistillLevel !== 'off') || explicitBoardWrite;
       let blockedInferredWrite = false;
+      const failedActions: string[] = [];
 
       // Extract Create Note tool calls
       const noteRegex = /<toolcall_create_note>([\s\S]*?)<\/toolcall_create_note>/gi;
@@ -733,8 +775,10 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
         const noteContent = noteMatch[1].trim();
         if (!allowNoteIdeaWrites && noteContent) blockedInferredWrite = true;
         if (allowNoteIdeaWrites && noteContent && shouldCaptureAsInboxContent(noteContent)) {
-          matchedNote = true;
           addNote(noteContent);
+          const created = useAppStore.getState().notes.find((note) => note.content === noteContent);
+          if (created) matchedNote = true;
+          else failedActions.push('Inbox note creation was requested but was not found after creation.');
         }
       }
       cleanText = cleanText.replace(noteRegex, '').trim();
@@ -751,9 +795,9 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
             blockedInferredWrite = true;
             continue;
           }
-          matchedIdea = true;
+          const title = ideaData.title || 'Untitled AI Draft';
           addIdea({
-            title: ideaData.title || 'Untitled AI Draft',
+            title,
             summary: ideaData.summary || ideaData.content?.slice(0, 100) || '',
             content: ideaData.content || '',
             type: ideaData.type || 'Concept',
@@ -767,8 +811,12 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
             incubationDecision: ideaData.incubationDecision,
             reviewCadence: ideaData.reviewCadence,
           });
+          const created = useAppStore.getState().ideas.find((idea) => idea.title === title);
+          if (created) matchedIdea = true;
+          else failedActions.push(`Idea "${title}" was requested but was not found after creation.`);
         } catch (err) {
           console.error("Failed to parse create_idea toolcall JSON:", err);
+          failedActions.push('Idea creation failed because the toolcall JSON could not be parsed.');
         }
       }
       cleanText = cleanText.replace(ideaRegex, '').trim();
@@ -783,8 +831,10 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
           const ideaData = JSON.parse(cleanJsonStr);
           if (!explicitBoardWrite) continue;
           const targetIdea = findIdeaByReference(ideaData.target);
-          if (!targetIdea) continue;
-          matchedIdeaUpdate = true;
+          if (!targetIdea) {
+            failedActions.push(`Idea "${ideaData.target || 'unknown'}" was not found.`);
+            continue;
+          }
           updateIdea(targetIdea.id, {
             title: ideaData.title || targetIdea.title,
             summary: ideaData.summary || targetIdea.summary,
@@ -799,8 +849,12 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
             incubationDecision: ideaData.incubationDecision ?? targetIdea.incubationDecision,
             reviewCadence: ideaData.reviewCadence ?? targetIdea.reviewCadence,
           });
+          const updated = useAppStore.getState().ideas.find((idea) => idea.id === targetIdea.id);
+          if (updated && (ideaData.title === undefined || updated.title === String(ideaData.title))) matchedIdeaUpdate = true;
+          else failedActions.push(`Idea "${targetIdea.title}" update was requested but could not be verified.`);
         } catch (err) {
           console.error("Failed to parse update_idea toolcall JSON:", err);
+          failedActions.push('Idea update failed because the toolcall JSON could not be parsed.');
         }
       }
       cleanText = cleanText.replace(updateIdeaRegex, '').trim();
@@ -921,9 +975,9 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
             blockedInferredWrite = true;
             continue;
           }
-          matchedFusion = true;
+          const title = fusionData.title || 'Untitled Fusion';
           addFusionItem({
-            title: fusionData.title || 'Untitled Fusion',
+            title,
             type: fusionData.type || 'Writing',
             status: fusionData.status || 'Draft',
             summary: fusionData.summary || '',
@@ -935,11 +989,57 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
             linkedGoalIds: findRelatedGoalIds(fusionData.linkedGoals),
             linkedProjectIds: findRelatedProjectIds(fusionData.linkedProjects)
           });
+          const created = useAppStore.getState().fusionItems.find((item) => item.title === title);
+          if (created) matchedFusion = true;
+          else failedActions.push(`Fusion "${title}" was requested but was not found after creation.`);
         } catch (err) {
           console.error("Failed to parse create_fusion toolcall JSON:", err);
+          failedActions.push('Fusion creation failed because the toolcall JSON could not be parsed.');
         }
       }
       cleanText = cleanText.replace(fusionRegex, '').trim();
+
+      // Extract Update Fusion tool calls
+      const updateFusionRegex = /<toolcall_update_fusion>([\s\S]*?)<\/toolcall_update_fusion>/gi;
+      let updateFusionMatch;
+      while ((updateFusionMatch = updateFusionRegex.exec(responseText)) !== null) {
+        try {
+          const jsonStr = updateFusionMatch[1].trim();
+          const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+          const data = JSON.parse(cleanJsonStr);
+          if (!explicitBoardWrite) {
+            blockedInferredWrite = true;
+            continue;
+          }
+          const targetFusion = findFusionByReference(data.target);
+          if (!targetFusion) {
+            failedActions.push(`Fusion "${data.target || 'unknown'}" was not found.`);
+            continue;
+          }
+          const updates = data.updates || {};
+          const nextUpdates = {
+            ...(updates.title !== undefined ? { title: String(updates.title) } : {}),
+            ...(updates.type !== undefined ? { type: updates.type } : {}),
+            ...(updates.status !== undefined ? { status: updates.status } : {}),
+            ...(updates.summary !== undefined ? { summary: String(updates.summary) } : {}),
+            ...(updates.centralConclusion !== undefined ? { centralConclusion: String(updates.centralConclusion) } : {}),
+            ...(updates.body !== undefined ? { body: String(updates.body) } : {}),
+            ...(updates.audience !== undefined ? { audience: updates.audience } : {}),
+            ...(Array.isArray(updates.linkedNotes) ? { linkedNoteIds: findRelatedNoteIds(updates.linkedNotes) } : {}),
+            ...(Array.isArray(updates.linkedIdeas) ? { linkedIdeaIds: findRelatedIdeaIds(updates.linkedIdeas) } : {}),
+            ...(Array.isArray(updates.linkedGoals) ? { linkedGoalIds: findRelatedGoalIds(updates.linkedGoals) } : {}),
+            ...(Array.isArray(updates.linkedProjects) ? { linkedProjectIds: findRelatedProjectIds(updates.linkedProjects) } : {}),
+          };
+          updateFusionItem(targetFusion.id, nextUpdates);
+          const updated = useAppStore.getState().fusionItems.find((item) => item.id === targetFusion.id);
+          if (updated && (updates.title === undefined || updated.title === String(updates.title))) matchedFusionUpdate = true;
+          else failedActions.push(`Fusion "${targetFusion.title}" update was requested but could not be verified.`);
+        } catch (err) {
+          console.error("Failed to parse update_fusion toolcall JSON:", err);
+          failedActions.push('Fusion update failed because the toolcall JSON could not be parsed.');
+        }
+      }
+      cleanText = cleanText.replace(updateFusionRegex, '').trim();
 
       // Extract Create Capability Bet tool calls
       const createBetRegex = /<toolcall_create_capability_bet>([\s\S]*?)<\/toolcall_create_capability_bet>/gi;
@@ -954,9 +1054,9 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
             blockedInferredWrite = true;
             continue;
           }
-          matchedCapabilityBet = true;
+          const title = data.title || 'Untitled Capability Bet';
           addCapabilityBet({
-            title: data.title || 'Untitled Capability Bet',
+            title,
             thesis: data.thesis || '',
             baselineConviction: Number.isFinite(data.baselineConviction) ? Number(data.baselineConviction) : 50,
             thresholdToCommit: Number.isFinite(data.thresholdToCommit) ? Number(data.thresholdToCommit) : 80,
@@ -967,8 +1067,12 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
             reviewCadence: data.reviewCadence || '',
             strategicNote: data.strategicNote || '',
           });
+          const created = useAppStore.getState().capabilityBets.find((bet) => bet.title === title);
+          if (created) matchedCapabilityBet = true;
+          else failedActions.push(`Capability Bet "${title}" was requested but was not found after creation.`);
         } catch (err) {
           console.error("Failed to parse create_capability_bet toolcall JSON:", err);
+          failedActions.push('Capability Bet creation failed because the toolcall JSON could not be parsed.');
         }
       }
       cleanText = cleanText.replace(createBetRegex, '').trim();
@@ -984,8 +1088,10 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
           const data = JSON.parse(cleanJsonStr);
           if (!explicitBoardWrite) continue;
           const targetBet = findCapabilityBetByReference(data.target);
-          if (!targetBet) continue;
-          matchedCapabilityBetUpdate = true;
+          if (!targetBet) {
+            failedActions.push(`Capability Bet "${data.target || 'unknown'}" was not found.`);
+            continue;
+          }
           const updates = data.updates || {};
           updateCapabilityBet(targetBet.id, {
             title: updates.title || targetBet.title,
@@ -1000,14 +1106,61 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
             reviewCadence: updates.reviewCadence !== undefined ? updates.reviewCadence : targetBet.reviewCadence,
             strategicNote: updates.strategicNote !== undefined ? updates.strategicNote : targetBet.strategicNote,
           });
+          const updated = useAppStore.getState().capabilityBets.find((bet) => bet.id === targetBet.id);
+          if (updated) matchedCapabilityBetUpdate = true;
+          else failedActions.push(`Capability Bet "${targetBet.title}" update was requested but could not be verified.`);
         } catch (err) {
           console.error("Failed to parse update_capability_bet toolcall JSON:", err);
+          failedActions.push('Capability Bet update failed because the toolcall JSON could not be parsed.');
         }
       }
       cleanText = cleanText.replace(updateBetRegex, '').trim();
 
+      // Extract Link Notes to Capability Bet tool calls
+      const linkNotesToBetRegex = /<toolcall_link_notes_to_bet>([\s\S]*?)<\/toolcall_link_notes_to_bet>/gi;
+      let linkNotesToBetMatch;
+      let matchedNoteBetLinks = false;
+      while ((linkNotesToBetMatch = linkNotesToBetRegex.exec(responseText)) !== null) {
+        try {
+          const jsonStr = linkNotesToBetMatch[1].trim();
+          const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+          const data = JSON.parse(cleanJsonStr);
+          if (!explicitBoardWrite) {
+            blockedInferredWrite = true;
+            continue;
+          }
+          const targetBet = findCapabilityBetByReference(data.target);
+          if (!targetBet) {
+            failedActions.push(`Capability Bet "${data.target || 'unknown'}" was not found for note linking.`);
+            continue;
+          }
+          const noteRefs = Array.isArray(data.notes) ? data.notes.map(String) : [];
+          const targetNotes = noteRefs.map((ref) => findNoteByReference(ref)).filter((note): note is typeof notes[number] => Boolean(note));
+          if (targetNotes.length === 0) {
+            failedActions.push(`No matching notes were found to link to "${targetBet.title}".`);
+            continue;
+          }
+          const polarity = ['supports', 'contradicts', 'complicates'].includes(data.polarity) ? data.polarity : 'supports';
+          for (const note of targetNotes) {
+            updateNote(note.id, {
+              capabilityBetIds: [...new Set([...(note.capabilityBetIds || []), targetBet.id])],
+              capabilityEvidencePolarity: polarity,
+              capabilityEvidenceSummary: data.summary ? String(data.summary) : note.capabilityEvidenceSummary,
+            });
+          }
+          const state = useAppStore.getState();
+          const verifiedCount = targetNotes.filter((note) => state.notes.find((candidate) => candidate.id === note.id)?.capabilityBetIds?.includes(targetBet.id)).length;
+          if (verifiedCount === targetNotes.length) matchedNoteBetLinks = true;
+          else failedActions.push(`Only ${verifiedCount}/${targetNotes.length} note links to "${targetBet.title}" could be verified.`);
+        } catch (err) {
+          console.error("Failed to parse link_notes_to_bet toolcall JSON:", err);
+          failedActions.push('Linking notes to a bet failed because the toolcall JSON could not be parsed.');
+        }
+      }
+      cleanText = cleanText.replace(linkNotesToBetRegex, '').trim();
+
       let actionMessage = '';
-      if (matchedNote || matchedIdea || matchedIdeaUpdate || matchedPersona || matchedGoal || matchedGoalUpdate || matchedProjectDelete || matchedFusion || matchedCapabilityBet || matchedCapabilityBetUpdate) {
+      if (matchedNote || matchedIdea || matchedIdeaUpdate || matchedPersona || matchedGoal || matchedGoalUpdate || matchedProjectDelete || matchedFusion || matchedFusionUpdate || matchedCapabilityBet || matchedCapabilityBetUpdate || matchedNoteBetLinks || failedActions.length) {
         actionMessage = "\n\n*(AI: ";
         const acts = [];
         if (matchedNote) acts.push("added to Inbox");
@@ -1018,9 +1171,12 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
         if (matchedGoalUpdate) acts.push("updated Goal panel");
         if (matchedProjectDelete) acts.push("deleted Project");
         if (matchedFusion) acts.push("created Fusion item");
+        if (matchedFusionUpdate) acts.push("updated Fusion item");
         if (matchedCapabilityBet) acts.push("created Capability Bet");
         if (matchedCapabilityBetUpdate) acts.push("updated Capability Bet");
-        actionMessage += acts.join(", ") + ")*";
+        if (matchedNoteBetLinks) acts.push("linked notes to Capability Bet");
+        if (failedActions.length) acts.push(`failed: ${failedActions.join(' | ')}`);
+        actionMessage += (acts.length ? acts.join(", ") : "no writes verified") + ")*";
       }
 
       const currentMessages = useAppStore.getState().chatMessages;
