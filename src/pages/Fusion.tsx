@@ -21,7 +21,10 @@ export default function FusionPage() {
     setLastDailyFusionScan,
     dismissFusionSuggestion,
     notes,
-    ideas
+    ideas,
+    projects,
+    goals,
+    capabilityBets,
   } = useAppStore();
 
   const [query, setQuery] = useState('');
@@ -49,14 +52,14 @@ export default function FusionPage() {
         }
       }
 
-      if (notes.length === 0 && ideas.length === 0) {
-        setScanError('Not enough notes or ideas to detect patterns yet. Add some materials first!');
+      if (notes.length === 0 && ideas.length === 0 && fusionItems.length === 0 && capabilityBets.length === 0) {
+        setScanError('Not enough vault material to detect patterns yet. Add some materials first!');
         setIsScanning(false);
         return;
       }
 
       const prompt = `You are the HumanBoard Daily Synthesis Insight Engine.
-Analyze the following raw notes and ideas in the user's vault to find patterns, themes, or logical connections.
+Analyze the following vault material to find patterns, themes, or logical connections.
 Identify up to 20 potential "Fusions" (writings, reports, articles, or theses) that can be generated from these materials.
 
 Raw Notes:
@@ -64,6 +67,23 @@ ${notes.slice(0, 40).map(n => `- ID: ${n.id} | Date: ${n.createdAt} | Content: $
 
 Ideas:
 ${ideas.slice(0, 40).map(i => `- ID: ${i.id} | Title: ${i.title} | Content: ${i.content.slice(0, 300)}`).join('\n')}
+
+Existing Fusions:
+${fusionItems.slice(0, 40).map(f => `- ID: ${f.id} | ${f.type}/${f.status} | Title: ${f.title} | Summary: ${(f.summary || f.centralConclusion || f.body).slice(0, 300)}`).join('\n')}
+
+Capability Bets:
+${capabilityBets.filter(b => !b.archivedAt).slice(0, 30).map(b => `- ID: ${b.id} | ${b.status} | Title: ${b.title} | Thesis: ${b.thesis.slice(0, 300)} | Keywords: ${b.keywords.join(', ')}`).join('\n')}
+
+Active Goals and Projects:
+${[
+  ...goals.filter(g => g.status === 'Active').slice(0, 12).map(g => `- Goal ID: ${g.id} | ${g.title}: ${g.description.slice(0, 240)}`),
+  ...projects.filter(p => p.status !== 'Completed').slice(0, 12).map(p => `- Project ID: ${p.id} | ${p.status} | ${p.title}: ${p.description.slice(0, 240)}`),
+].join('\n')}
+
+Rules:
+- Existing fusions are prior synthesized artifacts. Do not suggest duplicates; suggest editing/expanding an existing fusion only when it is the better next step.
+- Capability bets are first-class strategic entities. Use them as synthesis anchors when notes and ideas point to a capability, but do not turn a capability bet into a fusion unless there is a concrete argument/report/article to draft.
+- Prefer fusions when the output should be a synthesized post, report, thesis, or longform argument. Prefer ideas only for raw concepts; this task returns fusion suggestions only.
 
 For each suggested Fusion, provide:
 1. A descriptive title.
@@ -86,7 +106,7 @@ Respond ONLY with a valid JSON array of objects, with no markdown code block for
   }
 ]`;
 
-      const systemInstruction = "You are the HumanBoard Daily Synthesis Insight Engine. You analyze notes and ideas to find patterns and suggest new writings. Respond ONLY with a valid JSON array.";
+      const systemInstruction = "You are the HumanBoard Daily Synthesis Insight Engine. You analyze notes, ideas, existing fusions, goals, projects, and capability bets to suggest non-duplicate Fusion artifacts. Respond ONLY with a valid JSON array.";
 
       const responseText = await askGemma(prompt, systemInstruction);
       const cleanJson = responseText

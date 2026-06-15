@@ -481,6 +481,9 @@ export default function IncubationPage() {
     ideas,
     notes,
     projects,
+    goals,
+    reflections,
+    fusionItems,
     capabilityBets,
     signalEvents,
     capabilityTimelineEvents,
@@ -715,8 +718,9 @@ Return this exact JSON format:
     setIsSynthesizing(true);
     setSynthesisError(null);
     try {
-      const prompt = `Analyze the following raw notes and ideas from my subconscious vault.
-Identify recent orbits (what topics I'm circling), contradictions, cognitive tensions, and avoided topics.
+      const activeReflections = reflections.filter((reflection) => !reflection.dismissedAt);
+      const prompt = `Analyze the following HumanBoard vault context.
+Identify recent orbits (what topics I'm circling), contradictions, cognitive tensions, avoided topics, and synthesis opportunities.
 Synthesize this into a beautiful, structured markdown report.
 
 Here are my recent raw notes:
@@ -725,15 +729,38 @@ ${notes.slice(0, 40).map(n => `- [${n.createdAt}] ${n.content}`).join('\n')}
 Here are my current strategic ideas:
 ${ideas.filter(i => isIncubationCandidate(i)).map(i => `- ${i.title}: ${i.summary || i.content.slice(0, 150)}`).join('\n')}
 
+Here are existing Fusion artifacts. Treat these as first-class synthesized outputs and avoid duplicating them:
+${fusionItems.slice(0, 30).map(f => `- ID: ${f.id} | ${f.type}/${f.status} | ${f.title}: ${f.summary || f.centralConclusion || f.body.slice(0, 180)}`).join('\n')}
+
+Here are capability bets. Use these to assess what capabilities are warming up, missing evidence, or ready for linked-note support:
+${capabilityBets.filter(b => !b.archivedAt).slice(0, 30).map(b => `- ID: ${b.id} | ${b.status} | ${b.title} | conviction ${b.conviction}/${b.thresholdToCommit}: ${b.thesis}`).join('\n')}
+
+Here are active goals and projects:
+${[
+  ...goals.filter(g => g.status === 'Active').slice(0, 12).map(g => `- Goal ID: ${g.id} | ${g.title}: ${g.description}`),
+  ...projects.filter(p => p.status !== 'Completed').slice(0, 12).map(p => `- Project ID: ${p.id} | ${p.status} | ${p.title}: ${p.description}`),
+].join('\n')}
+
+Here are active reflection patterns:
+${activeReflections.slice(0, 20).map(r => `- ${r.pattern}: ${r.question}`).join('\n')}
+
+New function awareness:
+- Fusion is the correct artifact type for a synthesized article, thesis, report, longform argument, or cross-note conclusion. Do not recommend creating an Idea when a Fusion is the better destination.
+- The chatbot can create and edit Fusion items, create and update capability bets, and link notes as evidence to capability bets.
+- If a note looks like evidence for a capability bet, explicitly recommend linking that note to the bet.
+- Existing fusions are prior synthesis. Build on them, merge with them, or identify gaps instead of recreating the same output.
+
 Synthesize this into a structured report with:
 - **Subconscious Orbits**: Themes appearing repeatedly.
 - **Cognitive Tensions & Contradictions**: Where my notes suggest one thing but my ideas suggest another, or internal contradictions.
 - **Avoided Patterns**: Areas of high strategic value that I seem to be avoiding or deferring.
-- **Postures & Recommendations**: Strategic advice on capability bets to warm up or ideas to activate.
+- **Fusion Opportunities**: Existing fusions to update and new fusions worth creating, with source note/idea/bet IDs where possible.
+- **Capability Bet Evidence**: Bets that need linked notes, stronger evidence, contradiction handling, or an update.
+- **Postures & Recommendations**: Strategic advice on capability bets to warm up, fusions to edit, or ideas to activate.
 
 Return the markdown report. Be direct, insightful, and clear.`;
 
-      const systemInstruction = "You are the HumanBoard Subconscious Synthesis Engine. You analyze raw notes and ideas to find hidden cognitive patterns, orbits, tensions, and avoided topics. Respond in clean, elegant Markdown.";
+      const systemInstruction = "You are the HumanBoard Subconscious Synthesis Engine. You analyze the whole vault, including notes, ideas, fusions, goals, projects, reflections, and capability bets. Treat Fusion as the artifact for synthesized writing/report/thesis outputs. Respond in clean, elegant Markdown.";
       
       const response = await askGemma(prompt, systemInstruction);
       

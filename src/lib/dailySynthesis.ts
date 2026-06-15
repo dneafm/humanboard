@@ -37,6 +37,7 @@ function topThemes(snapshot: AppSnapshot) {
   const text = [
     ...snapshot.notes.slice(0, 20).map((note) => note.content),
     ...snapshot.ideas.slice(0, 20).flatMap((idea) => [idea.title, idea.summary, ...(idea.tags ?? [])]),
+    ...(snapshot.fusionItems ?? []).slice(0, 20).flatMap((fusion) => [fusion.title, fusion.summary, fusion.centralConclusion]),
     ...snapshot.goals.flatMap((goal) => [goal.title, goal.description]),
     ...snapshot.capabilityBets.flatMap((bet) => [bet.title, bet.thesis, ...bet.keywords]),
   ].join(' ').toLowerCase();
@@ -57,6 +58,7 @@ export function buildDailySynthesisInput(snapshot: AppSnapshot) {
   const activeGoals = snapshot.goals.filter((goal) => goal.status === 'Active');
   const stalledGoals = snapshot.goals.filter((goal) => goal.status === 'Paused');
   const stalledProjects = snapshot.projects.filter((project) => project.status === 'Paused');
+  const activeFusions = (snapshot.fusionItems ?? []).filter((fusion) => fusion.status === 'Draft' || fusion.status === 'Synthesizing' || fusion.status === 'Ready');
   const openQuestions = snapshot.ideas
     .filter((idea) => idea.type === 'Question' || (idea.openQuestions?.length ?? 0) > 0)
     .flatMap((idea) => [idea.title, ...(idea.openQuestions ?? [])])
@@ -77,6 +79,9 @@ export function buildDailySynthesisInput(snapshot: AppSnapshot) {
     ...snapshot.capabilityBets
       .filter((bet) => new Date(bet.updatedAt).getTime() >= recentThreshold)
       .map((bet) => ({ at: bet.updatedAt, text: `Capability bet: ${bet.title} — ${compact(bet.thesis)}`, id: bet.id })),
+    ...(snapshot.fusionItems ?? [])
+      .filter((fusion) => new Date(fusion.updatedAt).getTime() >= recentThreshold)
+      .map((fusion) => ({ at: fusion.updatedAt, text: `Fusion: ${fusion.title} - ${compact(fusion.summary || fusion.centralConclusion || fusion.body)}`, id: fusion.id })),
   ].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 10);
 
   return {
@@ -86,6 +91,7 @@ export function buildDailySynthesisInput(snapshot: AppSnapshot) {
         ...stalledGoals.map((goal) => `Goal: ${goal.title}`),
         ...stalledProjects.map((project) => `Project: ${project.title}`),
       ].slice(0, 8),
+      activeFusions: activeFusions.slice(0, 8).map((fusion) => `${fusion.title}: ${compact(fusion.summary || fusion.centralConclusion || fusion.body)} | status: ${fusion.status}`),
       recentEdits: recentEdits.map((item) => item.text),
       repeatedThemes: topThemes(snapshot),
       openQuestions: openQuestions.map((item) => compact(item)),
@@ -96,6 +102,7 @@ export function buildDailySynthesisInput(snapshot: AppSnapshot) {
       ...activeGoals.map((goal) => goal.id),
       ...stalledGoals.map((goal) => goal.id),
       ...stalledProjects.map((project) => project.id),
+      ...activeFusions.map((fusion) => fusion.id),
       ...recentEdits.map((item) => item.id),
     ])).slice(0, 20),
   };
