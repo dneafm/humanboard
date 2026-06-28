@@ -1,3 +1,15 @@
+# Deploys the HumanBoard app from `main` to Cloud Run (`humanboard-app`).
+#
+# Secrets policy:
+# - AI_API_KEY and GEMINI_API_KEY are sourced from this repository's GitHub
+#   Actions secrets — they are NEVER hardcoded in this file. Any previous
+#   hardcoded value in git history is invalidated at the provider.
+# - See agentboard task `hb-rotate-exposed-ai-credential-20260609` for the
+#   rotation and the operator handoff context.
+# - To rotate AI_API_KEY: update the GitHub repo secret, then trigger a new
+#   deploy; the next Cloud Run revision will pick up the new value at build
+#   time. The previous revision keeps the old env until traffic shifts.
+
 name: Deploy to Cloud Run
 
 on:
