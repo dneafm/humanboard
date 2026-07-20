@@ -5,6 +5,45 @@ import { apiFetch } from '../apiClient';
 
 const STORAGE_KEY = 'humanboard.app-snapshot.v1';
 
+export type SaveTarget = 'local' | 'server' | 'both';
+export type SaveResult = {
+  target: SaveTarget;
+  ok: boolean;
+  localOk: boolean;
+  serverOk: boolean;
+  serverSkipped: boolean;
+  error?: string;
+  approxBytes: number;
+  // Server payload rejected because it was too large for the request limit.
+  // The user can fix this by trimming large fusions/notes before retrying.
+  serverPayloadTooLarge?: boolean;
+};
+
+let lastSaveResult: SaveResult | null = null;
+const saveResultListeners = new Set<(result: SaveResult) => void>();
+
+export function getLastSaveResult(): SaveResult | null {
+  return lastSaveResult;
+}
+
+export function subscribeSaveResults(listener: (result: SaveResult) => void): () => void {
+  saveResultListeners.add(listener);
+  return () => {
+    saveResultListeners.delete(listener);
+  };
+}
+
+function emitSaveResult(result: SaveResult) {
+  lastSaveResult = result;
+  saveResultListeners.forEach((listener) => {
+    try {
+      listener(result);
+    } catch {
+      // ignore listener failures
+    }
+  });
+}
+
 function getUserId() {
   return useAuthStore.getState().userId;
 }
@@ -69,10 +108,10 @@ async function fetchServerSnapshot(): Promise<AppSnapshot | null> {
   }
 }
 
-async function saveToServer(snapshot: AppSnapshot): Promise<void> {
-  if (typeof fetch !== 'function') return;
+async function saveToServer(snapshot: AppSnapshot): Promise<{ ok: boolean; skipped: boolean; error?: string; tooLarge?: boolean }> {
+  if (typeof fetch !== 'function') return { ok: false, skipped: true, error: 'fetch unavailable' };
   const userId = getUserId();
-  if (!userId) return;
+  if (!userId) return { ok: false, skipped: true, error: 'no userId' };
 
   try {
     await apiFetch('/api/snapshot', {
@@ -82,8 +121,13 @@ async function saveToServer(snapshot: AppSnapshot): Promise<void> {
       },
       body: JSON.stringify(snapshot),
     });
-  } catch {
-    // ignore failures, fall back to localStorage
+    return { ok: true, skipped: false };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    // Express body-parser size errors come through as 413; the message
+    // usually contains "request entity too large" or "PayloadTooLargeError".
+    const tooLarge = /too large|413|payload/i.test(message);
+    return { ok: false, skipped: false, error: message, tooLarge };
   }
 }
 
@@ -142,11 +186,13 @@ export class LocalSnapshotRepository implements StorageRepository {
     }
   }
 
-  async save(snapshot: AppSnapshot): Promise<void> {
+  async save(snapshot: AppSnapshot): Promise<SaveResult> {
+    const serialized = JSON.stringify(snapshot);
+    const approxBytes = serialized.length;
+    let localOk = false;
+    let localError: string | undefined;
     if (typeof window !== 'undefined') {
       try {
-        const serialized = JSON.stringify(snapshot);
-        const approxBytes = serialized.length;
         // Browsers typically cap localStorage at 5-10 MB. Warn before we hit it.
         if (approxBytes > 4_500_000) {
           console.warn(
@@ -156,17 +202,45 @@ export class LocalSnapshotRepository implements StorageRepository {
           );
         }
         window.localStorage.setItem(getStorageKey(), serialized);
+        localOk = true;
       } catch (err) {
         // QuotaExceededError or other storage failure: do NOT abort the save —
         // fall through to saveToServer so the snapshot is at least persisted remotely.
-        const message = err instanceof Error ? err.message : String(err);
+        localError = err instanceof Error ? err.message : String(err);
         console.warn(
-          `[HumanBoard] localStorage save failed (${message}). ` +
+          `[HumanBoard] localStorage save failed (${localError}). ` +
           `Continuing with server-only persistence; data will still reload from the server.`,
         );
       }
     }
-    await saveToServer(snapshot);
+
+    const serverResult = await saveToServer(snapshot);
+    // "ok" is the strict-success flag: both layers persisted. The banner
+    // is shown whenever either layer failed, so the user can see partial
+    // failures (e.g. localStorage succeeded but the server rejected the
+    // payload) and recover.
+    const fullyOk = localOk && serverResult.ok;
+    const result: SaveResult = {
+      target: localOk && serverResult.ok ? 'both' : serverResult.ok ? 'server' : localOk ? 'local' : 'server',
+      ok: fullyOk,
+      localOk,
+      serverOk: serverResult.ok,
+      serverSkipped: serverResult.skipped,
+      approxBytes,
+      ...(serverResult.error ? { error: serverResult.error } : localError ? { error: `local: ${localError}` } : {}),
+      ...(serverResult.tooLarge ? { serverPayloadTooLarge: true } : {}),
+    };
+    if (!fullyOk) {
+      console.warn(
+        `[HumanBoard] Snapshot save partial failure: ` +
+        `localOk=${localOk}, serverOk=${serverResult.ok}, ` +
+        `serverSkipped=${serverResult.skipped}, ` +
+        `approxBytes=${approxBytes}, ` +
+        `error=${result.error ?? 'unknown'}`,
+      );
+    }
+    emitSaveResult(result);
+    return result;
   }
 }
 

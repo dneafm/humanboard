@@ -21,6 +21,7 @@ import { hydrateAppStoreFromRepository, useAppStore } from './store';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import MemoryConsolidator from './components/MemoryConsolidator';
 import { useAuthStore } from './stores/authStore';
+import { subscribeSaveResults } from './lib/storage/localSnapshotRepository';
 import { apiFetch } from './lib/apiClient';
 import AiEraKbAutoBridge from './components/AiEraKbAutoBridge';
 import NotificationCenter from './components/NotificationCenter';
@@ -1011,6 +1012,75 @@ function AuthScreen() {
   );
 }
 
+function PersistErrorBanner() {
+  const lastPersistError = useAppStore((state) => state.lastPersistError);
+  const persistRetry = useAppStore((state) => state.persistRetry);
+  const clearPersistError = useAppStore((state) => state.clearPersistError);
+  const [retrying, setRetrying] = useState(false);
+
+  if (!lastPersistError) return null;
+
+  const isPayloadTooLarge = /too large|413|payload/i.test(lastPersistError);
+
+  return (
+    <div
+      role="status"
+      className="fixed top-2 inset-x-2 z-[130] md:left-auto md:right-4 md:top-4 md:max-w-md mx-auto"
+    >
+      <div className="rounded-lg border border-rose-300/80 dark:border-rose-900 bg-rose-50/95 dark:bg-rose-950/90 text-rose-900 dark:text-rose-100 shadow-lg backdrop-blur px-4 py-3">
+        <div className="flex items-start gap-3">
+          <div className="text-sm font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+            Save failed
+          </div>
+          <button
+            type="button"
+            aria-label="Dismiss"
+            className="ml-auto text-rose-700/70 dark:text-rose-300/70 hover:text-rose-900 dark:hover:text-rose-100"
+            onClick={() => clearPersistError()}
+          >
+            ×
+          </button>
+        </div>
+        <p className="mt-1 text-sm leading-snug">
+          {isPayloadTooLarge
+            ? 'The current board is too large to sync to the server. Try trimming very large fusion bodies or removing old notes, then retry.'
+            : 'Your last change did not sync to the server. Local changes are still in memory but may be lost on reload.'}
+        </p>
+        <details className="mt-1 text-xs opacity-80">
+          <summary className="cursor-pointer select-none">Technical detail</summary>
+          <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-[11px] leading-tight">
+{lastPersistError}
+          </pre>
+        </details>
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            type="button"
+            className="rounded-md bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-3 py-1.5 transition-colors disabled:opacity-60"
+            disabled={retrying}
+            onClick={async () => {
+              setRetrying(true);
+              try {
+                await persistRetry();
+              } finally {
+                setRetrying(false);
+              }
+            }}
+          >
+            {retrying ? 'Retrying…' : 'Retry save'}
+          </button>
+          <button
+            type="button"
+            className="rounded-md border border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200 text-xs font-semibold px-3 py-1.5 hover:bg-rose-100/60 dark:hover:bg-rose-900/40 transition-colors"
+            onClick={() => clearPersistError()}
+          >
+            Dismiss
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FirebaseConfigScreen() {
   return (
     <div className="min-h-screen bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100 flex items-center justify-center px-4">
@@ -1199,6 +1269,25 @@ export default function App() {
     }
   }, [isDarkMode]);
 
+  // Mirror storage save results into the store so we can show a banner when
+  // the server save fails (the previous "silent catch" hid this for too long).
+  useEffect(() => {
+    return subscribeSaveResults((result) => {
+      useAppStore.setState({
+        lastPersistAt: new Date().toISOString(),
+        // Show the banner whenever either layer failed — local OR server.
+        // The server is the cross-device source of truth, so a server
+        // failure means the change is at risk if the user reloads or
+        // opens a different device.
+        lastPersistError: result.ok
+          ? null
+          : (result.error ?? (result.serverSkipped
+              ? 'Server save skipped (no auth?). Local-only persistence is in effect.'
+              : 'unknown error')),
+      });
+    });
+  }, []);
+
   useEffect(() => {
     if (!isAuthReady || !userId) {
       setHasHydratedUserSnapshot(false);
@@ -1294,6 +1383,7 @@ export default function App() {
         onOpenDocs={() => setIsDocsOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
+      <PersistErrorBanner />
       <div className="flex min-h-screen bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 font-sans selection:bg-stone-200 dark:selection:bg-stone-800 transition-colors duration-300">
         <Sidebar onOpenTutorial={openGuide} onOpenSettings={() => setIsSettingsOpen(true)} onOpenDocs={() => setIsDocsOpen(true)} />
         <main className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0">

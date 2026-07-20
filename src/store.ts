@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { defaultSections } from './lib/storage/defaultSnapshot';
-import { localSnapshotRepository } from './lib/storage/localSnapshotRepository';
+import { localSnapshotRepository, type SaveResult } from './lib/storage/localSnapshotRepository';
 import type { AppSnapshot, ChatMessage, ChatThread } from './lib/storage/types';
 
 export type SignalDirection = 'Supports' | 'Weakens' | 'Mixed' | 'Unclear';
@@ -439,6 +439,10 @@ interface AppState {
   chatMessages: ChatMessage[];
   chatThreads: ChatThread[];
   activeThreadId: string;
+  lastPersistError: string | null;
+  lastPersistAt: string | null;
+  persistRetry: () => Promise<void>;
+  clearPersistError: () => void;
   setChatMessages: (messages: ChatMessage[]) => void;
   setChatThreads: (threads: ChatThread[]) => void;
   setActiveThreadId: (id: string) => void;
@@ -700,6 +704,9 @@ function randomId() {
 }
 
 function persistSnapshot(snapshot: AppSnapshot) {
+  // Fire and forget; the storage layer reports its result via
+  // subscribeSaveResults() so the UI can show a banner if the
+  // server save failed.
   void localSnapshotRepository.save(snapshot);
 }
 
@@ -997,6 +1004,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeThreadId: '',
   fusionSuggestions: [],
   lastDailyFusionScan: '',
+  lastPersistError: null,
+  lastPersistAt: null,
   setChatMessages: (messages) => set((state) => {
     let activeId = state.activeThreadId;
     let chatThreads = [...state.chatThreads];
@@ -1554,6 +1563,40 @@ export const useAppStore = create<AppState>((set, get) => ({
     persistSnapshot(next);
     return { isDarkMode: next.isDarkMode };
   }),
+  clearPersistError: () => set(() => ({ lastPersistError: null })),
+  persistRetry: async () => {
+    // Force a re-save of the current snapshot. The storage layer reports
+    // success/failure via subscribeSaveResults(); we mirror that into the
+    // store so the UI can show a banner with the outcome.
+    const state = useAppStore.getState();
+    const snapshot: AppSnapshot = {
+      notes: state.notes,
+      ideas: state.ideas,
+      projects: state.projects,
+      sections: state.sections,
+      goals: state.goals,
+      reflections: state.reflections,
+      capabilityBets: state.capabilityBets,
+      signalEvents: state.signalEvents,
+      capabilityTimelineEvents: state.capabilityTimelineEvents,
+      isDarkMode: state.isDarkMode,
+      fusionItems: state.fusionItems,
+      fusionSuggestions: state.fusionSuggestions,
+      lastDailyFusionScan: state.lastDailyFusionScan,
+      chatThreads: state.chatThreads,
+      activeThreadId: state.activeThreadId,
+      chatMessages: state.chatMessages,
+    };
+    const result = (await localSnapshotRepository.save(snapshot)) as SaveResult;
+    useAppStore.setState({
+      lastPersistAt: new Date().toISOString(),
+      lastPersistError: result.ok
+        ? null
+        : (result.error ?? (result.serverSkipped
+            ? 'Server save skipped (no auth?). Local-only persistence is in effect.'
+            : 'unknown error')),
+    });
+  },
   setFusionSuggestions: (suggestions) => set((state) => {
     const next = { ...state, fusionSuggestions: suggestions };
     persistSnapshot(next);

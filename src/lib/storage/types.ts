@@ -37,7 +37,7 @@ export interface AppSnapshot {
 
 export interface StorageRepository {
   load(): Promise<AppSnapshot>;
-  save(snapshot: AppSnapshot): Promise<void>;
+  save(snapshot: AppSnapshot): Promise<unknown>;
 }
 
 export const STORAGE_REPOSITORY_VERSION = 1;
