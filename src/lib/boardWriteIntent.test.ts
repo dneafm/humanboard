@@ -62,4 +62,43 @@ test('strong negation overrides the verb', () => {
   assert.equal(detectBoardWriteIntent("let's discuss before we update"), false);
   assert.equal(detectBoardWriteIntent('not yet — just thinking about it'), false);
   assert.equal(detectBoardWriteIntent('just wondering if I should update'), false);
+  // "I don't want to X"
+  assert.equal(detectBoardWriteIntent("I don't want to update this"), false);
+  // "I don't X" where X is the action verb
+  assert.equal(detectBoardWriteIntent("I don't update the fusion"), false);
+  assert.equal(detectBoardWriteIntent("never update this"), false);
+});
+
+test('state-of-being "don\'t have / don\'t know" does NOT block a later write verb', () => {
+  // The live bug. "I don't have the content yet, just put a placeholder"
+  // was blocked because my old regex matched "don't" anywhere. The user
+  // is using "don't" to describe their state, not to negate the write.
+  // The second clause "just put a placeholder" is the actual request.
+  assert.equal(
+    detectBoardWriteIntent("I don't have the content yet, just put a placeholder body in the fusion"),
+    true,
+  );
+  assert.equal(
+    detectBoardWriteIntent("I don't know the full text, just put a placeholder body"),
+    true,
+  );
+  assert.equal(
+    detectBoardWriteIntent("I don't have it yet, just put a placeholder"),
+    true,
+  );
+  assert.equal(
+    detectBoardWriteIntent("I don't need the full text, just put a placeholder"),
+    true,
+  );
+  // "don't make me" pattern — "make" is in our verb list, but the
+  // user isn't asking us to make something; they're saying "don't make
+  // me [do something else]". The second clause is the real ask.
+  assert.equal(
+    detectBoardWriteIntent("don't make me paste, just put a placeholder body now"),
+    true,
+  );
+  // Direct negations of a write action still block.
+  assert.equal(detectBoardWriteIntent("don't update the fusion"), false);
+  assert.equal(detectBoardWriteIntent("don't make any changes"), false);
+  assert.equal(detectBoardWriteIntent("I don't want to update this"), false);
 });
