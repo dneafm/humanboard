@@ -442,6 +442,19 @@ interface AppState {
   lastPersistError: string | null;
   lastPersistAt: string | null;
   persistRetry: () => Promise<void>;
+  /**
+   * A pending "edit with AI" request from the Fusion text-selection
+   * popover. The Chatbot component watches this field; when it gets
+   * populated, the Chatbot dispatches a synthetic user message that
+   * asks the LLM to perform a `toolcall_update_fusion` with the
+   * edited text in the field the user selected.
+   *
+   * `seq` is a monotonically increasing counter so the Chatbot can
+   * tell new requests apart from in-flight ones.
+   */
+  pendingAiEdit: { seq: number; fusionId: string; fieldPath: string; selectedText: string; instruction: string } | null;
+  requestAiEdit: (input: { fusionId: string; fieldPath: string; selectedText: string; instruction: string }) => void;
+  clearPendingAiEdit: () => void;
   clearPersistError: () => void;
   setChatMessages: (messages: ChatMessage[]) => void;
   setChatThreads: (threads: ChatThread[]) => void;
@@ -1006,6 +1019,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   lastDailyFusionScan: '',
   lastPersistError: null,
   lastPersistAt: null,
+  pendingAiEdit: null,
   setChatMessages: (messages) => set((state) => {
     let activeId = state.activeThreadId;
     let chatThreads = [...state.chatThreads];
@@ -1564,6 +1578,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     return { isDarkMode: next.isDarkMode };
   }),
   clearPersistError: () => set(() => ({ lastPersistError: null })),
+  requestAiEdit: (input) => {
+    // The FusionTextEditPopover calls this when the user submits a
+    // text-selection + instruction. We bump the seq counter so the
+    // Chatbot can tell new requests from the same render cycle.
+    const current = useAppStore.getState().pendingAiEdit;
+    const nextSeq = (current?.seq ?? 0) + 1;
+    set({ pendingAiEdit: { seq: nextSeq, ...input } });
+  },
+  clearPendingAiEdit: () => set({ pendingAiEdit: null }),
   persistRetry: async () => {
     // Force a re-save of the current snapshot. The storage layer reports
     // success/failure via subscribeSaveResults(); we mirror that into the

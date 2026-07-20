@@ -5,6 +5,7 @@ import { generateFusionArtifact } from '../lib/ai';
 import { useAppStore, type FusionAudience, type FusionStatus, type FusionType, type FusionSuggestion } from '../store';
 import { useAuthStore } from '../stores/authStore';
 import { cn } from '../lib/utils';
+import { FusionTextEditPopover } from '../components/FusionTextEditPopover';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 
@@ -94,7 +95,8 @@ export default function FusionDetailPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto w-full p-8">
+    <div className="max-w-7xl mx-auto w-full p-8" data-fusion-id={item.id}>
+      <FusionTextEditPopover />
       <button onClick={() => navigate('/fusion')} className="mb-6 inline-flex items-center gap-2 text-sm text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100">
         <ArrowLeft className="h-4 w-4" /> Back to Fusion
       </button>
@@ -104,6 +106,7 @@ export default function FusionDetailPage() {
           <input
             value={item.title}
             onChange={(event) => updateFusionItem(item.id, { title: event.target.value })}
+            data-fusion-field="title"
             className="w-full bg-transparent text-3xl font-semibold tracking-tight text-stone-900 outline-none dark:text-stone-100"
           />
           <div className="grid gap-3 md:grid-cols-4">
@@ -208,6 +211,7 @@ export default function FusionDetailPage() {
                     placeholder="Enter author name..."
                     value={item.authorName || ''}
                     onChange={(e) => updateFusionItem(item.id, { authorName: e.target.value })}
+                    data-fusion-field="authorName"
                     className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-850 rounded-xl px-3.5 py-2 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-400 dark:focus:border-stone-700 transition-colors"
                   />
                 </div>
@@ -218,6 +222,7 @@ export default function FusionDetailPage() {
                     placeholder="E.g., Tech researcher and strategic builder..."
                     value={item.authorBio || ''}
                     onChange={(e) => updateFusionItem(item.id, { authorBio: e.target.value })}
+                    data-fusion-field="authorBio"
                     className="w-full bg-stone-50 dark:bg-stone-950 border border-stone-200 dark:border-stone-850 rounded-xl px-3.5 py-2 text-sm text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-400 dark:focus:border-stone-700 transition-colors"
                   />
                 </div>
@@ -303,6 +308,7 @@ export default function FusionDetailPage() {
                 title="Summary"
                 value={item.summary}
                 onChange={(val) => updateFusionItem(item.id, { summary: val })}
+                fusionFieldPath="summary"
                 placeholder="Short abstract or summary..."
                 rows={4}
                 onAiGenerate={() => handleGenerate('summary')}
@@ -315,6 +321,7 @@ export default function FusionDetailPage() {
                 title="Final conclusion"
                 value={item.centralConclusion}
                 onChange={(val) => updateFusionItem(item.id, { centralConclusion: val })}
+                fusionFieldPath="centralConclusion"
                 placeholder="What is the conclusion worth sharing?"
                 rows={4}
                 onAiGenerate={() => handleGenerate('conclusion')}
@@ -327,6 +334,7 @@ export default function FusionDetailPage() {
                 title="Body"
                 value={item.body}
                 onChange={(val) => updateFusionItem(item.id, { body: val })}
+                fusionFieldPath="body"
                 placeholder="Write the full post, writing, thesis, or report..."
                 rows={18}
                 onAiGenerate={() => handleGenerate('full')}
@@ -752,6 +760,7 @@ function NotionBlockEditor({
   isGenerating,
   canGenerate,
   aiLabel,
+  fusionFieldPath,
 }: {
   title: string;
   value: string;
@@ -762,6 +771,7 @@ function NotionBlockEditor({
   isGenerating: boolean;
   canGenerate: boolean;
   aiLabel: string;
+  fusionFieldPath?: 'summary' | 'centralConclusion' | 'body';
 }) {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -1183,6 +1193,7 @@ function NotionBlockEditor({
                     value={block.content}
                     onChange={(e) => handleBlockChange(e, block.id)}
                     onKeyDown={(e) => handleBlockKeyDown(e, block.id)}
+                    data-fusion-field={fusionFieldPath ?? 'body'}
                     placeholder={
                       block.type === 'h1'
                         ? 'Heading 1'

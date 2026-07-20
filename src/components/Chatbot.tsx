@@ -373,6 +373,42 @@ export default function Chatbot() {
     scrollToBottom();
   }, [displayedMessages, isOpen]);
 
+  // When the FusionTextEditPopover dispatches a requestAiEdit, the
+  // store sets pendingAiEdit. The Chatbot picks it up, opens itself
+  // if closed, and treats it as a synthetic user message. The seq
+  // counter prevents processing the same request twice.
+  //
+  // We use a ref to submitSyntheticMessage so this effect doesn't
+  // need to wait for the function declaration order at the bottom
+  // of the component.
+  const submitSyntheticMessageRef = useRef<(userMsg: string) => Promise<void>>(async () => {});
+  const lastAiEditSeqRef = useRef<number>(0);
+  useEffect(() => {
+    const pending = useAppStore.getState().pendingAiEdit;
+    if (!pending) return;
+    if (pending.seq <= lastAiEditSeqRef.current) return;
+    lastAiEditSeqRef.current = pending.seq;
+    if (!isOpen) setIsOpen(true);
+    useAppStore.getState().clearPendingAiEdit();
+    const fusion = useAppStore.getState().fusionItems.find((f) => f.id === pending.fusionId);
+    const fusionTitle = fusion?.title ?? 'this fusion';
+    const truncatedSelection = pending.selectedText.length > 800
+      ? pending.selectedText.slice(0, 800) + '... [truncated]'
+      : pending.selectedText;
+    const synthetic = `Please edit the following selection in the "${pending.fieldPath}" field of the "${fusionTitle}" fusion.
+
+Selected text (verbatim):
+"""
+${truncatedSelection}
+"""
+
+User instruction: ${pending.instruction}
+
+Replace the selected text with an edited version that follows the instruction. Use the toolcall_update_fusion tool to apply your edit. Make sure the rest of the field stays exactly the same — only the selected portion should change.`;
+    void submitSyntheticMessageRef.current(synthetic);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useAppStore.getState().pendingAiEdit?.seq]);
+
   const relatedContext = useMemo(() => {
     const routeHints: Record<string, string[]> = {
       '/': ['inbox', 'note', 'capture'],
@@ -558,12 +594,38 @@ export default function Chatbot() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!input.trim() && !pendingImage) || isLoading) return;
-
     const userMsg = input.trim();
     const imageToProcess = pendingImage;
-
     setInput('');
     clearPendingImage();
+    setIsLoading(true);
+    await submitMessage(userMsg, imageToProcess);
+  };
+
+  /**
+   * Synthetic message submission used by the AI-edit dispatcher
+   * (no input box to clear, no image to attach).
+   */
+  const submitSyntheticMessage = async (userMsg: string) => {
+    if (isLoading) return;
+    setIsLoading(true);
+    await submitMessage(userMsg, null);
+  };
+  // Expose submitSyntheticMessage to the useEffect that listens for
+  // pendingAiEdit requests from the FusionTextEditPopover. The ref
+  // works regardless of function declaration order.
+  submitSyntheticMessageRef.current = submitSyntheticMessage;
+
+  /**
+   * Internal message submission pipeline. Used by both the form
+   * submit handler and the synthetic-AI-edit dispatcher. Does the
+   * LLM call, toolcall parsing, save, and chat append. Does NOT
+   * clear the input box — the caller does that.
+   */
+  const submitMessage = async (userMsg: string, imageOverride: File | null) => {
+    if ((!userMsg.trim() && !imageOverride) || isLoading) return;
+    const imageToProcess = imageOverride ?? pendingImage;
+
     setIsLoading(true);
 
     try {
