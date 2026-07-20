@@ -5,6 +5,7 @@ import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { askGemma, buildMemoryShapedSystemInstruction, getGemmaRuntimeStatus, analyzeImageToNote, extractWebContent, detectTruncatedToolcall } from '../lib/ai';
 import { diffFusionFields } from '../lib/fusionUpdateDiff';
+import { recordDebugEvent } from '../lib/debugLog';
 import { getClipboardImage } from '../lib/imageNote';
 import { getStoredAutoDistillLevel, autoDistillInstructionForLevel } from '../lib/autoDistill';
 import { shouldTreatAsMeaningfulNote } from '../lib/noteQuality';
@@ -612,6 +613,15 @@ export default function Chatbot() {
       };
 
       setChatMessages([...chatMessages, userMessage]);
+      recordDebugEvent({
+        type: 'user_message',
+        label: 'chatbot.handleSubmit',
+        payload: {
+          messageId: userMessage.id,
+          chars: (userMessage.content || '').length,
+          hasImage: Boolean(base64Url),
+        },
+      });
       const explicitBoardWrite = explicitlyRequestsBoardWrite(userMsg);
       const systemInstruction = buildMemoryShapedSystemInstruction(`Use the provided HumanBoard knowledge context when relevant. The whole-vault index gives complete entity-level awareness; the relevance-ranked context gives deeper evidence. Prefer connecting the user to existing notes, ideas, goals, projects, principles, capability bets, fusion artifacts, and reflections before giving generic advice. For broad assessment requests, explicitly assess patterns, gaps, contradictions, concentration, and neglected areas across the whole vault.
 
@@ -829,6 +839,16 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       // toolcall instead of letting the user see a hallucinated "I created
       // the fusion" success.
       const truncatedToolcallName = detectTruncatedToolcall(responseText);
+      if (truncatedToolcallName) {
+        recordDebugEvent({
+          type: 'llm_truncated',
+          label: `unclosed <toolcall_${truncatedToolcallName}>`,
+          payload: {
+            unclosedTag: truncatedToolcallName,
+            responseChars: responseText.length,
+          },
+        });
+      }
       const failedActions: string[] = [];
       if (truncatedToolcallName) {
         const err = `The AI response was cut off mid-toolcall (unclosed <toolcall_${truncatedToolcallName}>). ` +
@@ -1065,15 +1085,25 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       const fusionRegex = /<toolcall_create_fusion>([\s\S]*?)<\/toolcall_create_fusion>/gi;
       let fusionMatch;
       while ((fusionMatch = fusionRegex.exec(responseText)) !== null) {
+        const jsonStr = fusionMatch[1].trim();
+        const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
         try {
-          const jsonStr = fusionMatch[1].trim();
-          const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
           const fusionData = JSON.parse(cleanJsonStr);
           if (!allowNoteIdeaWrites) {
             blockedInferredWrite = true;
             failedActions.push(
               `Fusion "${fusionData.title || 'Untitled Fusion'}" was not created because Auto-distill is off and the message did not explicitly ask to save it. Toggle Auto-distill or phrase the request as "save a fusion" to enable writes.`,
             );
+            recordDebugEvent({
+              type: 'toolcall_skipped',
+              label: 'toolcall_create_fusion',
+              payload: {
+                reason: 'gate-blocked',
+                allowNoteIdeaWrites,
+                explicitBoardWrite,
+                title: fusionData.title,
+              },
+            });
             continue;
           }
           const title = asOptionalString(fusionData.title)?.trim() || 'Untitled Fusion';
@@ -1086,6 +1116,15 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
             failedActions.push(
               `Fusion "${title}" already exists (id ${duplicate.id}); not creating a duplicate. Use toolcall_update_fusion with target="${title}" to edit it.`,
             );
+            recordDebugEvent({
+              type: 'toolcall_skipped',
+              label: 'toolcall_create_fusion',
+              payload: {
+                reason: 'duplicate-title',
+                title,
+                existingId: duplicate.id,
+              },
+            });
             continue;
           }
           const isPublic = typeof fusionData.isPublic === 'boolean' ? fusionData.isPublic : false;
@@ -1108,11 +1147,35 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
           // Verify by id (not by title — title collisions are now possible
           // because we no-op'd on the duplicate path above).
           const created = useAppStore.getState().fusionItems.find((item) => item.id === newId);
-          if (created) matchedFusion = true;
+          if (created) {
+            matchedFusion = true;
+            recordDebugEvent({
+              type: 'toolcall_applied',
+              label: 'toolcall_create_fusion',
+              payload: {
+                newId,
+                title,
+                bodyChars: (fusionData.body || '').length,
+                summaryChars: (fusionData.summary || '').length,
+                conclusionChars: (fusionData.centralConclusion || '').length,
+              },
+            });
+          }
           else failedActions.push(`Fusion "${title}" was created with id ${newId} but could not be re-read from the store.`);
         } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
           console.error("Failed to parse create_fusion toolcall JSON:", err);
           failedActions.push('Fusion creation failed because the toolcall JSON could not be parsed.');
+          recordDebugEvent({
+            type: 'toolcall_failed',
+            label: 'toolcall_create_fusion',
+            payload: {
+              reason: 'json-parse-error',
+              jsonChars: jsonStr.length,
+              jsonPreview: cleanJsonStr.slice(0, 200),
+            },
+            error: message,
+          });
         }
       }
       cleanText = cleanText.replace(fusionRegex, '').trim();
@@ -1121,20 +1184,38 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       const updateFusionRegex = /<toolcall_update_fusion>([\s\S]*?)<\/toolcall_update_fusion>/gi;
       let updateFusionMatch;
       while ((updateFusionMatch = updateFusionRegex.exec(responseText)) !== null) {
+        const jsonStr = updateFusionMatch[1].trim();
+        const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
         try {
-          const jsonStr = updateFusionMatch[1].trim();
-          const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
           const data = JSON.parse(cleanJsonStr);
           if (!explicitBoardWrite) {
             blockedInferredWrite = true;
             failedActions.push(
               `Fusion update on "${data.target || 'unknown'}" was blocked because the message did not explicitly ask to save/edit/update. Phrase the request as "update the X fusion" or "edit my fusion" to enable writes.`,
             );
+            recordDebugEvent({
+              type: 'toolcall_skipped',
+              label: 'toolcall_update_fusion',
+              payload: {
+                reason: 'gate-blocked',
+                explicitBoardWrite,
+                target: data.target,
+              },
+            });
             continue;
           }
           const targetFusion = findFusionByReference(data.target);
           if (!targetFusion) {
             failedActions.push(`Fusion "${data.target || 'unknown'}" was not found.`);
+            recordDebugEvent({
+              type: 'toolcall_skipped',
+              label: 'toolcall_update_fusion',
+              payload: {
+                reason: 'target-not-found',
+                target: data.target,
+                existingFusions: fusionItems.map((f) => f.title).slice(0, 12),
+              },
+            });
             continue;
           }
           const updates = data.updates || {};
@@ -1188,6 +1269,16 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
               `Fusion "${targetFusion.title}" update was requested but the toolcall contained no changeable fields. ` +
               `The model may have hallucinated the update — try rephrasing the request with explicit fields to change.`,
             );
+            recordDebugEvent({
+              type: 'toolcall_skipped',
+              label: 'toolcall_update_fusion',
+              payload: {
+                reason: 'empty-updates',
+                targetId: targetFusion.id,
+                targetTitle: targetFusion.title,
+                rawUpdatesKeys: Object.keys(updates),
+              },
+            });
             continue;
           }
 
@@ -1206,10 +1297,20 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
           const updated = useAppStore.getState().fusionItems.find((item) => item.id === targetFusion.id);
           if (!updated) {
             failedActions.push(`Fusion "${targetFusion.title}" update could not be verified in the store.`);
+            recordDebugEvent({
+              type: 'toolcall_failed',
+              label: 'toolcall_update_fusion',
+              payload: { reason: 'post-update-not-found', targetId: targetFusion.id },
+            });
             continue;
           }
           if (updates.title !== undefined && updated.title !== String(updates.title)) {
             failedActions.push(`Fusion title update was rejected by the store (current: "${updated.title}").`);
+            recordDebugEvent({
+              type: 'toolcall_failed',
+              label: 'toolcall_update_fusion',
+              payload: { reason: 'title-rejected', targetId: targetFusion.id, currentTitle: updated.title },
+            });
             continue;
           }
 
@@ -1227,12 +1328,43 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
               `for [${Object.keys(nextUpdates).join(', ')}]. The chatbot said it updated the fusion but nothing actually changed. ` +
               `Try a more specific instruction, e.g. "add concrete details about X" or "rewrite the conclusion to emphasize Y".`,
             );
+            recordDebugEvent({
+              type: 'toolcall_skipped',
+              label: 'toolcall_update_fusion',
+              payload: {
+                reason: 'no-op-diffs',
+                targetId: targetFusion.id,
+                targetTitle: targetFusion.title,
+                nextUpdatesKeys: Object.keys(nextUpdates),
+                before,
+                after,
+              },
+            });
             continue;
           }
           matchedFusionUpdate = true;
+          recordDebugEvent({
+            type: 'toolcall_applied',
+            label: 'toolcall_update_fusion',
+            payload: {
+              targetId: targetFusion.id,
+              targetTitle: targetFusion.title,
+              changedFields,
+              bodyChars: typeof updates.body === 'string' ? updates.body.length : undefined,
+              summaryChars: typeof updates.summary === 'string' ? updates.summary.length : undefined,
+              conclusionChars: typeof updates.centralConclusion === 'string' ? updates.centralConclusion.length : undefined,
+            },
+          });
         } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
           console.error("Failed to parse update_fusion toolcall JSON:", err);
           failedActions.push('Fusion update failed because the toolcall JSON could not be parsed.');
+          recordDebugEvent({
+            type: 'toolcall_failed',
+            label: 'toolcall_update_fusion',
+            payload: { reason: 'json-parse-error', jsonChars: jsonStr.length, jsonPreview: cleanJsonStr.slice(0, 200) },
+            error: message,
+          });
         }
       }
       cleanText = cleanText.replace(updateFusionRegex, '').trim();

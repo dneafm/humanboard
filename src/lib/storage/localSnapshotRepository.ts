@@ -2,6 +2,7 @@ import { defaultSnapshot } from './defaultSnapshot';
 import type { AppSnapshot, StorageRepository } from './types';
 import { useAuthStore } from '../../stores/authStore';
 import { apiFetch } from '../apiClient';
+import { recordDebugEvent } from '../debugLog';
 
 const STORAGE_KEY = 'humanboard.app-snapshot.v1';
 
@@ -189,6 +190,15 @@ export class LocalSnapshotRepository implements StorageRepository {
   async save(snapshot: AppSnapshot): Promise<SaveResult> {
     const serialized = JSON.stringify(snapshot);
     const approxBytes = serialized.length;
+    recordDebugEvent({
+      type: 'save_attempt',
+      label: 'persistSnapshot',
+      payload: {
+        approxBytes,
+        fusionCount: snapshot.fusionItems?.length ?? 0,
+        noteCount: snapshot.notes?.length ?? 0,
+      },
+    });
     let localOk = false;
     let localError: string | undefined;
     if (typeof window !== 'undefined') {
@@ -239,6 +249,19 @@ export class LocalSnapshotRepository implements StorageRepository {
         `error=${result.error ?? 'unknown'}`,
       );
     }
+    recordDebugEvent({
+      type: 'save_result',
+      label: fullyOk ? 'persistSnapshot ok' : 'persistSnapshot PARTIAL FAILURE',
+      payload: {
+        localOk,
+        serverOk: serverResult.ok,
+        serverSkipped: serverResult.skipped,
+        approxBytes,
+        target: result.target,
+        ...(result.serverPayloadTooLarge ? { serverPayloadTooLarge: true } : {}),
+      },
+      ...(result.error ? { error: result.error } : {}),
+    });
     emitSaveResult(result);
     return result;
   }

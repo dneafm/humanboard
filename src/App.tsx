@@ -22,6 +22,7 @@ import { useEffect, useLayoutEffect, useState } from 'react';
 import MemoryConsolidator from './components/MemoryConsolidator';
 import { useAuthStore } from './stores/authStore';
 import { subscribeSaveResults } from './lib/storage/localSnapshotRepository';
+import { DebugPanel } from './components/DebugPanel';
 import { apiFetch } from './lib/apiClient';
 import AiEraKbAutoBridge from './components/AiEraKbAutoBridge';
 import NotificationCenter from './components/NotificationCenter';
@@ -1384,6 +1385,7 @@ export default function App() {
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
       <PersistErrorBanner />
+      <DebugPanel />
       <div className="flex min-h-screen bg-white dark:bg-stone-950 text-stone-900 dark:text-stone-100 font-sans selection:bg-stone-200 dark:selection:bg-stone-800 transition-colors duration-300">
         <Sidebar onOpenTutorial={openGuide} onOpenSettings={() => setIsSettingsOpen(true)} onOpenDocs={() => setIsDocsOpen(true)} />
         <main className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0">

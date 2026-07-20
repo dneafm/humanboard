@@ -1,5 +1,6 @@
 import type { CapabilityBet, EvidencePolarity, Idea } from '../store';
 import { apiFetch, apiUrl, buildApiHeaders } from './apiClient';
+import { recordDebugEvent } from './debugLog';
 
 type RuntimeConfig = {
   baseUrl: string;
@@ -249,6 +250,20 @@ async function callGemma(prompt: string, systemInstruction: string) {
         ...(runtime.apiKey ? { Authorization: `Bearer ${runtime.apiKey}` } : {}),
       };
 
+  // Record the outgoing request so the debug panel can show what we
+  // actually sent (prompt + system instruction lengths, model, url).
+  recordDebugEvent({
+    type: 'llm_request',
+    label: 'askGemma',
+    payload: {
+      model: runtime.model,
+      url: runtime.chatCompletionsUrl,
+      promptChars: prompt.length,
+      systemChars: systemInstruction.length,
+      maxTokens: CHAT_COMPLETION_MAX_TOKENS,
+    },
+  });
+
   let response: Response;
   try {
     response = await fetchChatCompletion(runtime.chatCompletionsUrl, requestHeaders, {
@@ -261,14 +276,32 @@ async function callGemma(prompt: string, systemInstruction: string) {
       ],
     });
   } catch (error) {
-    throw buildRuntimeError('Could not reach the AI runtime.', error instanceof Error ? error.message : String(error));
+    const message = error instanceof Error ? error.message : String(error);
+    recordDebugEvent({
+      type: 'llm_response',
+      label: 'askGemma (network error)',
+      payload: { ok: false },
+      error: message,
+    });
+    throw buildRuntimeError('Could not reach the AI runtime.', message);
   }
 
   if (!response.ok) {
     if (response.status === 429) {
+      recordDebugEvent({
+        type: 'llm_response',
+        label: 'askGemma (429 rate limited)',
+        payload: { ok: false, status: 429 },
+      });
       throw new Error("Daily AI Request Limit Reached: You have reached the maximum of 1,000 AI interactions for today. Your quota resets at midnight UTC.");
     }
     const errorText = await response.text();
+    recordDebugEvent({
+      type: 'llm_response',
+      label: `askGemma (HTTP ${response.status})`,
+      payload: { ok: false, status: response.status, errorTextChars: errorText.length },
+      error: errorText.slice(0, 500),
+    });
     throw buildRuntimeError(`AI request failed with HTTP ${response.status}.`, errorText);
   }
 
@@ -278,13 +311,37 @@ async function callGemma(prompt: string, systemInstruction: string) {
   };
 
   if (payload.error?.message) {
+    recordDebugEvent({
+      type: 'llm_response',
+      label: 'askGemma (provider error)',
+      payload: { ok: false },
+      error: payload.error.message,
+    });
     throw buildRuntimeError('AI runtime returned an API error.', payload.error.message);
   }
 
   const content = payload.choices?.[0]?.message?.content?.trim() || '';
   if (!content) {
+    recordDebugEvent({
+      type: 'llm_response',
+      label: 'askGemma (empty content)',
+      payload: { ok: false, hasChoices: Array.isArray(payload.choices) },
+    });
     throw buildRuntimeError('AI runtime returned an empty response.');
   }
+  // Record the raw response so the debug panel can show exactly what
+  // the LLM emitted — including any toolcall blocks, prose, or
+  // truncation. Long content is preserved (we just truncate in the
+  // summarizePayload display helper).
+  recordDebugEvent({
+    type: 'llm_response',
+    label: 'askGemma',
+    payload: {
+      ok: true,
+      contentChars: content.length,
+      content,
+    },
+  });
   return content;
 }
 
