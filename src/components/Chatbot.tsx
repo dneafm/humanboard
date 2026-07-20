@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import { askGemma, buildMemoryShapedSystemInstruction, getGemmaRuntimeStatus, analyzeImageToNote, extractWebContent, detectTruncatedToolcall } from '../lib/ai';
 import { diffFusionFields } from '../lib/fusionUpdateDiff';
 import { recordDebugEvent } from '../lib/debugLog';
+import { detectBoardWriteIntent } from '../lib/boardWriteIntent';
 import { getClipboardImage } from '../lib/imageNote';
 import { getStoredAutoDistillLevel, autoDistillInstructionForLevel } from '../lib/autoDistill';
 import { shouldTreatAsMeaningfulNote } from '../lib/noteQuality';
@@ -342,11 +343,7 @@ export default function Chatbot() {
     return true;
   };
 
-  const explicitlyRequestsBoardWrite = (raw: string) => (
-    /\b(save|store|remember|capture|record|add|create|compile|update|edit|revise|rewrite|expand|mark)\b[\s\S]{0,40}\b(note|idea|board|inbox|map|knowledge|goal|project|fusion|bet|thesis|report|post|writing|synthesis|draft)\b/i.test(raw)
-    || /\b(note|idea|board|inbox|map|knowledge|goal|project|fusion|bet|thesis|report|post|writing|synthesis|draft)\b[\s\S]{0,40}\b(save|store|remember|capture|record|add|create|compile|update|edit|revise|rewrite|expand|mark)\b/i.test(raw)
-    || /\b(save|store|remember|capture|record)\s+(this|that|it)\b/i.test(raw)
-  );
+  const explicitlyRequestsBoardWrite = (raw: string) => detectBoardWriteIntent(raw);
 
   const extractUrls = (raw: string) => Array.from(new Set((raw.match(URL_REGEX) || []).map((url) => url.trim()))).slice(0, 2);
 
