@@ -452,8 +452,8 @@ interface AppState {
    * `seq` is a monotonically increasing counter so the Chatbot can
    * tell new requests apart from in-flight ones.
    */
-  pendingAiEdit: { seq: number; fusionId: string; fieldPath: string; selectedText: string; instruction: string } | null;
-  requestAiEdit: (input: { fusionId: string; fieldPath: string; selectedText: string; instruction: string }) => void;
+  pendingAiEdit: { seq: number; fusionId: string; fieldPath: string; selectedText: string; instruction: string; outputFormat: string } | null;
+  requestAiEdit: (input: { fusionId: string; fieldPath: string; selectedText: string; instruction: string; outputFormat?: string }) => void;
   clearPendingAiEdit: () => void;
   clearPersistError: () => void;
   setChatMessages: (messages: ChatMessage[]) => void;
@@ -1584,7 +1584,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Chatbot can tell new requests from the same render cycle.
     const current = useAppStore.getState().pendingAiEdit;
     const nextSeq = (current?.seq ?? 0) + 1;
-    set({ pendingAiEdit: { seq: nextSeq, ...input } });
+    set({
+      pendingAiEdit: {
+        seq: nextSeq,
+        fusionId: input.fusionId,
+        fieldPath: input.fieldPath,
+        selectedText: input.selectedText,
+        instruction: input.instruction,
+        outputFormat: input.outputFormat ?? 'same',
+      },
+    });
   },
   clearPendingAiEdit: () => set({ pendingAiEdit: null }),
   persistRetry: async () => {

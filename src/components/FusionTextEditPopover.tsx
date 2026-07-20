@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Sparkles, X } from 'lucide-react';
+import { Sparkles, X, Code, Eye, ChevronDown } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { useAppStore } from '../store';
 
 type SelectionState = {
@@ -10,29 +11,60 @@ type SelectionState = {
 } | null;
 
 /**
+ * Output format the LLM should use when applying the edit. We pass
+ * this to the model as part of the synthetic instruction so the
+ * user can shape the structure of the replacement text.
+ */
+type OutputFormat =
+  | 'same'        // preserve the original style (default)
+  | 'markdown'    // use **bold**, *italic*, etc.
+  | 'plain'       // no formatting
+  | 'bullets'     // convert to a bullet list
+  | 'numbered'    // convert to a numbered list
+  | 'heading'     // start with a ## heading, then prose
+  | 'quote';      // wrap in > blockquote
+
+const FORMAT_OPTIONS: Array<{ value: OutputFormat; label: string; hint: string }> = [
+  { value: 'same',     label: 'Same style',    hint: 'Preserve the original style' },
+  { value: 'markdown', label: 'Markdown',      hint: 'Use **bold**, *italic*, headings, etc.' },
+  { value: 'plain',    label: 'Plain text',    hint: 'No formatting' },
+  { value: 'bullets',  label: 'Bullet list',   hint: 'Convert to a bullet list' },
+  { value: 'numbered', label: 'Numbered list', hint: 'Convert to a numbered list' },
+  { value: 'heading',  label: 'Heading',       hint: 'Start with a ## heading + prose' },
+  { value: 'quote',    label: 'Blockquote',    hint: 'Wrap in a > blockquote' },
+];
+
+const FORMAT_INSTRUCTION: Record<OutputFormat, string> = {
+  same:     'Preserve the original formatting style. Only change the words, not the structure.',
+  markdown: 'Format the result with Markdown: use **bold** for emphasis, *italic*, `code`, ## headings, - bullets, etc.',
+  plain:    'Output plain text with no Markdown formatting, no leading symbols, no headings.',
+  bullets:  'Convert the result into a Markdown bullet list (each line starting with "- ").',
+  numbered: 'Convert the result into a Markdown numbered list (each line starting with "1. ", "2. ", etc.).',
+  heading:  'Start the result with a ## Markdown heading (one short line), then a blank line, then the prose.',
+  quote:    'Wrap the result in a Markdown blockquote: start each line with "> ".',
+};
+
+/**
  * Floating "Edit with AI" popover that appears when the user selects
- * text inside any Fusion field (title, summary, body, etc.). Clicking
- * it opens a small instruction input; submitting dispatches a
- * requestAiEdit action to the store, which the Chatbot picks up
- * and turns into a synthetic user message.
- *
- * The popover positions itself just above the selection, falling
- * back to a fixed position near the textarea if the selection rect
- * is unavailable (rare for `<textarea>`).
+ * text inside any Fusion field (title, summary, body, etc.). Shows
+ * the selected text in *rendered* form (markdown → HTML) by default
+ * with a toggle to view the raw source, plus a format picker that
+ * tells the LLM how to structure the replacement text.
  */
 export function FusionTextEditPopover() {
   const [selection, setSelection] = useState<SelectionState>(null);
   const [open, setOpen] = useState(false);
   const [instruction, setInstruction] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [view, setView] = useState<'rendered' | 'raw'>('rendered');
+  const [format, setFormat] = useState<OutputFormat>('same');
+  const [formatMenuOpen, setFormatMenuOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement | null>(null);
 
   // Track which Fusion detail page is open. The popover should only
   // fire when the user is editing the fusion on this page.
   const lastFusionIdRef = useRef<string | null>(null);
   useEffect(() => {
-    // The Chatbot dispatches requestAiEdit with a fusionId. We track
-    // it so we know the popover is on the right page.
     const unsub = useAppStore.subscribe((state) => {
       const pending = state.pendingAiEdit;
       if (pending) {
@@ -56,8 +88,6 @@ export function FusionTextEditPopover() {
         setOpen(false);
         return;
       }
-      // Find the closest Fusion field ancestor (title, summary,
-      // centralConclusion, body, authorName, authorBio).
       const anchor = sel.anchorNode;
       if (!anchor) return;
       const el = (anchor.nodeType === Node.ELEMENT_NODE ? anchor as Element : anchor.parentElement)
@@ -69,13 +99,9 @@ export function FusionTextEditPopover() {
       }
       const fieldPath = el.getAttribute('data-fusion-field');
       if (!fieldPath) return;
-      // Get the Fusion id from the closest FusionDetail container
-      // (we attach data-fusion-id to the page wrapper).
       const container = (el.closest('[data-fusion-id]') || document.querySelector('[data-fusion-id]')) as HTMLElement | null;
       const fusionId = container?.getAttribute('data-fusion-id') ?? null;
       if (!fusionId) {
-        // We don't know which fusion this is. Skip rather than risk
-        // editing the wrong one.
         setSelection(null);
         setOpen(false);
         return;
@@ -95,12 +121,12 @@ export function FusionTextEditPopover() {
     return () => document.removeEventListener('selectionchange', handler);
   }, []);
 
-  // Close the popover if the user clicks outside it.
   useEffect(() => {
     if (!selection) return;
     const onClick = (e: MouseEvent) => {
       if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
         setOpen(false);
+        setFormatMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', onClick);
@@ -109,8 +135,6 @@ export function FusionTextEditPopover() {
 
   if (!selection) return null;
 
-  // Position the popover just above the selection. Fall back to a
-  // sensible fixed position if the rect is degenerate.
   const top = Math.max(8, selection.rect.top - 56);
   const left = Math.max(8, Math.min(selection.rect.left, window.innerWidth - 360));
 
@@ -122,14 +146,16 @@ export function FusionTextEditPopover() {
       fieldPath: selection.fieldPath,
       selectedText: selection.text,
       instruction: instruction.trim(),
+      outputFormat: format,
     });
     setOpen(false);
     setInstruction('');
     setSelection(null);
-    // Reset the submitting flag after a short delay so the user can
-    // re-select the same text and try again if needed.
     setTimeout(() => setSubmitting(false), 800);
   };
+
+  const formatLabel = FORMAT_OPTIONS.find((o) => o.value === format)?.label ?? 'Same style';
+  const formatHint = FORMAT_OPTIONS.find((o) => o.value === format)?.hint ?? '';
 
   return (
     <div
@@ -151,7 +177,7 @@ export function FusionTextEditPopover() {
           Edit with AI
         </button>
       ) : (
-        <div className="w-[340px] rounded-xl border border-amber-300 bg-white p-3 shadow-2xl dark:border-amber-700 dark:bg-stone-900">
+        <div className="w-[380px] rounded-xl border border-amber-300 bg-white p-3 shadow-2xl dark:border-amber-700 dark:bg-stone-900">
           <div className="mb-2 flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-amber-500" />
             <div className="flex-1 text-xs font-semibold text-stone-700 dark:text-stone-200">
@@ -162,6 +188,7 @@ export function FusionTextEditPopover() {
               onClick={(e) => {
                 e.stopPropagation();
                 setOpen(false);
+                setFormatMenuOpen(false);
               }}
               className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700 dark:hover:bg-stone-800 dark:hover:text-stone-200"
               title="Cancel"
@@ -169,10 +196,108 @@ export function FusionTextEditPopover() {
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
-          <div className="mb-2 max-h-24 overflow-y-auto rounded-md border border-stone-200 bg-stone-50 p-2 text-[11px] leading-relaxed text-stone-600 dark:border-stone-800 dark:bg-stone-950 dark:text-stone-400">
-            <span className="select-none text-stone-400">Selected: </span>
-            {selection.text}
+
+          {/* Selected text preview (rendered or raw) */}
+          <div className="mb-2 overflow-hidden rounded-md border border-stone-200 bg-stone-50 dark:border-stone-800 dark:bg-stone-950">
+            <div className="flex items-center justify-between gap-1 border-b border-stone-200 bg-stone-100/60 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-stone-500 dark:border-stone-800 dark:bg-stone-900/60">
+              <span>Selected text</span>
+              <div className="flex items-center gap-0.5 rounded bg-white/70 p-0.5 dark:bg-stone-800/70">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setView('rendered');
+                  }}
+                  className={`flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors ${
+                    view === 'rendered'
+                      ? 'bg-amber-500 text-white'
+                      : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+                  }`}
+                  title="Rendered (as it appears in the Fusion)"
+                >
+                  <Eye className="h-3 w-3" />
+                  Rendered
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setView('raw');
+                  }}
+                  className={`flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors ${
+                    view === 'raw'
+                      ? 'bg-amber-500 text-white'
+                      : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+                  }`}
+                  title="Raw source (markdown text)"
+                >
+                  <Code className="h-3 w-3" />
+                  Raw
+                </button>
+              </div>
+            </div>
+            <div className="max-h-32 overflow-y-auto p-2 text-[11px] leading-relaxed text-stone-700 dark:text-stone-300">
+              {view === 'rendered' ? (
+                <div className="fusion-popover-prose prose prose-xs prose-stone max-w-none dark:prose-invert">
+                  <ReactMarkdown>{selection.text}</ReactMarkdown>
+                </div>
+              ) : (
+                <pre className="whitespace-pre-wrap font-mono text-[10.5px] text-stone-600 dark:text-stone-400">
+{selection.text}
+                </pre>
+              )}
+            </div>
           </div>
+
+          {/* Format picker — tells the LLM how to structure the replacement */}
+          <div className="mb-2 flex items-center gap-1.5 text-[11px]">
+            <span className="text-stone-500">Format:</span>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFormatMenuOpen((v) => !v);
+                }}
+                className="flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2 py-1 text-xs font-medium text-stone-700 hover:border-amber-400 hover:text-amber-700 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-200 dark:hover:text-amber-300"
+                title={formatHint}
+              >
+                {formatLabel}
+                <ChevronDown className="h-3 w-3 opacity-60" />
+              </button>
+              {formatMenuOpen && (
+                <div
+                  className="absolute left-0 top-full z-10 mt-1 w-52 rounded-md border border-stone-200 bg-white py-1 shadow-xl dark:border-stone-700 dark:bg-stone-900"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {FORMAT_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        setFormat(opt.value);
+                        setFormatMenuOpen(false);
+                      }}
+                      className={`block w-full px-2 py-1.5 text-left text-xs hover:bg-amber-50 dark:hover:bg-amber-950/40 ${
+                        format === opt.value
+                          ? 'bg-amber-50 font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+                          : 'text-stone-700 dark:text-stone-200'
+                      }`}
+                    >
+                      <div>{opt.label}</div>
+                      <div className="text-[10px] font-normal text-stone-500">{opt.hint}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {format !== 'same' && (
+              <span className="text-[10px] text-amber-700 dark:text-amber-300" title={formatHint}>
+                {formatHint}
+              </span>
+            )}
+          </div>
+
           <textarea
             value={instruction}
             onChange={(e) => setInstruction(e.target.value)}

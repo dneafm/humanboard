@@ -395,6 +395,15 @@ export default function Chatbot() {
     const truncatedSelection = pending.selectedText.length > 800
       ? pending.selectedText.slice(0, 800) + '... [truncated]'
       : pending.selectedText;
+    const formatHint = {
+      same:     'Preserve the original formatting style. Only change the words, not the structure.',
+      markdown: 'Format the result with Markdown: use **bold** for emphasis, *italic*, `code`, ## headings, - bullets, etc.',
+      plain:    'Output plain text with no Markdown formatting, no leading symbols, no headings.',
+      bullets:  'Convert the result into a Markdown bullet list (each line starting with "- ").',
+      numbered: 'Convert the result into a Markdown numbered list (each line starting with "1. ", "2. ", etc.).',
+      heading:  'Start the result with a ## Markdown heading (one short line), then a blank line, then the prose.',
+      quote:    'Wrap the result in a Markdown blockquote: start each line with "> ".',
+    }[pending.outputFormat] ?? 'Preserve the original formatting style.';
     const synthetic = `Please edit the following selection in the "${pending.fieldPath}" field of the "${fusionTitle}" fusion.
 
 Selected text (verbatim):
@@ -404,7 +413,9 @@ ${truncatedSelection}
 
 User instruction: ${pending.instruction}
 
-Replace the selected text with an edited version that follows the instruction. Use the toolcall_update_fusion tool to apply your edit. Make sure the rest of the field stays exactly the same — only the selected portion should change.`;
+Output format: ${formatHint}
+
+Replace the selected text with an edited version that follows the instruction AND the output format. Use the toolcall_update_fusion tool to apply your edit. Make sure the rest of the field stays exactly the same — only the selected portion should change.`;
     void submitSyntheticMessageRef.current(synthetic);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [useAppStore.getState().pendingAiEdit?.seq]);
