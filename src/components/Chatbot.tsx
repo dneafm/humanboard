@@ -1389,6 +1389,40 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       }
       cleanText = cleanText.replace(linkNotesToBetRegex, '').trim();
 
+      // Hallucination detector: the LLM's prose describes an action
+      // (update / create / save / add / mark / set / etc.) but no
+      // matching toolcall was actually parsed. This is the "the bot
+      // said it updated the fusion but the JSON block is missing"
+      // failure mode that the user kept hitting. Surface it loudly so
+      // the user knows the prose was a hallucination, not a real write.
+      if (
+        explicitBoardWrite &&
+        !matchedNote && !matchedIdea && !matchedIdeaUpdate && !matchedPersona &&
+        !matchedGoal && !matchedGoalUpdate && !matchedProjectDelete &&
+        !matchedFusion && !matchedFusionUpdate && !matchedFusionDelete &&
+        !matchedCapabilityBet && !matchedCapabilityBetUpdate && !matchedNoteBetLinks &&
+        !blockedInferredWrite &&
+        cleanText
+      ) {
+        const claimKeywords = /\b(updated|created|saved|added|marked|set|changed|edited|removed|deleted|drafted|wrote|rewrote|expanded|captured|noted|appended|populated|filled)\b/i;
+        if (claimKeywords.test(cleanText)) {
+          failedActions.push(
+            `The chatbot said it performed an action in its reply but no toolcall was actually emitted in the response. ` +
+            `This is a model hallucination: the prose claims the action but the JSON toolcall is missing or unparseable. ` +
+            `Try rephrasing with an explicit request that includes the field to change, e.g. ` +
+            `"use the toolcall_update_fusion tool to set body to ...". ` +
+            `If the model keeps doing this, you can also paste the body text directly into the Fusion editor.`,
+          );
+        } else {
+          // No action verb at all — the LLM just didn't do anything.
+          failedActions.push(
+            `The user message asked to save/edit/update something, but the chatbot reply did not contain a toolcall. ` +
+            `The chatbot may have been confused, or the LLM decided no action was appropriate. ` +
+            `Try rephrasing or use the Fusion editor directly.`,
+          );
+        }
+      }
+
       let actionMessage = '';
       if (matchedNote || matchedIdea || matchedIdeaUpdate || matchedPersona || matchedGoal || matchedGoalUpdate || matchedProjectDelete || matchedFusion || matchedFusionUpdate || matchedFusionDelete || matchedCapabilityBet || matchedCapabilityBetUpdate || matchedNoteBetLinks || failedActions.length) {
         actionMessage = "\n\n*(AI: ";
