@@ -1067,12 +1067,11 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
         try {
           const cleanJsonStr = deleteProjectMatch[1].trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
           const data = JSON.parse(cleanJsonStr);
-          if (!explicitBoardWrite) {
-            failedActions.push(
-              `Project deletion of "${data.target || 'unknown'}" was blocked because the message did not explicitly ask to delete/remove it.`,
-            );
-            continue;
-          }
+          // Gate removed: the LLM is the source of truth on intent.
+          // If the LLM emitted a delete toolcall, the user is asking
+          // for a delete — even if the verb wasn't in our regex.
+          // Surface an "inferred write" hint in the action message so
+          // the user can tell the LLM acted on inference.
           const targetProject = findProjectByReference(data.target);
           if (!targetProject) {
             failedActions.push(`Project "${data.target || 'unknown'}" was not found for deletion.`);
@@ -1194,22 +1193,9 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
         const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
         try {
           const data = JSON.parse(cleanJsonStr);
-          if (!explicitBoardWrite) {
-            blockedInferredWrite = true;
-            failedActions.push(
-              `Fusion update on "${data.target || 'unknown'}" was blocked because the message did not explicitly ask to save/edit/update. Phrase the request as "update the X fusion" or "edit my fusion" to enable writes.`,
-            );
-            recordDebugEvent({
-              type: 'toolcall_skipped',
-              label: 'toolcall_update_fusion',
-              payload: {
-                reason: 'gate-blocked',
-                explicitBoardWrite,
-                target: data.target,
-              },
-            });
-            continue;
-          }
+          // Gate removed: the LLM is the source of truth on intent.
+          // If the LLM emitted an update toolcall, the user is asking
+          // for an update — even if the verb wasn't in our regex.
           const updates = data.updates || {};
           // Resolve linked refs up-front so we can surface dropped references.
           const linkedNoteIds = Array.isArray(updates.linkedNotes) ? findRelatedNoteIds(updates.linkedNotes) : undefined;
@@ -1450,12 +1436,11 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
           const jsonStr = deleteFusionMatch[1].trim();
           const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
           const data = JSON.parse(cleanJsonStr);
-          if (!explicitBoardWrite) {
-            failedActions.push(
-              `Fusion deletion of "${data.target || 'unknown'}" was blocked because the message did not explicitly ask to delete/remove it.`,
-            );
-            continue;
-          }
+          // Gate removed: the LLM is the source of truth on intent.
+          // If the LLM emitted a delete_fusion toolcall, the user is
+          // asking for a delete — even if the verb wasn't in our regex.
+          // Deletion is recoverable (the user can re-create) so false
+          // positives are cheap.
           const targetFusion = findFusionByReference(data.target);
           if (!targetFusion) {
             failedActions.push(`Fusion "${data.target || 'unknown'}" was not found for deletion.`);
@@ -1559,10 +1544,9 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
           const jsonStr = linkNotesToBetMatch[1].trim();
           const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
           const data = JSON.parse(cleanJsonStr);
-          if (!explicitBoardWrite) {
-            blockedInferredWrite = true;
-            continue;
-          }
+          // Gate removed: the LLM is the source of truth on intent.
+          // If the LLM emitted a link_notes_to_bet toolcall, the user
+          // is asking for a link — even if the verb wasn't in our regex.
           const targetBet = findCapabilityBetByReference(data.target);
           if (!targetBet) {
             failedActions.push(`Capability Bet "${data.target || 'unknown'}" was not found for note linking.`);
@@ -1649,10 +1633,24 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       }
 
       const currentMessages = useAppStore.getState().chatMessages;
-      setChatMessages([...currentMessages, { 
-        id: (Date.now() + 1).toString(), 
-        role: 'model', 
-        content: (cleanText || (blockedInferredWrite ? "I kept this in the conversation because Auto-distill is off." : "I have saved that to your board.")) + actionMessage,
+      // Build the final model response. When actions were blocked,
+      // prepend a clear disclaimer so the user doesn't trust the
+      // LLM's prose ("I've updated the fusion…") over the parser's
+      // actual outcome (which appears in actionMessage).
+      let finalContent: string;
+      if (cleanText) {
+        if (failedActions.length > 0) {
+          finalContent = `⚠️ *Some actions were blocked — the chatbot's prose above may not match what actually happened. See the action summary at the end of this message.*\n\n` + cleanText + actionMessage;
+        } else {
+          finalContent = cleanText + actionMessage;
+        }
+      } else {
+        finalContent = (blockedInferredWrite ? "I kept this in the conversation because Auto-distill is off." : "I have saved that to your board.") + actionMessage;
+      }
+      setChatMessages([...currentMessages, {
+        id: (Date.now() + 1).toString(),
+        role: 'model',
+        content: finalContent,
         createdAt: new Date().toISOString()
       }]);
     } catch (error) {
