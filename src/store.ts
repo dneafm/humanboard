@@ -454,7 +454,7 @@ interface AppState {
   addProject: (project: Omit<Project, 'id' | 'createdAt' | 'lastUpdatedAt' | 'linkedNoteIds' | 'linkedIdeaIds' | 'linkedGoalIds' | 'tasks' | 'updates' | 'experiments'> & Partial<Pick<Project, 'createdAt' | 'lastUpdatedAt' | 'linkedNoteIds' | 'linkedIdeaIds' | 'linkedGoalIds' | 'tasks' | 'updates' | 'experiments'>>) => void;
   updateProject: (id: string, updates: Partial<Project>) => void;
   deleteProject: (id: string) => void;
-  addFusionItem: (item: Omit<FusionItem, 'id' | 'createdAt' | 'updatedAt' | 'shareReadiness' | 'checklist'>) => void;
+  addFusionItem: (item: Omit<FusionItem, 'id' | 'createdAt' | 'updatedAt' | 'shareReadiness' | 'checklist'>) => string;
   updateFusionItem: (id: string, updates: Partial<FusionItem>) => void;
   deleteFusionItem: (id: string) => void;
   addSection: (section: Omit<Section, 'id'>) => string;
@@ -1272,40 +1272,44 @@ export const useAppStore = create<AppState>((set, get) => ({
     persistSnapshot(next);
     return { projects: next.projects };
   }),
-  addFusionItem: (item) => set((state) => {
+  addFusionItem: (item) => {
     const now = new Date().toISOString();
-    const tempItem = {
-      ...item,
-      linkedNoteIds: item.linkedNoteIds ?? [],
-      linkedIdeaIds: item.linkedIdeaIds ?? [],
-      linkedGoalIds: item.linkedGoalIds ?? [],
-      linkedProjectIds: item.linkedProjectIds ?? [],
-    };
-    const checklist = computeFusionChecklist(tempItem);
-    const shareReadiness = computeFusionReadiness(checklist);
-    const nextItem: FusionItem = {
-      ...item,
-      id: randomId(),
-      createdAt: now,
-      updatedAt: now,
-      completedAt: item.status === 'Completed' ? now : undefined,
-      linkedNoteIds: item.linkedNoteIds ?? [],
-      linkedIdeaIds: item.linkedIdeaIds ?? [],
-      linkedGoalIds: item.linkedGoalIds ?? [],
-      linkedProjectIds: item.linkedProjectIds ?? [],
-      summary: item.summary ?? '',
-      centralConclusion: item.centralConclusion ?? '',
-      body: item.body ?? '',
-      checklist,
-      shareReadiness,
-    };
-    const next = {
-      ...state,
-      fusionItems: [nextItem, ...state.fusionItems],
-    };
-    persistSnapshot(next);
-    return { fusionItems: next.fusionItems };
-  }),
+    const newId = randomId();
+    set((state) => {
+      const tempItem = {
+        ...item,
+        linkedNoteIds: item.linkedNoteIds ?? [],
+        linkedIdeaIds: item.linkedIdeaIds ?? [],
+        linkedGoalIds: item.linkedGoalIds ?? [],
+        linkedProjectIds: item.linkedProjectIds ?? [],
+      };
+      const checklist = computeFusionChecklist(tempItem);
+      const shareReadiness = computeFusionReadiness(checklist);
+      const nextItem: FusionItem = {
+        ...item,
+        id: newId,
+        createdAt: now,
+        updatedAt: now,
+        completedAt: item.status === 'Completed' ? now : undefined,
+        linkedNoteIds: item.linkedNoteIds ?? [],
+        linkedIdeaIds: item.linkedIdeaIds ?? [],
+        linkedGoalIds: item.linkedGoalIds ?? [],
+        linkedProjectIds: item.linkedProjectIds ?? [],
+        summary: item.summary ?? '',
+        centralConclusion: item.centralConclusion ?? '',
+        body: item.body ?? '',
+        checklist,
+        shareReadiness,
+      };
+      const next = {
+        ...state,
+        fusionItems: [nextItem, ...state.fusionItems],
+      };
+      persistSnapshot(next);
+      return { fusionItems: next.fusionItems };
+    });
+    return newId;
+  },
   updateFusionItem: (id, updates) => set((state) => {
     const next = {
       ...state,

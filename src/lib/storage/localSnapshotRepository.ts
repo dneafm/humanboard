@@ -144,7 +144,27 @@ export class LocalSnapshotRepository implements StorageRepository {
 
   async save(snapshot: AppSnapshot): Promise<void> {
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem(getStorageKey(), JSON.stringify(snapshot));
+      try {
+        const serialized = JSON.stringify(snapshot);
+        const approxBytes = serialized.length;
+        // Browsers typically cap localStorage at 5-10 MB. Warn before we hit it.
+        if (approxBytes > 4_500_000) {
+          console.warn(
+            `[HumanBoard] Local snapshot is ${(approxBytes / 1_000_000).toFixed(1)} MB — ` +
+            `approaching the localStorage quota. The server snapshot will still be authoritative; ` +
+            `consider trimming very large fusion bodies or exporting to clear space.`,
+          );
+        }
+        window.localStorage.setItem(getStorageKey(), serialized);
+      } catch (err) {
+        // QuotaExceededError or other storage failure: do NOT abort the save —
+        // fall through to saveToServer so the snapshot is at least persisted remotely.
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `[HumanBoard] localStorage save failed (${message}). ` +
+          `Continuing with server-only persistence; data will still reload from the server.`,
+        );
+      }
     }
     await saveToServer(snapshot);
   }

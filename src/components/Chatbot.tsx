@@ -3,13 +3,13 @@ import { Bot, X, Send, Maximize2, Minimize2, BookmarkPlus, Check, Image as Image
 import { useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
-import { askGemma, buildMemoryShapedSystemInstruction, getGemmaRuntimeStatus, analyzeImageToNote, extractWebContent } from '../lib/ai';
+import { askGemma, buildMemoryShapedSystemInstruction, getGemmaRuntimeStatus, analyzeImageToNote, extractWebContent, detectTruncatedToolcall } from '../lib/ai';
 import { getClipboardImage } from '../lib/imageNote';
 import { getStoredAutoDistillLevel, autoDistillInstructionForLevel } from '../lib/autoDistill';
 import { shouldTreatAsMeaningfulNote } from '../lib/noteQuality';
 import { colorForNewSection, findSectionByName, normalizeSectionName } from '../lib/sections';
 import { buildWholeVaultIndex } from '../lib/vaultContext';
-import { useAppStore } from '../store';
+import { useAppStore, type FusionType, type FusionStatus, type FusionAudience } from '../store';
 import { useAuthStore } from '../stores/authStore';
 import type { ChatMessage } from '../lib/storage/types';
 import productDocs from '../../docs/product-knowledge.md?raw';
@@ -17,6 +17,43 @@ import productDocs from '../../docs/product-knowledge.md?raw';
 const AI_HISTORY_MESSAGE_LIMIT = 12;
 const AI_HISTORY_CHARACTER_LIMIT = 12_000;
 const URL_REGEX = /https?:\/\/[^\s)]+/gi;
+
+const FUSION_TYPES: FusionType[] = ['Post', 'Writing', 'Thesis', 'Report'];
+const FUSION_STATUSES: FusionStatus[] = ['Draft', 'Synthesizing', 'Ready', 'Completed'];
+const FUSION_AUDIENCES: FusionAudience[] = ['Personal', 'Team', 'Public', 'Client'];
+
+function normalizeFusionType(value: unknown, fallback: FusionType = 'Writing'): FusionType {
+  if (typeof value === 'string' && (FUSION_TYPES as string[]).includes(value)) return value as FusionType;
+  if (typeof value === 'string') {
+    const match = FUSION_TYPES.find((t) => t.toLowerCase() === value.toLowerCase());
+    if (match) return match;
+  }
+  return fallback;
+}
+
+function normalizeFusionStatus(value: unknown, fallback: FusionStatus = 'Draft'): FusionStatus {
+  if (typeof value === 'string' && (FUSION_STATUSES as string[]).includes(value)) return value as FusionStatus;
+  if (typeof value === 'string') {
+    const match = FUSION_STATUSES.find((s) => s.toLowerCase() === value.toLowerCase());
+    if (match) return match;
+  }
+  return fallback;
+}
+
+function normalizeFusionAudience(value: unknown, fallback: FusionAudience = 'Personal'): FusionAudience {
+  if (typeof value === 'string' && (FUSION_AUDIENCES as string[]).includes(value)) return value as FusionAudience;
+  if (typeof value === 'string') {
+    const match = FUSION_AUDIENCES.find((a) => a.toLowerCase() === value.toLowerCase());
+    if (match) return match;
+  }
+  return fallback;
+}
+
+function asOptionalString(value: unknown): string | undefined {
+  if (typeof value === 'string') return value;
+  if (value === null || value === undefined) return undefined;
+  return String(value);
+}
 
 function buildAiHistoryContext(messages: ChatMessage[]) {
   const recentMessages = messages.slice(-AI_HISTORY_MESSAGE_LIMIT);
@@ -58,6 +95,7 @@ export default function Chatbot() {
   const deleteProject = useAppStore((state) => state.deleteProject);
   const addFusionItem = useAppStore((state) => state.addFusionItem);
   const updateFusionItem = useAppStore((state) => state.updateFusionItem);
+  const deleteFusionItem = useAppStore((state) => state.deleteFusionItem);
   const addCapabilityBet = useAppStore((state) => state.addCapabilityBet);
   const updateCapabilityBet = useAppStore((state) => state.updateCapabilityBet);
   const userId = useAuthStore((state) => state.userId);
@@ -207,7 +245,21 @@ export default function Chatbot() {
   const findFusionByReference = (value?: string) => {
     const normalized = normalizeText(value);
     if (!normalized) return undefined;
-    return fusionItems.find((item) => normalizeText(item.id) === normalized || normalizeText(item.title) === normalized);
+    // 1) Exact id match (most reliable).
+    const byId = fusionItems.find((item) => normalizeText(item.id) === normalized);
+    if (byId) return byId;
+    // 2) Exact title match (case-insensitive).
+    const byExactTitle = fusionItems.find((item) => normalizeText(item.title) === normalized);
+    if (byExactTitle) return byExactTitle;
+    // 3) Substring match on title — lets "edit the regen-finance fusion"
+    //    resolve to "Regenerative Finance Thesis" instead of failing.
+    //    Picks the shortest title that contains the normalized ref, so
+    //    "Foo" doesn't accidentally resolve to a much longer title.
+    const substringMatches = fusionItems
+      .filter((item) => normalizeText(item.title).includes(normalized))
+      .sort((a, b) => a.title.length - b.title.length);
+    if (substringMatches.length > 0) return substringMatches[0];
+    return undefined;
   };
 
   const findRelatedIdeaIds = (values?: string[]) => {
@@ -289,8 +341,8 @@ export default function Chatbot() {
   };
 
   const explicitlyRequestsBoardWrite = (raw: string) => (
-    /\b(save|store|remember|capture|record|add|create|compile|update)\b[\s\S]{0,40}\b(note|idea|board|inbox|map|knowledge)\b/i.test(raw)
-    || /\b(note|idea)\b[\s\S]{0,40}\b(save|store|remember|capture|record|add|create|compile|update)\b/i.test(raw)
+    /\b(save|store|remember|capture|record|add|create|compile|update|edit|revise|rewrite|expand|mark)\b[\s\S]{0,40}\b(note|idea|board|inbox|map|knowledge|goal|project|fusion|bet|thesis|report|post|writing|synthesis|draft)\b/i.test(raw)
+    || /\b(note|idea|board|inbox|map|knowledge|goal|project|fusion|bet|thesis|report|post|writing|synthesis|draft)\b[\s\S]{0,40}\b(save|store|remember|capture|record|add|create|compile|update|edit|revise|rewrite|expand|mark)\b/i.test(raw)
     || /\b(save|store|remember|capture|record)\s+(this|that|it)\b/i.test(raw)
   );
 
@@ -665,6 +717,9 @@ Tool 8: Create a Fusion item. Use this when the user explicitly requests to synt
   "centralConclusion": "The core takeaway or conclusion",
   "body": "Markdown or text contents",
   "audience": "Personal|Team|Public|Client",
+  "isPublic": false,
+  "authorName": "optional author byline; omit to leave blank for the user to fill in later",
+  "authorBio": "optional one-line author bio for the public fusion page",
   "linkedNotes": ["optional note content snippet or id"],
   "linkedIdeas": ["optional idea title or id"],
   "linkedGoals": ["optional goal title or id"],
@@ -684,6 +739,9 @@ Tool 9: Update an existing Fusion item. Use this when the user asks to edit, rev
     "centralConclusion": "optional replacement conclusion",
     "body": "optional replacement body",
     "audience": "Personal|Team|Public|Client",
+    "isPublic": true,
+    "authorName": "optional updated byline",
+    "authorBio": "optional updated bio",
     "linkedNotes": ["complete replacement note refs when changing note links"],
     "linkedIdeas": ["complete replacement idea refs when changing idea links"],
     "linkedGoals": ["complete replacement goal refs when changing goal links"],
@@ -691,6 +749,13 @@ Tool 9: Update an existing Fusion item. Use this when the user asks to edit, rev
   }
 }
 </toolcall_update_fusion>
+
+Tool 9b: Delete an existing Fusion item. Use this when the user explicitly asks to delete, remove, archive, or get rid of a fusion, post, report, or thesis.
+<toolcall_delete_fusion>
+{
+  "target": "existing fusion title or id"
+}
+</toolcall_delete_fusion>
 
 Tool 10: Create a Capability Bet (Incubation). Use this when the user asks you to track, monitor, or create a strategic capability bet on the incubation board.
 <toolcall_create_capability_bet>
@@ -743,6 +808,7 @@ When the user asks to create or edit a goal or roadmap panel, use toolcall_creat
 When the user explicitly asks to remove a project, use toolcall_delete_project instead of only describing what to do.
 When the user asks to create, synthesize, or write a fusion, post, report, or thesis, use toolcall_create_fusion instead of only describing what to do or creating a regular idea.
 When the user asks to edit an existing fusion, use toolcall_update_fusion.
+When the user explicitly asks to remove or delete a fusion, post, report, or thesis, use toolcall_delete_fusion.
 When the user asks to link notes or evidence to a capability bet, use toolcall_link_notes_to_bet.
 Include the toolcall anywhere in your response. You can use multiple toolcalls if needed.`);
 
@@ -756,6 +822,21 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       );
 
       let cleanText = responseText;
+      // If the LLM hit its output token limit mid-toolcall, the closing tag
+      // is missing and the regex parser would silently drop the call. Detect
+      // that up-front so we can surface a clear error and skip the partial
+      // toolcall instead of letting the user see a hallucinated "I created
+      // the fusion" success.
+      const truncatedToolcallName = detectTruncatedToolcall(responseText);
+      const failedActions: string[] = [];
+      if (truncatedToolcallName) {
+        const err = `The AI response was cut off mid-toolcall (unclosed <toolcall_${truncatedToolcallName}>). ` +
+          `This usually means the body or linked material was larger than the model's output budget. ` +
+          `Try: (1) splitting the fusion into a shorter body with a link to a separate note containing the long form, ` +
+          `or (2) using the Fusion editor directly for very large content.`;
+        failedActions.push(err);
+        console.warn(`[Chatbot] ${err}`);
+      }
       let matchedNote = false;
       let matchedIdea = false;
       let matchedIdeaUpdate = false;
@@ -766,14 +847,18 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       let matchedFusionUpdate = false;
       const allowNoteIdeaWrites = (autoDistill && autoDistillLevel !== 'off') || explicitBoardWrite;
       let blockedInferredWrite = false;
-      const failedActions: string[] = [];
 
       // Extract Create Note tool calls
       const noteRegex = /<toolcall_create_note>([\s\S]*?)<\/toolcall_create_note>/gi;
       let noteMatch;
       while ((noteMatch = noteRegex.exec(responseText)) !== null) {
         const noteContent = noteMatch[1].trim();
-        if (!allowNoteIdeaWrites && noteContent) blockedInferredWrite = true;
+        if (!allowNoteIdeaWrites && noteContent) {
+          blockedInferredWrite = true;
+          failedActions.push(
+            `Inbox note was not saved because Auto-distill is off and the message did not explicitly ask to save. Toggle Auto-distill or say "save this as a note".`,
+          );
+        }
         if (allowNoteIdeaWrites && noteContent && shouldCaptureAsInboxContent(noteContent)) {
           addNote(noteContent);
           const created = useAppStore.getState().notes.find((note) => note.content === noteContent);
@@ -793,6 +878,9 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
           const ideaData = JSON.parse(cleanJsonStr);
           if (!allowNoteIdeaWrites) {
             blockedInferredWrite = true;
+            failedActions.push(
+              `Idea "${ideaData.title || 'Untitled AI Draft'}" was not created because Auto-distill is off and the message did not explicitly ask to save.`,
+            );
             continue;
           }
           const title = ideaData.title || 'Untitled AI Draft';
@@ -952,13 +1040,22 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
         try {
           const cleanJsonStr = deleteProjectMatch[1].trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
           const data = JSON.parse(cleanJsonStr);
-          if (!explicitBoardWrite) continue;
+          if (!explicitBoardWrite) {
+            failedActions.push(
+              `Project deletion of "${data.target || 'unknown'}" was blocked because the message did not explicitly ask to delete/remove it.`,
+            );
+            continue;
+          }
           const targetProject = findProjectByReference(data.target);
-          if (!targetProject) continue;
+          if (!targetProject) {
+            failedActions.push(`Project "${data.target || 'unknown'}" was not found for deletion.`);
+            continue;
+          }
           matchedProjectDelete = true;
           deleteProject(targetProject.id);
         } catch (err) {
           console.error("Failed to parse delete_project toolcall JSON:", err);
+          failedActions.push('Project deletion failed because the toolcall JSON could not be parsed.');
         }
       }
       cleanText = cleanText.replace(deleteProjectRegex, '').trim();
@@ -973,25 +1070,45 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
           const fusionData = JSON.parse(cleanJsonStr);
           if (!allowNoteIdeaWrites) {
             blockedInferredWrite = true;
+            failedActions.push(
+              `Fusion "${fusionData.title || 'Untitled Fusion'}" was not created because Auto-distill is off and the message did not explicitly ask to save it. Toggle Auto-distill or phrase the request as "save a fusion" to enable writes.`,
+            );
             continue;
           }
-          const title = fusionData.title || 'Untitled Fusion';
-          addFusionItem({
+          const title = asOptionalString(fusionData.title)?.trim() || 'Untitled Fusion';
+          // Duplicate-by-title guard: if an existing fusion already has this
+          // title, route the request to update_fusion instead of creating a
+          // duplicate. The model can still ask to update by id via
+          // toolcall_update_fusion directly.
+          const duplicate = findFusionByReference(title);
+          if (duplicate) {
+            failedActions.push(
+              `Fusion "${title}" already exists (id ${duplicate.id}); not creating a duplicate. Use toolcall_update_fusion with target="${title}" to edit it.`,
+            );
+            continue;
+          }
+          const isPublic = typeof fusionData.isPublic === 'boolean' ? fusionData.isPublic : false;
+          const newId = addFusionItem({
             title,
-            type: fusionData.type || 'Writing',
-            status: fusionData.status || 'Draft',
-            summary: fusionData.summary || '',
-            centralConclusion: fusionData.centralConclusion || '',
-            body: fusionData.body || '',
-            audience: fusionData.audience || 'Personal',
+            type: normalizeFusionType(fusionData.type),
+            status: normalizeFusionStatus(fusionData.status),
+            summary: asOptionalString(fusionData.summary) ?? '',
+            centralConclusion: asOptionalString(fusionData.centralConclusion) ?? '',
+            body: asOptionalString(fusionData.body) ?? '',
+            audience: normalizeFusionAudience(fusionData.audience),
+            isPublic,
+            authorName: asOptionalString(fusionData.authorName)?.trim() || undefined,
+            authorBio: asOptionalString(fusionData.authorBio)?.trim() || undefined,
             linkedNoteIds: findRelatedNoteIds(fusionData.linkedNotes),
             linkedIdeaIds: findRelatedIdeaIds(fusionData.linkedIdeas),
             linkedGoalIds: findRelatedGoalIds(fusionData.linkedGoals),
-            linkedProjectIds: findRelatedProjectIds(fusionData.linkedProjects)
+            linkedProjectIds: findRelatedProjectIds(fusionData.linkedProjects),
           });
-          const created = useAppStore.getState().fusionItems.find((item) => item.title === title);
+          // Verify by id (not by title — title collisions are now possible
+          // because we no-op'd on the duplicate path above).
+          const created = useAppStore.getState().fusionItems.find((item) => item.id === newId);
           if (created) matchedFusion = true;
-          else failedActions.push(`Fusion "${title}" was requested but was not found after creation.`);
+          else failedActions.push(`Fusion "${title}" was created with id ${newId} but could not be re-read from the store.`);
         } catch (err) {
           console.error("Failed to parse create_fusion toolcall JSON:", err);
           failedActions.push('Fusion creation failed because the toolcall JSON could not be parsed.');
@@ -1009,6 +1126,9 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
           const data = JSON.parse(cleanJsonStr);
           if (!explicitBoardWrite) {
             blockedInferredWrite = true;
+            failedActions.push(
+              `Fusion update on "${data.target || 'unknown'}" was blocked because the message did not explicitly ask to save/edit/update. Phrase the request as "update the X fusion" or "edit my fusion" to enable writes.`,
+            );
             continue;
           }
           const targetFusion = findFusionByReference(data.target);
@@ -1017,29 +1137,98 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
             continue;
           }
           const updates = data.updates || {};
-          const nextUpdates = {
-            ...(updates.title !== undefined ? { title: String(updates.title) } : {}),
-            ...(updates.type !== undefined ? { type: updates.type } : {}),
-            ...(updates.status !== undefined ? { status: updates.status } : {}),
-            ...(updates.summary !== undefined ? { summary: String(updates.summary) } : {}),
-            ...(updates.centralConclusion !== undefined ? { centralConclusion: String(updates.centralConclusion) } : {}),
-            ...(updates.body !== undefined ? { body: String(updates.body) } : {}),
-            ...(updates.audience !== undefined ? { audience: updates.audience } : {}),
-            ...(Array.isArray(updates.linkedNotes) ? { linkedNoteIds: findRelatedNoteIds(updates.linkedNotes) } : {}),
-            ...(Array.isArray(updates.linkedIdeas) ? { linkedIdeaIds: findRelatedIdeaIds(updates.linkedIdeas) } : {}),
-            ...(Array.isArray(updates.linkedGoals) ? { linkedGoalIds: findRelatedGoalIds(updates.linkedGoals) } : {}),
-            ...(Array.isArray(updates.linkedProjects) ? { linkedProjectIds: findRelatedProjectIds(updates.linkedProjects) } : {}),
-          };
+
+          // Resolve linked refs up-front so we can surface dropped references.
+          const linkedNoteIds = Array.isArray(updates.linkedNotes) ? findRelatedNoteIds(updates.linkedNotes) : undefined;
+          const linkedIdeaIds = Array.isArray(updates.linkedIdeas) ? findRelatedIdeaIds(updates.linkedIdeas) : undefined;
+          const linkedGoalIds = Array.isArray(updates.linkedGoals) ? findRelatedGoalIds(updates.linkedGoals) : undefined;
+          const linkedProjectIds = Array.isArray(updates.linkedProjects) ? findRelatedProjectIds(updates.linkedProjects) : undefined;
+
+          const droppedNotes = Array.isArray(updates.linkedNotes)
+            ? updates.linkedNotes.length - (linkedNoteIds?.length ?? 0)
+            : 0;
+          const droppedIdeas = Array.isArray(updates.linkedIdeas)
+            ? updates.linkedIdeas.length - (linkedIdeaIds?.length ?? 0)
+            : 0;
+          const droppedGoals = Array.isArray(updates.linkedGoals)
+            ? updates.linkedGoals.length - (linkedGoalIds?.length ?? 0)
+            : 0;
+          const droppedProjects = Array.isArray(updates.linkedProjects)
+            ? updates.linkedProjects.length - (linkedProjectIds?.length ?? 0)
+            : 0;
+          const totalDropped = droppedNotes + droppedIdeas + droppedGoals + droppedProjects;
+          if (totalDropped > 0) {
+            failedActions.push(
+              `Fusion "${targetFusion.title}": ${totalDropped} linked reference(s) could not be matched and were dropped (notes=${droppedNotes}, ideas=${droppedIdeas}, goals=${droppedGoals}, projects=${droppedProjects}).`,
+            );
+          }
+
+          const nextUpdates: Record<string, unknown> = {};
+          if (updates.title !== undefined) nextUpdates.title = String(updates.title);
+          if (updates.type !== undefined) nextUpdates.type = normalizeFusionType(updates.type);
+          if (updates.status !== undefined) nextUpdates.status = normalizeFusionStatus(updates.status);
+          if (updates.summary !== undefined) nextUpdates.summary = String(updates.summary);
+          if (updates.centralConclusion !== undefined) nextUpdates.centralConclusion = String(updates.centralConclusion);
+          if (updates.body !== undefined) nextUpdates.body = String(updates.body);
+          if (updates.audience !== undefined) nextUpdates.audience = normalizeFusionAudience(updates.audience);
+          if (typeof updates.isPublic === 'boolean') nextUpdates.isPublic = updates.isPublic;
+          if (updates.authorName !== undefined) nextUpdates.authorName = String(updates.authorName).trim() || undefined;
+          if (updates.authorBio !== undefined) nextUpdates.authorBio = String(updates.authorBio).trim() || undefined;
+          if (linkedNoteIds !== undefined) nextUpdates.linkedNoteIds = linkedNoteIds;
+          if (linkedIdeaIds !== undefined) nextUpdates.linkedIdeaIds = linkedIdeaIds;
+          if (linkedGoalIds !== undefined) nextUpdates.linkedGoalIds = linkedGoalIds;
+          if (linkedProjectIds !== undefined) nextUpdates.linkedProjectIds = linkedProjectIds;
+
           updateFusionItem(targetFusion.id, nextUpdates);
+          // Verify by id (the previous id-based lookup is already the right key,
+          // but we also confirm the field we expected to change did change).
           const updated = useAppStore.getState().fusionItems.find((item) => item.id === targetFusion.id);
-          if (updated && (updates.title === undefined || updated.title === String(updates.title))) matchedFusionUpdate = true;
-          else failedActions.push(`Fusion "${targetFusion.title}" update was requested but could not be verified.`);
+          if (!updated) {
+            failedActions.push(`Fusion "${targetFusion.title}" update could not be verified in the store.`);
+            continue;
+          }
+          if (updates.title !== undefined && updated.title !== String(updates.title)) {
+            failedActions.push(`Fusion title update was rejected by the store (current: "${updated.title}").`);
+            continue;
+          }
+          matchedFusionUpdate = true;
         } catch (err) {
           console.error("Failed to parse update_fusion toolcall JSON:", err);
           failedActions.push('Fusion update failed because the toolcall JSON could not be parsed.');
         }
       }
       cleanText = cleanText.replace(updateFusionRegex, '').trim();
+
+      // Extract Delete Fusion tool calls
+      const deleteFusionRegex = /<toolcall_delete_fusion>([\s\S]*?)<\/toolcall_delete_fusion>/gi;
+      let deleteFusionMatch;
+      let matchedFusionDelete = false;
+      while ((deleteFusionMatch = deleteFusionRegex.exec(responseText)) !== null) {
+        try {
+          const jsonStr = deleteFusionMatch[1].trim();
+          const cleanJsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+          const data = JSON.parse(cleanJsonStr);
+          if (!explicitBoardWrite) {
+            failedActions.push(
+              `Fusion deletion of "${data.target || 'unknown'}" was blocked because the message did not explicitly ask to delete/remove it.`,
+            );
+            continue;
+          }
+          const targetFusion = findFusionByReference(data.target);
+          if (!targetFusion) {
+            failedActions.push(`Fusion "${data.target || 'unknown'}" was not found for deletion.`);
+            continue;
+          }
+          deleteFusionItem(targetFusion.id);
+          const stillThere = useAppStore.getState().fusionItems.find((item) => item.id === targetFusion.id);
+          if (!stillThere) matchedFusionDelete = true;
+          else failedActions.push(`Fusion "${targetFusion.title}" deletion could not be verified.`);
+        } catch (err) {
+          console.error("Failed to parse delete_fusion toolcall JSON:", err);
+          failedActions.push('Fusion deletion failed because the toolcall JSON could not be parsed.');
+        }
+      }
+      cleanText = cleanText.replace(deleteFusionRegex, '').trim();
 
       // Extract Create Capability Bet tool calls
       const createBetRegex = /<toolcall_create_capability_bet>([\s\S]*?)<\/toolcall_create_capability_bet>/gi;
@@ -1052,6 +1241,9 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
           const data = JSON.parse(cleanJsonStr);
           if (!allowNoteIdeaWrites) {
             blockedInferredWrite = true;
+            failedActions.push(
+              `Capability Bet "${data.title || 'Untitled Capability Bet'}" was not created because Auto-distill is off and the message did not explicitly ask to save it.`,
+            );
             continue;
           }
           const title = data.title || 'Untitled Capability Bet';
@@ -1160,7 +1352,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
       cleanText = cleanText.replace(linkNotesToBetRegex, '').trim();
 
       let actionMessage = '';
-      if (matchedNote || matchedIdea || matchedIdeaUpdate || matchedPersona || matchedGoal || matchedGoalUpdate || matchedProjectDelete || matchedFusion || matchedFusionUpdate || matchedCapabilityBet || matchedCapabilityBetUpdate || matchedNoteBetLinks || failedActions.length) {
+      if (matchedNote || matchedIdea || matchedIdeaUpdate || matchedPersona || matchedGoal || matchedGoalUpdate || matchedProjectDelete || matchedFusion || matchedFusionUpdate || matchedFusionDelete || matchedCapabilityBet || matchedCapabilityBetUpdate || matchedNoteBetLinks || failedActions.length) {
         actionMessage = "\n\n*(AI: ";
         const acts = [];
         if (matchedNote) acts.push("added to Inbox");
@@ -1172,6 +1364,7 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
         if (matchedProjectDelete) acts.push("deleted Project");
         if (matchedFusion) acts.push("created Fusion item");
         if (matchedFusionUpdate) acts.push("updated Fusion item");
+        if (matchedFusionDelete) acts.push("deleted Fusion item");
         if (matchedCapabilityBet) acts.push("created Capability Bet");
         if (matchedCapabilityBetUpdate) acts.push("updated Capability Bet");
         if (matchedNoteBetLinks) acts.push("linked notes to Capability Bet");

@@ -53,6 +53,7 @@ async function fetchChatCompletion(
   payload: {
     model: string;
     temperature: number;
+    max_tokens: number;
     messages: Array<{ role: string; content: string }>;
   },
 ) {
@@ -73,6 +74,12 @@ async function fetchChatCompletion(
   }
 }
 
+// Generous budget so the model can emit large fusion bodies inside a
+// <toolcall_create_fusion> block without truncating the closing JSON / tag.
+// Tuned for Ollama `num_predict` semantics — typical gemma defaults of 2-4K
+// tokens are too small for a full-length write-up.
+const CHAT_COMPLETION_MAX_TOKENS = 16384;
+
 function extractJsonObject(raw: string) {
   const trimmed = raw.trim();
   if (!trimmed) return trimmed;
@@ -92,6 +99,8 @@ function extractJsonObject(raw: string) {
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
+
+export { detectTruncatedToolcall } from './aiTruncation';
 
 function normalizeText(value: string) {
   return value
@@ -245,6 +254,7 @@ async function callGemma(prompt: string, systemInstruction: string) {
     response = await fetchChatCompletion(runtime.chatCompletionsUrl, requestHeaders, {
       model: runtime.model,
       temperature: 0.4,
+      max_tokens: CHAT_COMPLETION_MAX_TOKENS,
       messages: [
         { role: 'system', content: systemInstruction },
         { role: 'user', content: prompt },
