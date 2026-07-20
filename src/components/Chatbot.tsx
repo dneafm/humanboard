@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { askGemma, buildMemoryShapedSystemInstruction, getGemmaRuntimeStatus, analyzeImageToNote, extractWebContent, detectTruncatedToolcall } from '../lib/ai';
+import { diffFusionFields } from '../lib/fusionUpdateDiff';
 import { getClipboardImage } from '../lib/imageNote';
 import { getStoredAutoDistillLevel, autoDistillInstructionForLevel } from '../lib/autoDistill';
 import { shouldTreatAsMeaningfulNote } from '../lib/noteQuality';
@@ -1179,9 +1180,29 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
           if (linkedGoalIds !== undefined) nextUpdates.linkedGoalIds = linkedGoalIds;
           if (linkedProjectIds !== undefined) nextUpdates.linkedProjectIds = linkedProjectIds;
 
+          // No-op guard 1: the model emitted a toolcall with no changeable
+          // fields. This usually means the model is hallucinating the
+          // update (e.g. it rewrote only the prose and forgot the JSON).
+          if (Object.keys(nextUpdates).length === 0) {
+            failedActions.push(
+              `Fusion "${targetFusion.title}" update was requested but the toolcall contained no changeable fields. ` +
+              `The model may have hallucinated the update — try rephrasing the request with explicit fields to change.`,
+            );
+            continue;
+          }
+
+          // Snapshot the current values of the fields we're about to change
+          // so we can verify the update actually mutated them — not just
+          // bumped `updatedAt`. This catches the "I marked it Ready but
+          // it was already Ready" / "I added note X but the title was
+          // already X" failure modes where the bot claims success but
+          // nothing visible changed.
+          const before: Record<string, unknown> = {};
+          for (const key of Object.keys(nextUpdates)) {
+            before[key] = (targetFusion as unknown as Record<string, unknown>)[key];
+          }
+
           updateFusionItem(targetFusion.id, nextUpdates);
-          // Verify by id (the previous id-based lookup is already the right key,
-          // but we also confirm the field we expected to change did change).
           const updated = useAppStore.getState().fusionItems.find((item) => item.id === targetFusion.id);
           if (!updated) {
             failedActions.push(`Fusion "${targetFusion.title}" update could not be verified in the store.`);
@@ -1189,6 +1210,23 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
           }
           if (updates.title !== undefined && updated.title !== String(updates.title)) {
             failedActions.push(`Fusion title update was rejected by the store (current: "${updated.title}").`);
+            continue;
+          }
+
+          // No-op guard 2: every value the model supplied already matched
+          // the current state. Surfacing this stops the chatbot from
+          // telling the user "done" when nothing actually moved.
+          const after: Record<string, unknown> = {};
+          for (const key of Object.keys(nextUpdates)) {
+            after[key] = (updated as unknown as Record<string, unknown>)[key];
+          }
+          const changedFields = diffFusionFields(before, after, nextUpdates);
+          if (changedFields.length === 0) {
+            failedActions.push(
+              `Fusion "${targetFusion.title}" update was a no-op: the values supplied by the model already match the current state ` +
+              `for [${Object.keys(nextUpdates).join(', ')}]. The chatbot said it updated the fusion but nothing actually changed. ` +
+              `Try a more specific instruction, e.g. "add concrete details about X" or "rewrite the conclusion to emphasize Y".`,
+            );
             continue;
           }
           matchedFusionUpdate = true;
