@@ -632,6 +632,15 @@ ${autoDistill
   : `Do not create notes or ideas unless the user explicitly asks you to save, capture, remember, add, create, compile, or update one. Continue answering normally without writing inferred information to the board.`}
 Only save content that belongs in the HumanBoard database. Do NOT save operational chatter about patching/debugging the app, UI bug reports, build/restart requests, or implementation instructions unless the user explicitly says to store them as knowledge.
 
+CRITICAL TOOLCALL DISCIPLINE — read this carefully:
+- If you intend to perform a tool action (create, update, delete, link), the toolcall tag MUST appear in your response, formatted exactly as shown below (e.g. \`<toolcall_update_fusion>...</toolcall_update_fusion>\`).
+- DO NOT write "I will do X", "Now creating...", "Removing the old one:", "Updating the body...", "First...", "Then...", "The draft should now...", or any similar narrative scaffolding WITHOUT a matching toolcall in the same response. The user reads this prose as a successful action and assumes the change happened — but nothing was actually written.
+- If you cannot emit a toolcall for any reason, you MUST NOT claim an action was performed. Say "I can't perform this action right now" or "I need X to do this" instead.
+- Examples:
+    WRONG: "I'll delete the old fusion and create a new one.\n\nFirst, removing the old one:\n\nNow creating the new fusion with a synthesized body:\n\nRefresh your Fusion page."
+    RIGHT: "I'll delete the old fusion and create a new one.\n\n<toolcall_delete_fusion>\n{ \"target\": \"The Abstract Control Protocol\" }\n</toolcall_delete_fusion>\n\n<toolcall_create_fusion>\n{ \"title\": \"The Abstract Control Protocol\", \"type\": \"Thesis\", ... }\n</toolcall_create_fusion>"
+- When the user asks you to perform a tool action, the toolcall tag is the action. Prose is optional. Prose without a toolcall when a tool action was requested is a failure mode.
+
 Tool 1: Create an inbox note. Use this to save an episodic memory, raw thought, or quick fact.
 <toolcall_create_note>The text of the note goes here</toolcall_create_note>
 
