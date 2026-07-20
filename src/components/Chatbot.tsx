@@ -1210,9 +1210,77 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
             });
             continue;
           }
+          const updates = data.updates || {};
+          // Resolve linked refs up-front so we can surface dropped references.
+          const linkedNoteIds = Array.isArray(updates.linkedNotes) ? findRelatedNoteIds(updates.linkedNotes) : undefined;
+          const linkedIdeaIds = Array.isArray(updates.linkedIdeas) ? findRelatedIdeaIds(updates.linkedIdeas) : undefined;
+          const linkedGoalIds = Array.isArray(updates.linkedGoals) ? findRelatedGoalIds(updates.linkedGoals) : undefined;
+          const linkedProjectIds = Array.isArray(updates.linkedProjects) ? findRelatedProjectIds(updates.linkedProjects) : undefined;
           const targetFusion = findFusionByReference(data.target);
           if (!targetFusion) {
-            failedActions.push(`Fusion "${data.target || 'unknown'}" was not found.`);
+            // Auto-create fallback: when the LLM tried to update a
+            // fusion that doesn't exist BUT the toolcall has substantive
+            // body/summary/conclusion content, create the fusion
+            // instead of failing. The user can always delete the new
+            // fusion from the Fusion page if it wasn't what they wanted.
+            //
+            // This handles the common "fresh start" flow where the user
+            // asks the bot to delete + recreate, but the LLM only
+            // described the delete (caught by the hallucination detector)
+            // and then later tries to update a fusion that no longer
+            // exists in its mental model.
+            const bodyText = asOptionalString(updates.body) ?? '';
+            const summaryText = asOptionalString(updates.summary) ?? '';
+            const conclusionText = asOptionalString(updates.centralConclusion) ?? '';
+            const hasContent = bodyText.length > 0 || summaryText.length > 0 || conclusionText.length > 0;
+            if (hasContent) {
+              const newTitle = asOptionalString(data.target)?.trim()
+                || asOptionalString(updates.title)?.trim()
+                || 'Untitled Fusion';
+              const newId = addFusionItem({
+                title: newTitle,
+                type: normalizeFusionType(updates.type),
+                status: normalizeFusionStatus(updates.status),
+                summary: summaryText,
+                centralConclusion: conclusionText,
+                body: bodyText,
+                audience: normalizeFusionAudience(updates.audience),
+                isPublic: typeof updates.isPublic === 'boolean' ? updates.isPublic : false,
+                authorName: asOptionalString(updates.authorName)?.trim() || undefined,
+                authorBio: asOptionalString(updates.authorBio)?.trim() || undefined,
+                linkedNoteIds: linkedNoteIds ?? [],
+                linkedIdeaIds: linkedIdeaIds ?? [],
+                linkedGoalIds: linkedGoalIds ?? [],
+                linkedProjectIds: linkedProjectIds ?? [],
+              });
+              const created = useAppStore.getState().fusionItems.find((item) => item.id === newId);
+              if (created) {
+                matchedFusion = true;
+                recordDebugEvent({
+                  type: 'toolcall_applied',
+                  label: 'toolcall_update_fusion (auto-created from orphan update)',
+                  payload: {
+                    newId,
+                    newTitle,
+                    reason: 'target-not-found but toolcall had body content — auto-created',
+                    bodyChars: bodyText.length,
+                    summaryChars: summaryText.length,
+                    conclusionChars: conclusionText.length,
+                  },
+                });
+                failedActions.push(
+                  `Fusion "${data.target}" didn't exist in your vault, so I created a new fusion with the content from the update toolcall. ` +
+                  `If you wanted to update an existing fusion, the title may have changed earlier in this session. ` +
+                  `You can rename or delete the new fusion from the Fusion page.`,
+                );
+                continue;
+              }
+            }
+            failedActions.push(
+              `Fusion "${data.target || 'unknown'}" was not found in your vault. ` +
+              `Existing fusions: ${fusionItems.map((f) => f.title).slice(0, 6).join(', ') || '(none)'}. ` +
+              `To create a new one, ask the chatbot to "create a fusion called '${data.target}'" or use the Fusion editor directly.`,
+            );
             recordDebugEvent({
               type: 'toolcall_skipped',
               label: 'toolcall_update_fusion',
@@ -1224,13 +1292,11 @@ Include the toolcall anywhere in your response. You can use multiple toolcalls i
             });
             continue;
           }
-          const updates = data.updates || {};
 
           // Resolve linked refs up-front so we can surface dropped references.
-          const linkedNoteIds = Array.isArray(updates.linkedNotes) ? findRelatedNoteIds(updates.linkedNotes) : undefined;
-          const linkedIdeaIds = Array.isArray(updates.linkedIdeas) ? findRelatedIdeaIds(updates.linkedIdeas) : undefined;
-          const linkedGoalIds = Array.isArray(updates.linkedGoals) ? findRelatedGoalIds(updates.linkedGoals) : undefined;
-          const linkedProjectIds = Array.isArray(updates.linkedProjects) ? findRelatedProjectIds(updates.linkedProjects) : undefined;
+          // (linkedNoteIds/linkedIdeaIds/linkedGoalIds/linkedProjectIds
+          // are now declared at the top of the update_fusion block so
+          // the target-not-found auto-create branch can use them too.)
 
           const droppedNotes = Array.isArray(updates.linkedNotes)
             ? updates.linkedNotes.length - (linkedNoteIds?.length ?? 0)
