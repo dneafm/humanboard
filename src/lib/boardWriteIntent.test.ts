@@ -35,6 +35,28 @@ test('returns true for natural phrasings the old regex missed (the live bug)', (
   assert.equal(detectBoardWriteIntent('try again'), true);
   assert.equal(detectBoardWriteIntent('go'), true);
   assert.equal(detectBoardWriteIntent('proceed'), true);
+  // The second live bug: "include small examples between each pillar"
+  // (47 chars) was blocked because the verb list didn't have "include".
+  // The LLM understood the intent perfectly and emitted a 5445-char
+  // body in toolcall_update_fusion, but the gate was closed.
+  assert.equal(detectBoardWriteIntent('include small examples between each pillar'), true);
+  assert.equal(detectBoardWriteIntent('incorporate more context'), true);
+  assert.equal(detectBoardWriteIntent('elaborate on the first pillar'), true);
+  assert.equal(detectBoardWriteIntent('refine the diagnostic filter'), true);
+  assert.equal(detectBoardWriteIntent('polish the opening paragraph'), true);
+  assert.equal(detectBoardWriteIntent('tighten the conclusion'), true);
+  assert.equal(detectBoardWriteIntent('improve the body'), true);
+  assert.equal(detectBoardWriteIntent('extend the body with more examples'), true);
+  assert.equal(detectBoardWriteIntent('flesh out the three pillars'), true);
+  assert.equal(detectBoardWriteIntent('show the full body in the fusion'), true);
+  assert.equal(detectBoardWriteIntent('embed the linked ideas in the body'), true);
+  assert.equal(detectBoardWriteIntent('add to the body'), true);
+  assert.equal(detectBoardWriteIntent('include in the body'), true);
+  assert.equal(detectBoardWriteIntent('with examples'), true);
+  assert.equal(detectBoardWriteIntent('with more context'), true);
+  assert.equal(detectBoardWriteIntent('with details'), true);
+  assert.equal(detectBoardWriteIntent('flesh out'), true);
+  assert.equal(detectBoardWriteIntent('fill in'), true);
 });
 
 test('returns false for empty / null / undefined', () => {

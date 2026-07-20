@@ -17,7 +17,7 @@
  * bot was broken.
  */
 
-const WRITE_VERB_RE = /\b(save|store|remember|capture|record|add|create|compile|update|edit|revise|rewrite|expand|mark|attempt|try|change|modify|set|put|write|fill|populate|refresh|redo|rerun|reapply|fix|replace|swap|append|insert|delete|remove|drop|draft|compose|build|post|publish|share|send|keep|log|note|mention|make|generate|new|resubmit|do|call|execute|use|invoke|run|go|proceed|continue|retry|process|apply|update it|do it|do that|do this|fix it|change it|try again|try it|call the tool|use the tool|invoke the tool|run the tool|use the toolcall|use toolcall)\b/i;
+const WRITE_VERB_RE = /\b(save|store|remember|capture|record|add|create|compile|update|edit|revise|rewrite|expand|mark|attempt|try|change|modify|set|put|write|fill|populate|refresh|redo|rerun|reapply|fix|replace|swap|append|insert|delete|remove|drop|draft|compose|build|post|publish|share|send|keep|log|note|mention|make|generate|new|resubmit|do|call|execute|use|invoke|run|go|proceed|continue|retry|process|apply|include|incorporate|populate|elaborate|refine|polish|tighten|improve|extend|flesh|show|display|alter|rewrite|redo|embed|tuck|throw|slip|sprinkle|update it|do it|do that|do this|fix it|change it|try again|try it|call the tool|use the tool|invoke the tool|run the tool|use the toolcall|use toolcall|include in|add in|add some|add more|include more|flesh out|fill in|add to|include in the|add in the|add to the|include to the|include in body|add to body|with examples|with more|with details|with context|with some|with a)\b/i;
 
 /**
  * Subset of WRITE_VERB_RE used when looking for a verb after a
