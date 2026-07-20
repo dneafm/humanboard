@@ -24,6 +24,17 @@ test('returns true for natural phrasings the old regex missed (the live bug)', (
   assert.equal(detectBoardWriteIntent('generate a thesis draft'), true);
   assert.equal(detectBoardWriteIntent('make a new fusion'), true);
   assert.equal(detectBoardWriteIntent('post the body of the fusion'), true);
+  // The follow-up "actually do it" follow-ups — user telling the bot
+  // to invoke the toolcall mechanism explicitly.
+  assert.equal(detectBoardWriteIntent('call the tool'), true);
+  assert.equal(detectBoardWriteIntent('use the tool'), true);
+  assert.equal(detectBoardWriteIntent('use the toolcall'), true);
+  assert.equal(detectBoardWriteIntent('do it'), true);
+  assert.equal(detectBoardWriteIntent('do that'), true);
+  assert.equal(detectBoardWriteIntent('fix it'), true);
+  assert.equal(detectBoardWriteIntent('try again'), true);
+  assert.equal(detectBoardWriteIntent('go'), true);
+  assert.equal(detectBoardWriteIntent('proceed'), true);
 });
 
 test('returns false for empty / null / undefined', () => {
