@@ -32,6 +32,8 @@ export default function PublicFusionPage() {
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
+  const [subscribeError, setSubscribeError] = useState<string | null>(null);
+  const [subscribePending, setSubscribePending] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -91,11 +93,30 @@ export default function PublicFusionPage() {
     }
   }, [data]);
 
-  const handleSubscribe = (e: React.FormEvent) => {
+  const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email.trim()) {
+    const trimmed = email.trim();
+    if (!trimmed) return;
+    if (subscribePending) return;
+    setSubscribeError(null);
+    setSubscribePending(true);
+    try {
+      const response = await fetch('/api/public/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: trimmed, fusionId: data?.fusion?.id || undefined }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        setSubscribeError(payload?.error || 'Could not subscribe. Please try again.');
+        return;
+      }
       setSubscribed(true);
       setEmail('');
+    } catch (err) {
+      setSubscribeError(err instanceof Error ? err.message : 'Network error. Please try again.');
+    } finally {
+      setSubscribePending(false);
     }
   };
 
@@ -154,10 +175,13 @@ export default function PublicFusionPage() {
             </span>
           </div>
           <div className="flex items-center gap-4">
+            <a href="/shared" className="text-xs font-semibold text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors">
+              All posts
+            </a>
             <a href="/" className="text-xs font-semibold text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors">
               Workspace
             </a>
-            <button 
+            <button
               onClick={() => {
                 const el = document.getElementById('subscribe-section');
                 el?.scrollIntoView({ behavior: 'smooth' });
@@ -247,21 +271,33 @@ export default function PublicFusionPage() {
               ✓ Subscribed! You are now added to the publication list.
             </div>
           ) : (
-            <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-              <input 
-                type="email"
-                required
-                placeholder="Enter your email address..."
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                className="flex-1 bg-white dark:bg-stone-950 border border-stone-200 dark:border-stone-850 rounded-xl px-4 py-3 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-400 dark:focus:border-stone-700 transition-colors shadow-inner"
-              />
-              <button 
-                type="submit"
-                className="bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 px-6 py-3 rounded-xl hover:opacity-90 transition-all font-semibold text-sm shadow-md"
-              >
-                Subscribe
-              </button>
+            <form onSubmit={handleSubscribe} className="flex flex-col gap-3 max-w-md mx-auto">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="email"
+                  required
+                  placeholder="Enter your email address..."
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  disabled={subscribePending}
+                  className="flex-1 bg-white dark:bg-stone-950 border border-stone-200 dark:border-stone-850 rounded-xl px-4 py-3 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-stone-400 dark:focus:border-stone-700 transition-colors shadow-inner disabled:opacity-60"
+                />
+                <button
+                  type="submit"
+                  disabled={subscribePending}
+                  className="bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 px-6 py-3 rounded-xl hover:opacity-90 transition-all font-semibold text-sm shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {subscribePending ? 'Subscribing...' : 'Subscribe'}
+                </button>
+              </div>
+              {subscribeError && (
+                <div className="text-xs text-rose-700 dark:text-rose-300 text-center">
+                  {subscribeError}
+                </div>
+              )}
+              <div className="text-[11px] text-stone-400 dark:text-stone-500 text-center">
+                Or read the <a href="/shared" className="underline hover:text-stone-700 dark:hover:text-stone-200">latest posts</a> · <a href="/feed.xml" className="underline hover:text-stone-700 dark:hover:text-stone-200">RSS feed</a>
+              </div>
             </form>
           )}
         </section>
@@ -269,10 +305,18 @@ export default function PublicFusionPage() {
         {/* Other Publications Section */}
         {otherFusions.length > 0 && (
           <section className="border-t border-stone-200/60 dark:border-stone-900/60 pt-16 mt-16">
-            <h4 className="font-serif text-xl font-bold text-stone-950 dark:text-stone-50 mb-8 tracking-tight flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-stone-500" />
-              Other publications by this author
-            </h4>
+            <div className="flex items-end justify-between mb-8 gap-4">
+              <h4 className="font-serif text-xl font-bold text-stone-950 dark:text-stone-50 tracking-tight flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-stone-500" />
+                Other publications by this author
+              </h4>
+              <Link
+                to={`/shared/author/${encodeURIComponent(authorName)}`}
+                className="text-[10px] font-bold uppercase tracking-widest text-stone-700 hover:text-stone-950 dark:text-stone-300 dark:hover:text-stone-50 transition-colors shrink-0"
+              >
+                View all <ArrowUpRight className="inline w-3 h-3" />
+              </Link>
+            </div>
             <div className="grid gap-6 sm:grid-cols-2">
               {otherFusions.map(item => (
                 <Link 

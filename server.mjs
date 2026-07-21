@@ -18,6 +18,8 @@ const DIST_DIR = path.join(__dirname, 'dist');
 const PACKAGE_JSON_PATH = path.join(__dirname, 'package.json');
 const LEGACY_SNAPSHOT_PATH = path.resolve(process.env.HUMANBOARD_SNAPSHOT_PATH || path.join(__dirname, 'snapshot.json'));
 const USER_DATA_DIR = path.resolve(process.env.HUMANBOARD_USER_DATA_DIR || path.join(__dirname, 'data', 'users'));
+const PUBLIC_DATA_DIR = path.resolve(process.env.HUMANBOARD_PUBLIC_DATA_DIR || path.join(__dirname, 'data', 'public'));
+const SUBSCRIBERS_PATH = path.join(PUBLIC_DATA_DIR, 'subscribers.json');
 const AI_ERA_DB_PATH = process.env.AI_ERA_KB_PATH || 'F:/backtest/ai-era-kb/ai_era_kb.sqlite3';
 const AI_BASE_URL = String(process.env.AI_BASE_URL || process.env.GEMMA_BASE_URL || 'http://127.0.0.1:11434/v1').replace(/\/+$/, '');
 const AI_API_KEY = String(process.env.AI_API_KEY || process.env.GEMMA_API_KEY || '').trim();
@@ -801,6 +803,133 @@ app.get('/api/public/fusion/:id', async (req, res) => {
   }
 });
 
+app.post('/api/public/subscribe', express.json({ limit: '10kb' }), async (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    res.status(400).json({ error: 'Please enter a valid email address.' });
+    return;
+  }
+  const sourceFusionId = String(req.body?.fusionId || '').trim().slice(0, 128) || null;
+  const referrer = String(req.headers.referer || '').slice(0, 500) || null;
+  try {
+    const subscribers = await loadSubscribers();
+    if (subscribers.some((s) => s.email === email)) {
+      res.json({ success: true, alreadySubscribed: true });
+      return;
+    }
+    subscribers.push({
+      id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      email,
+      sourceFusionId,
+      referrer,
+      subscribedAt: new Date().toISOString(),
+      ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null,
+    });
+    await saveSubscribers(subscribers);
+    pushRuntimeEvent('info', 'subscriber_added', `New subscriber: ${email}`, { sourceFusionId, referrer });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to save subscriber' });
+  }
+});
+
+app.get('/api/public/fusions', async (_req, res) => {
+  try {
+    const fusions = await listAllPublicFusions();
+    res.json({ fusions, count: fusions.length });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to list public fusions' });
+  }
+});
+
+app.get('/api/public/author/:name', async (req, res) => {
+  const name = decodeURIComponent(req.params.name || '').trim();
+  if (!name) {
+    res.status(400).json({ error: 'Missing author name' });
+    return;
+  }
+  try {
+    const fusions = await listAllPublicFusions();
+    const matches = fusions.filter((f) => (f.authorName || '').toLowerCase() === name.toLowerCase());
+    if (matches.length === 0) {
+      res.status(404).json({ error: 'Author not found' });
+      return;
+    }
+    res.json({
+      author: {
+        name: matches[0].authorName,
+        bio: matches[0].authorBio,
+      },
+      fusions: matches,
+      count: matches.length,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load author' });
+  }
+});
+
+app.get('/api/admin/subscribers', async (_req, res) => {
+  try {
+    const subscribers = await loadSubscribers();
+    res.json({ subscribers, count: subscribers.length });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load subscribers' });
+  }
+});
+
+app.get('/api/og/fusion/:id', async (req, res) => {
+  const fusion = await getPublicFusionData(req.params.id);
+  if (!fusion) {
+    res.status(404).type('text/plain').send('Fusion not found or not public');
+    return;
+  }
+  const svg = buildOgImageSvg({
+    title: fusion.title,
+    summary: fusion.summary,
+    author: fusion.authorName,
+    type: fusion.type,
+  });
+  res.set('Content-Type', 'image/svg+xml; charset=utf-8');
+  res.set('Cache-Control', 'public, max-age=300, s-maxage=3600');
+  res.send(svg);
+});
+
+app.get('/feed.xml', async (req, res) => {
+  try {
+    const fusions = await listAllPublicFusions();
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const items = fusions.slice(0, 50).map((f) => {
+      const link = `${baseUrl}/shared/fusion/${encodeURIComponent(f.id)}`;
+      const pubDate = new Date(f.createdAt || f.updatedAt || Date.now()).toUTCString();
+      return `    <item>
+      <title>${escapeXml(f.title || 'Untitled')}</title>
+      <link>${link}</link>
+      <guid isPermaLink="true">${link}</guid>
+      <description>${escapeXml(f.summary || '')}</description>
+      <dc:creator>${escapeXml(f.authorName || 'HumanBoard Creator')}</dc:creator>
+      <pubDate>${pubDate}</pubDate>
+    </item>`;
+    }).join('\n');
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>HumanBoard Publication</title>
+    <link>${baseUrl}/shared</link>
+    <description>Consolidated strategic insights, principles, and project directions.</description>
+    <language>en-us</language>
+    <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
+    <atom:link href="${baseUrl}/feed.xml" rel="self" type="application/rss+xml" />
+${items}
+  </channel>
+</rss>`;
+    res.set('Content-Type', 'application/rss+xml; charset=utf-8');
+    res.set('Cache-Control', 'public, max-age=300');
+    res.send(xml);
+  } catch (error) {
+    res.status(500).send('Feed error');
+  }
+});
+
 app.get('/api/snapshot', async (req, res) => {
   const userId = await requireUserId(req, res);
   if (!userId) return;
@@ -1071,8 +1200,117 @@ async function getPublicFusionData(fusionId) {
   return null;
 }
 
+function escapeXml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function wrapText(text, maxChars) {
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  const lines = [];
+  let current = '';
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length > maxChars && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.slice(0, 4);
+}
+
+async function loadSubscribers() {
+  if (!existsSync(SUBSCRIBERS_PATH)) return [];
+  try {
+    const raw = await fs.readFile(SUBSCRIBERS_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveSubscribers(subscribers) {
+  await fs.mkdir(PUBLIC_DATA_DIR, { recursive: true });
+  const tmp = `${SUBSCRIBERS_PATH}.tmp`;
+  await fs.writeFile(tmp, JSON.stringify(subscribers, null, 2), 'utf-8');
+  await fs.rename(tmp, SUBSCRIBERS_PATH);
+}
+
+async function listAllPublicFusions() {
+  if (!existsSync(USER_DATA_DIR)) return [];
+  const entries = await fs.readdir(USER_DATA_DIR, { withFileTypes: true });
+  const all = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const snapshotPath = path.join(USER_DATA_DIR, entry.name, 'snapshot.json');
+    if (!existsSync(snapshotPath)) continue;
+    try {
+      const raw = await fs.readFile(snapshotPath, 'utf-8');
+      const parsed = JSON.parse(raw);
+      const fusions = Array.isArray(parsed.fusionItems) ? parsed.fusionItems : [];
+      for (const fusion of fusions) {
+        if (!fusion.isPublic) continue;
+        all.push({
+          id: fusion.id,
+          title: fusion.title,
+          summary: fusion.summary,
+          type: fusion.type,
+          audience: fusion.audience,
+          createdAt: fusion.createdAt,
+          updatedAt: fusion.updatedAt,
+          authorName: fusion.authorName || 'HumanBoard Creator',
+          authorBio: fusion.authorBio || '',
+          authorId: entry.name,
+        });
+      }
+    } catch (e) {
+      console.error(`Error scanning snapshot ${snapshotPath}:`, e);
+    }
+  }
+  all.sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
+  return all;
+}
+
+function buildOgImageSvg({ title, summary, author, type }) {
+  const lines = wrapText(title || 'Untitled', 26);
+  const titleSvg = lines
+    .map((line, i) => `<text x="80" y="${220 + i * 70}" font-family="Georgia, 'Times New Roman', serif" font-size="56" font-weight="700" fill="#1c1917">${escapeXml(line)}</text>`)
+    .join('\n  ');
+  const summaryText = summary ? escapeXml(summary.slice(0, 180)) : '';
+  const summaryTruncated = summary && summary.length > 180;
+  const authorText = escapeXml(author || 'HumanBoard Creator');
+  const typeText = escapeXml((type || 'Post').toUpperCase());
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fafaf9"/>
+      <stop offset="100%" stop-color="#e7e5e4"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect x="0" y="0" width="8" height="630" fill="#f59e0b"/>
+  <text x="80" y="120" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="22" font-weight="700" fill="#78716c" letter-spacing="6">${typeText}</text>
+  ${titleSvg}
+  ${summaryText ? `<text x="80" y="500" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="26" fill="#57534e">${summaryText}${summaryTruncated ? '...' : ''}</text>` : ''}
+  <text x="80" y="580" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="22" font-weight="600" fill="#1c1917">${authorText}</text>
+  <text x="1120" y="580" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="18" font-weight="700" fill="#a8a29e" text-anchor="end" letter-spacing="2">HUMANBOARD</text>
+</svg>`;
+}
+
 app.use(async (req, res, next) => {
   if (req.path.startsWith('/api/')) {
+    return next();
+  }
+  if (req.path === '/feed.xml') {
     return next();
   }
 
@@ -1082,6 +1320,12 @@ app.use(async (req, res, next) => {
     return;
   }
 
+  const host = req.get('host') || '';
+  const protocol = req.protocol;
+  const baseUrl = `${protocol}://${host}`;
+  const canonicalUrl = `${baseUrl}${req.originalUrl}`;
+
+  // /shared/fusion/:id - single post with full SEO (og:image, twitter:card, JSON-LD)
   const isSharedFusion = req.path.startsWith('/shared/fusion/');
   if (isSharedFusion) {
     const fusionId = req.path.split('/').pop();
@@ -1089,52 +1333,198 @@ app.use(async (req, res, next) => {
     if (fusion) {
       try {
         let html = await fs.readFile(indexPath, 'utf-8');
-        const title = `${escapeHtml(fusion.title)} - HumanBoard Publication`;
-        const description = escapeHtml(fusion.summary || 'Strategic research publication.');
-        const canonicalUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
-        const author = escapeHtml(fusion.authorName || 'HumanBoard Creator');
+        const pageTitle = `${fusion.title} - HumanBoard Publication`;
+        const description = (fusion.summary || 'Strategic research publication.').slice(0, 300);
+        const author = fusion.authorName || 'HumanBoard Creator';
+        const ogImageUrl = `${baseUrl}/api/og/fusion/${encodeURIComponent(fusion.id)}`;
         const publishedDate = fusion.createdAt || new Date().toISOString();
+        const modifiedDate = fusion.updatedAt || publishedDate;
 
         const seoTags = `
-  <title>${title}</title>
-  <meta name="description" content="${description}" />
-  <link rel="canonical" href="${canonicalUrl}" />
-  
+  <title>${escapeHtml(pageTitle)}</title>
+  <meta name="description" content="${escapeHtml(description)}" />
+  <link rel="canonical" href="${escapeHtml(canonicalUrl)}" />
+
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="article" />
-  <meta property="og:url" content="${canonicalUrl}" />
-  <meta property="og:title" content="${title}" />
-  <meta property="og:description" content="${description}" />
-  
+  <meta property="og:site_name" content="HumanBoard Publication" />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:url" content="${escapeHtml(canonicalUrl)}" />
+  <meta property="og:title" content="${escapeHtml(pageTitle)}" />
+  <meta property="og:description" content="${escapeHtml(description)}" />
+  <meta property="og:image" content="${escapeHtml(ogImageUrl)}" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="${escapeHtml(fusion.title)}" />
+  <meta property="article:published_time" content="${escapeHtml(publishedDate)}" />
+  <meta property="article:modified_time" content="${escapeHtml(modifiedDate)}" />
+  <meta property="article:author" content="${escapeHtml(author)}" />
+  <meta property="article:section" content="${escapeHtml(fusion.type || 'Post')}" />
+
   <!-- Twitter -->
-  <meta property="twitter:card" content="summary" />
-  <meta property="twitter:url" content="${canonicalUrl}" />
-  <meta property="twitter:title" content="${title}" />
-  <meta property="twitter:description" content="${description}" />
-  
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${escapeHtml(pageTitle)}" />
+  <meta name="twitter:description" content="${escapeHtml(description)}" />
+  <meta name="twitter:image" content="${escapeHtml(ogImageUrl)}" />
+  <meta name="twitter:image:alt" content="${escapeHtml(fusion.title)}" />
+  <meta name="twitter:label1" content="Written by" />
+  <meta name="twitter:data1" content="${escapeHtml(author)}" />
+  <meta name="twitter:label2" content="Type" />
+  <meta name="twitter:data2" content="${escapeHtml(fusion.type || 'Post')}" />
+
   <!-- JSON-LD Article Schema -->
   <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "BlogPosting",
-      "headline": "${title}",
-      "description": "${description}",
-      "author": {
-        "@type": "Person",
-        "name": "${author}"
-      },
-      "datePublished": "${publishedDate}"
-    }
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": ${JSON.stringify(fusion.title)},
+    "description": ${JSON.stringify(description)},
+    "image": ${JSON.stringify(ogImageUrl)},
+    "author": {
+      "@type": "Person",
+      "name": ${JSON.stringify(author)}
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "HumanBoard Publication",
+      "url": ${JSON.stringify(baseUrl)}
+    },
+    "datePublished": ${JSON.stringify(publishedDate)},
+    "dateModified": ${JSON.stringify(modifiedDate)},
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": ${JSON.stringify(canonicalUrl)}
+    },
+    "articleSection": ${JSON.stringify(fusion.type || 'Post')}
+  }
   </script>
 `;
 
         html = html.replace('</head>', `${seoTags}</head>`);
         html = html.replace(/<title>.*?<\/title>/gi, '');
+        res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
         res.type('text/html').send(html);
         return;
       } catch (err) {
         console.error('Error serving server-injected shared fusion:', err);
       }
+    }
+  }
+
+  // /shared/author/:name - author page SEO
+  const authorMatch = req.path.match(/^\/shared\/author\/([^/]+)$/);
+  if (authorMatch) {
+    const authorName = decodeURIComponent(authorMatch[1] || '').trim();
+    if (authorName) {
+      try {
+        const fusions = await listAllPublicFusions();
+        const matches = fusions.filter((f) => (f.authorName || '').toLowerCase() === authorName.toLowerCase());
+        if (matches.length > 0) {
+          const author = matches[0].authorName;
+          const authorBio = matches[0].authorBio || `Posts by ${author} on HumanBoard.`;
+          const pageTitle = `${author} - HumanBoard Publication`;
+          const description = authorBio.slice(0, 300);
+          const latestOgImage = `${baseUrl}/api/og/fusion/${encodeURIComponent(matches[0].id)}`;
+
+          const seoTags = `
+  <title>${escapeHtml(pageTitle)}</title>
+  <meta name="description" content="${escapeHtml(description)}" />
+  <link rel="canonical" href="${escapeHtml(canonicalUrl)}" />
+
+  <meta property="og:type" content="profile" />
+  <meta property="og:site_name" content="HumanBoard Publication" />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:url" content="${escapeHtml(canonicalUrl)}" />
+  <meta property="og:title" content="${escapeHtml(pageTitle)}" />
+  <meta property="og:description" content="${escapeHtml(description)}" />
+  <meta property="og:image" content="${escapeHtml(latestOgImage)}" />
+  <meta property="profile:first_name" content="${escapeHtml(author.split(' ')[0] || author)}" />
+  <meta property="profile:last_name" content="${escapeHtml(author.split(' ').slice(1).join(' ') || '')}" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${escapeHtml(pageTitle)}" />
+  <meta name="twitter:description" content="${escapeHtml(description)}" />
+  <meta name="twitter:image" content="${escapeHtml(latestOgImage)}" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    "name": ${JSON.stringify(author)},
+    "description": ${JSON.stringify(description)},
+    "mainEntity": {
+      "@type": "Person",
+      "name": ${JSON.stringify(author)},
+      "description": ${JSON.stringify(authorBio)}
+    }
+  }
+  </script>
+`;
+          let html = await fs.readFile(indexPath, 'utf-8');
+          html = html.replace('</head>', `${seoTags}</head>`);
+          html = html.replace(/<title>.*?<\/title>/gi, '');
+          res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
+          res.type('text/html').send(html);
+          return;
+        }
+      } catch (err) {
+        console.error('Error serving author SSR:', err);
+      }
+    }
+  }
+
+  // /shared - public index page SEO
+  if (req.path === '/shared' || req.path === '/shared/') {
+    try {
+      const fusions = await listAllPublicFusions();
+      const pageTitle = 'HumanBoard Publication';
+      const description = 'Consolidated strategic insights, principles, and project directions from HumanBoard writers.';
+      const ogImage = fusions.length > 0
+        ? `${baseUrl}/api/og/fusion/${encodeURIComponent(fusions[0].id)}`
+        : `${baseUrl}/api/og/fusion/_default`;
+
+      const seoTags = `
+  <title>${escapeHtml(pageTitle)}</title>
+  <meta name="description" content="${escapeHtml(description)}" />
+  <link rel="canonical" href="${escapeHtml(canonicalUrl)}" />
+  <link rel="alternate" type="application/rss+xml" title="HumanBoard Publication RSS" href="${escapeHtml(baseUrl + '/feed.xml')}" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="HumanBoard Publication" />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:url" content="${escapeHtml(canonicalUrl)}" />
+  <meta property="og:title" content="${escapeHtml(pageTitle)}" />
+  <meta property="og:description" content="${escapeHtml(description)}" />
+  <meta property="og:image" content="${escapeHtml(ogImage)}" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${escapeHtml(pageTitle)}" />
+  <meta name="twitter:description" content="${escapeHtml(description)}" />
+  <meta name="twitter:image" content="${escapeHtml(ogImage)}" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "HumanBoard Publication",
+    "url": ${JSON.stringify(baseUrl + '/shared')},
+    "description": ${JSON.stringify(description)},
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": ${JSON.stringify(baseUrl + '/shared?author={search_term_string}')},
+      "query-input": "required name=search_term_string"
+    }
+  }
+  </script>
+`;
+      let html = await fs.readFile(indexPath, 'utf-8');
+      html = html.replace('</head>', `${seoTags}</head>`);
+      html = html.replace(/<title>.*?<\/title>/gi, '');
+      res.set('Cache-Control', 'public, max-age=60, s-maxage=300');
+      res.type('text/html').send(html);
+      return;
+    } catch (err) {
+      console.error('Error serving /shared SSR:', err);
     }
   }
 

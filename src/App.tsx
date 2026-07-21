@@ -16,6 +16,8 @@ import CommandCenterPage from './pages/CommandCenter';
 import FusionPage from './pages/Fusion';
 import FusionDetailPage from './pages/FusionDetail';
 import PublicFusionPage from './pages/PublicFusion';
+import PublicFusionIndexPage from './pages/PublicFusionIndex';
+import PublicAuthorPage from './pages/PublicAuthor';
 import Chatbot from './components/Chatbot';
 import { hydrateAppStoreFromRepository, useAppStore } from './store';
 import { useEffect, useLayoutEffect, useState } from 'react';
@@ -1336,6 +1338,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/shared/fusion/:id" element={<PublicFusionPage />} />
+          <Route path="/shared" element={<PublicFusionIndexPage />} />
+          <Route path="/shared/author/:name" element={<PublicAuthorPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
@@ -1423,6 +1427,8 @@ export default function App() {
             <Route path="/fusion" element={<FusionPage />} />
             <Route path="/fusion/:id" element={<FusionDetailPage />} />
             <Route path="/shared/fusion/:id" element={<PublicFusionPage />} />
+            <Route path="/shared" element={<PublicFusionIndexPage />} />
+            <Route path="/shared/author/:name" element={<PublicAuthorPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
