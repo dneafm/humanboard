@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
-import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogOut, HelpCircle, X, LayoutDashboard, Menu, ArrowRight, Check, MessageSquareText, ShieldCheck, Sparkles, Image, Bell, GitBranch, WandSparkles, ChevronDown, Settings as SettingsIcon, FileText, BookOpen } from 'lucide-react';
+import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogOut, HelpCircle, X, LayoutDashboard, Menu, ArrowRight, Check, MessageSquareText, ShieldCheck, Sparkles, Image, Bell, GitBranch, WandSparkles, ChevronDown, Settings as SettingsIcon, FileText, BookOpen, Users } from 'lucide-react';
 import { cn } from './lib/utils';
 import ReactMarkdown from 'react-markdown';
 import productDocs from '../docs/product-knowledge.md?raw';
@@ -18,6 +18,7 @@ import FusionDetailPage from './pages/FusionDetail';
 import PublicFusionPage from './pages/PublicFusion';
 import PublicFusionIndexPage from './pages/PublicFusionIndex';
 import PublicAuthorPage from './pages/PublicAuthor';
+import SubscribersPage from './pages/Subscribers';
 import Chatbot from './components/Chatbot';
 import { hydrateAppStoreFromRepository, useAppStore } from './store';
 import { useEffect, useLayoutEffect, useState } from 'react';
@@ -548,6 +549,7 @@ function Sidebar({ onOpenTutorial, onOpenSettings, onOpenDocs }: { onOpenTutoria
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
     { to: '/fusion', icon: FileText, label: 'Fusion' },
     { to: '/search', icon: SearchIcon, label: 'Search' },
+    { to: '/subscribers', icon: Users, label: 'Subscribers' },
   ];
 
   return (
@@ -1262,6 +1264,7 @@ export default function App() {
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
     { to: '/fusion', icon: FileText, label: 'Fusion' },
     { to: '/search', icon: SearchIcon, label: 'Search' },
+    { to: '/subscribers', icon: Users, label: 'Subscribers' },
   ];
 
   useEffect(() => {
@@ -1429,6 +1432,7 @@ export default function App() {
             <Route path="/shared/fusion/:id" element={<PublicFusionPage />} />
             <Route path="/shared" element={<PublicFusionIndexPage />} />
             <Route path="/shared/author/:name" element={<PublicAuthorPage />} />
+            <Route path="/subscribers" element={<SubscribersPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

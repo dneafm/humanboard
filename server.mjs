@@ -871,11 +871,82 @@ app.get('/api/public/author/:name', async (req, res) => {
 app.get('/api/admin/subscribers', async (_req, res) => {
   try {
     const subscribers = await loadSubscribers();
-    res.json({ subscribers, count: subscribers.length });
+    // Build per-fusion breakdown for the dashboard
+    const fusionCount = new Map();
+    for (const s of subscribers) {
+      if (!s.sourceFusionId) continue;
+      fusionCount.set(s.sourceFusionId, (fusionCount.get(s.sourceFusionId) || 0) + 1);
+    }
+    const fusionLookup = await lookupPublicFusions(Array.from(fusionCount.keys()));
+    const byFusion = Array.from(fusionCount.entries())
+      .map(([fusionId, count]) => ({
+        fusionId,
+        count,
+        title: fusionLookup.get(fusionId)?.title || '(deleted fusion)',
+        type: fusionLookup.get(fusionId)?.type || null,
+      }))
+      .sort((a, b) => b.count - a.count);
+    const last7Days = subscribers.filter((s) => {
+      const t = new Date(s.subscribedAt).getTime();
+      return Date.now() - t < 7 * 24 * 60 * 60 * 1000;
+    }).length;
+    res.json({
+      subscribers,
+      count: subscribers.length,
+      last7Days,
+      byFusion,
+    });
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load subscribers' });
   }
 });
+
+app.delete('/api/admin/subscribers/:id', async (req, res) => {
+  try {
+    const subscribers = await loadSubscribers();
+    const filtered = subscribers.filter((s) => s.id !== req.params.id);
+    if (filtered.length === subscribers.length) {
+      res.status(404).json({ error: 'Subscriber not found' });
+      return;
+    }
+    await saveSubscribers(filtered);
+    res.json({ success: true, count: filtered.length });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete subscriber' });
+  }
+});
+
+app.get('/api/admin/subscribers/count', async (_req, res) => {
+  try {
+    const subscribers = await loadSubscribers();
+    res.json({ count: subscribers.length });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to count subscribers' });
+  }
+});
+
+async function lookupPublicFusions(fusionIds) {
+  const result = new Map();
+  if (!fusionIds.length || !existsSync(USER_DATA_DIR)) return result;
+  try {
+    const entries = await fs.readdir(USER_DATA_DIR, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const snapshotPath = path.join(USER_DATA_DIR, entry.name, 'snapshot.json');
+      if (!existsSync(snapshotPath)) continue;
+      try {
+        const raw = await fs.readFile(snapshotPath, 'utf-8');
+        const parsed = JSON.parse(raw);
+        for (const f of parsed.fusionItems || []) {
+          if (fusionIds.includes(f.id) && f.isPublic && !result.has(f.id)) {
+            result.set(f.id, { title: f.title, type: f.type });
+          }
+        }
+      } catch {}
+    }
+  } catch {}
+  return result;
+}
 
 app.get('/api/og/fusion/:id', async (req, res) => {
   const fusion = await getPublicFusionData(req.params.id);

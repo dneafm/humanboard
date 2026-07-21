@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, FileText, Link2, Minus, Plus, Sparkles, GripVertical, Columns2, Columns3, Heading1, Heading2, Heading3, Loader2, Trash2, Globe, ArrowUpRight } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, CheckCircle2, FileText, Link2, Minus, Plus, Sparkles, GripVertical, Columns2, Columns3, Heading1, Heading2, Heading3, Loader2, Trash2, Globe, ArrowUpRight, Users } from 'lucide-react';
 import { generateFusionArtifact } from '../lib/ai';
 import { useAppStore, type FusionAudience, type FusionStatus, type FusionType, type FusionSuggestion } from '../store';
 import { useAuthStore } from '../stores/authStore';
@@ -8,6 +8,7 @@ import { cn } from '../lib/utils';
 import { FusionTextEditPopover } from '../components/FusionTextEditPopover';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import { fetchSubscribers } from '../lib/subscribers';
 
 const fusionTypes: FusionType[] = ['Post', 'Writing', 'Thesis', 'Report'];
 const fusionStatuses: FusionStatus[] = ['Draft', 'Synthesizing', 'Ready', 'Completed'];
@@ -32,9 +33,27 @@ export default function FusionDetailPage() {
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [subscriberCount, setSubscriberCount] = useState<number | null>(null);
   const { user } = useAuthStore();
   const defaultAuthorName = user?.displayName || 'HumanBoard Creator';
   const publicLink = window.location.origin + '/shared/fusion/' + item.id;
+
+  useEffect(() => {
+    if (!item?.id) return;
+    let cancelled = false;
+    fetchSubscribers()
+      .then((data) => {
+        if (cancelled) return;
+        const matches = data.subscribers.filter((s) => s.sourceFusionId === item.id);
+        setSubscriberCount(matches.length);
+      })
+      .catch(() => {
+        if (!cancelled) setSubscriberCount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [item?.id]);
 
   const linkedNotes = useMemo(() => notes.filter((note) => item?.linkedNoteIds.includes(note.id)), [item?.linkedNoteIds, notes]);
   const linkedIdeas = useMemo(() => ideas.filter((idea) => item?.linkedIdeaIds.includes(idea.id)), [ideas, item?.linkedIdeaIds]);
@@ -230,7 +249,19 @@ export default function FusionDetailPage() {
 
               <div className="bg-stone-50 dark:bg-stone-950 p-4 rounded-2xl border border-stone-200/50 dark:border-stone-850/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="min-w-0 flex-1">
-                  <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1">Public Shareable Link</div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Public Shareable Link</div>
+                    {subscriberCount !== null && subscriberCount > 0 && (
+                      <Link
+                        to="/subscribers"
+                        className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-950/40 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-950/60 transition-colors"
+                        title={`${subscriberCount} subscriber${subscriberCount === 1 ? '' : 's'} from this post — open the Subscribers page`}
+                      >
+                        <Users className="h-2.5 w-2.5" />
+                        {subscriberCount} {subscriberCount === 1 ? 'subscriber' : 'subscribers'}
+                      </Link>
+                    )}
+                  </div>
                   <div className="text-xs text-stone-600 dark:text-stone-400 truncate select-all">{publicLink}</div>
                 </div>
                 <div className="flex gap-2 shrink-0">
