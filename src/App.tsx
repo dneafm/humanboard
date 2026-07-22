@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
-import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogOut, HelpCircle, X, LayoutDashboard, Menu, ArrowRight, Check, MessageSquareText, ShieldCheck, Sparkles, Image, Bell, GitBranch, WandSparkles, ChevronDown, Settings as SettingsIcon, FileText, BookOpen, Users } from 'lucide-react';
+import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogOut, HelpCircle, X, LayoutDashboard, Menu, ArrowRight, Check, MessageSquareText, ShieldCheck, Sparkles, Image, Bell, GitBranch, WandSparkles, ChevronDown, Settings as SettingsIcon, FileText, BookOpen, Users, Compass, Globe, Layers } from 'lucide-react';
 import { cn } from './lib/utils';
 import ReactMarkdown from 'react-markdown';
 import productDocs from '../docs/product-knowledge.md?raw';
@@ -542,7 +542,7 @@ function Sidebar({ onOpenTutorial, onOpenSettings, onOpenDocs }: { onOpenTutoria
   const { isDarkMode, toggleDarkMode } = useAppStore();
   const { user, signOutUser } = useAuthStore();
   const isLocalCommandCenter = window.location.port === '3010';
-  const navItems = [
+  const workspaceNavItems = [
     ...(isLocalCommandCenter ? [{ to: '/command-center', icon: LayoutDashboard, label: 'Command Center' }] : []),
     { to: '/', icon: Inbox, label: 'Inbox' },
     { to: '/ideas', icon: Lightbulb, label: 'Ideas' },
@@ -553,8 +553,14 @@ function Sidebar({ onOpenTutorial, onOpenSettings, onOpenDocs }: { onOpenTutoria
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
     { to: '/fusion', icon: FileText, label: 'Fusion' },
     { to: '/search', icon: SearchIcon, label: 'Search' },
+  ];
+  const publicNavItems = [
+    { to: '/shared', icon: Layers, label: 'Posts' },
+    { to: '/shared/notes', icon: FileText, label: 'Notes' },
+    { to: '/shared/discover', icon: Compass, label: 'Discover' },
     { to: '/subscribers', icon: Users, label: 'Subscribers' },
   ];
+  const navItems = [...workspaceNavItems, ...publicNavItems];
 
   return (
     <div className="hidden md:flex w-64 bg-stone-50 dark:bg-stone-950 border-r border-stone-200 dark:border-stone-800 flex-col h-screen sticky top-0 transition-colors duration-300">
@@ -566,17 +572,30 @@ function Sidebar({ onOpenTutorial, onOpenSettings, onOpenDocs }: { onOpenTutoria
           HumanBoard
         </h1>
       </div>
-      <nav className="flex-1 px-4 space-y-1">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            data-tour={item.label === 'Inbox' ? 'tour-sidebar-inbox' : item.label === 'Ideas' ? 'tour-sidebar-ideas' : item.label === 'Goals' ? 'tour-sidebar-goals' : item.label === 'Incubation' ? 'tour-sidebar-incubation' : item.label === 'Review' ? 'tour-sidebar-review' : item.label === 'Projects' ? 'tour-sidebar-projects' : undefined}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all",
-                isActive 
-                  ? "bg-stone-200/50 dark:bg-stone-900 text-stone-900 dark:text-stone-100 shadow-sm" 
+      <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
+        {navItems.map((item) => {
+          const isPublicSection = publicNavItems.some((p) => p.to === item.to);
+          const isFirstInPublicSection = isPublicSection && item.to === publicNavItems[0].to;
+          return (
+            <div key={item.to}>
+              {isFirstInPublicSection && (
+                <div className="pt-4 pb-2 px-3">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400 dark:text-stone-500 flex items-center gap-1.5">
+                    <Globe className="h-3 w-3" />
+                    Public
+                  </div>
+                </div>
+              )}
+              <NavLink
+                to={item.to}
+                target={item.to.startsWith('/shared') ? '_blank' : undefined}
+                rel={item.to.startsWith('/shared') ? 'noreferrer' : undefined}
+                data-tour={item.label === 'Inbox' ? 'tour-sidebar-inbox' : item.label === 'Ideas' ? 'tour-sidebar-ideas' : item.label === 'Goals' ? 'tour-sidebar-goals' : item.label === 'Incubation' ? 'tour-sidebar-incubation' : item.label === 'Review' ? 'tour-sidebar-review' : item.label === 'Projects' ? 'tour-sidebar-projects' : undefined}
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all",
+                    isActive
+                      ? "bg-stone-200/50 dark:bg-stone-900 text-stone-900 dark:text-stone-100 shadow-sm" 
                   : "text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-900/50 hover:text-stone-900 dark:hover:text-stone-100"
               )
             }
@@ -584,7 +603,9 @@ function Sidebar({ onOpenTutorial, onOpenSettings, onOpenDocs }: { onOpenTutoria
             <item.icon className="w-4 h-4" />
             {item.label}
           </NavLink>
-        ))}
+            </div>
+          );
+        })}
       </nav>
       <div className="p-4 border-t border-stone-200 dark:border-stone-800 space-y-2">
         <UpdateButton />
@@ -1268,6 +1289,9 @@ export default function App() {
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
     { to: '/fusion', icon: FileText, label: 'Fusion' },
     { to: '/search', icon: SearchIcon, label: 'Search' },
+    { to: '/shared', icon: Layers, label: 'Posts' },
+    { to: '/shared/notes', icon: FileText, label: 'Notes' },
+    { to: '/shared/discover', icon: Compass, label: 'Discover' },
     { to: '/subscribers', icon: Users, label: 'Subscribers' },
   ];
 
