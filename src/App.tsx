@@ -18,7 +18,11 @@ import FusionDetailPage from './pages/FusionDetail';
 import PublicFusionPage from './pages/PublicFusion';
 import PublicFusionIndexPage from './pages/PublicFusionIndex';
 import PublicAuthorPage from './pages/PublicAuthor';
+import PublicNotesPage from './pages/PublicNotes';
+import PublicNoteDetailPage from './pages/PublicNoteDetail';
+import PublicDiscoverPage from './pages/PublicDiscover';
 import SubscribersPage from './pages/Subscribers';
+import { ComposeNoteModal } from './components/ComposeNoteModal';
 import Chatbot from './components/Chatbot';
 import { hydrateAppStoreFromRepository, useAppStore } from './store';
 import { useEffect, useLayoutEffect, useState } from 'react';
@@ -1432,6 +1436,9 @@ export default function App() {
             <Route path="/shared/fusion/:id" element={<PublicFusionPage />} />
             <Route path="/shared" element={<PublicFusionIndexPage />} />
             <Route path="/shared/author/:name" element={<PublicAuthorPage />} />
+            <Route path="/shared/notes" element={<PublicNotesPage />} />
+            <Route path="/shared/notes/:id" element={<PublicNoteDetailPage />} />
+            <Route path="/shared/discover" element={<PublicDiscoverPage />} />
             <Route path="/subscribers" element={<SubscribersPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />

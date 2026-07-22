@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, BookOpen, Calendar, Mail, Share2, Award, User, Layers, ArrowUpRight, Check } from 'lucide-react';
+import { ArrowLeft, BookOpen, Calendar, Mail, Share2, Award, User, Layers, ArrowUpRight, Check, Compass, Heart, Eye, FileText } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { formatDistanceToNow } from 'date-fns';
+import { recordView, toggleLike } from '../lib/publicEngagement';
 
 type PublicFusionData = {
   fusion: {
@@ -15,6 +16,9 @@ type PublicFusionData = {
     createdAt: string;
     authorName?: string;
     authorBio?: string;
+    viewCount?: number;
+    likeCount?: number;
+    liked?: boolean;
   };
   otherFusions: Array<{
     id: string;
@@ -92,6 +96,31 @@ export default function PublicFusionPage() {
       metaDescription.content = data.fusion.summary || 'Strategic research publication.';
     }
   }, [data]);
+
+  // Record view on first load
+  useEffect(() => {
+    if (!data?.fusion?.id) return;
+    void recordView('fusion', data.fusion.id).then((result) => {
+      if (result.counted && data?.fusion) {
+        setData((prev) => prev ? {
+          ...prev,
+          fusion: { ...prev.fusion, viewCount: result.count },
+        } : prev);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.fusion?.id]);
+
+  const handleLike = async () => {
+    if (!data?.fusion?.id) return;
+    try {
+      const result = await toggleLike('fusion', data.fusion.id);
+      setData((prev) => prev ? {
+        ...prev,
+        fusion: { ...prev.fusion, likeCount: result.count, liked: result.liked },
+      } : prev);
+    } catch {}
+  };
 
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,6 +204,14 @@ export default function PublicFusionPage() {
             </span>
           </div>
           <div className="flex items-center gap-4">
+            <a href="/shared/notes" className="text-xs font-semibold text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors flex items-center gap-1">
+              <FileText className="w-3 h-3" />
+              Notes
+            </a>
+            <a href="/shared/discover" className="text-xs font-semibold text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors flex items-center gap-1">
+              <Compass className="w-3 h-3" />
+              Discover
+            </a>
             <a href="/shared" className="text-xs font-semibold text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors">
               All posts
             </a>
@@ -231,7 +268,25 @@ export default function PublicFusionPage() {
               <Calendar className="w-3.5 h-3.5" />
               {formatDistanceToNow(new Date(fusion.createdAt), { addSuffix: true })}
             </span>
-            <button 
+            <span className="flex items-center gap-1.5" title={`${fusion.viewCount ?? 0} views`}>
+              <Eye className="w-3.5 h-3.5" />
+              {fusion.viewCount ?? 0}
+            </span>
+            <button
+              type="button"
+              onClick={handleLike}
+              className={`flex items-center gap-1.5 font-semibold uppercase tracking-wider transition-colors ${
+                fusion.liked
+                  ? 'text-rose-600 dark:text-rose-400'
+                  : 'text-stone-500 hover:text-rose-600 dark:hover:text-rose-400'
+              }`}
+              aria-label={fusion.liked ? 'Unlike' : 'Like'}
+              title={fusion.liked ? 'Unlike' : 'Like'}
+            >
+              <Heart className={`w-3.5 h-3.5 ${fusion.liked ? 'fill-current' : ''}`} />
+              {fusion.likeCount ?? 0}
+            </button>
+            <button
               onClick={handleShare}
               className="flex items-center gap-1.5 text-stone-500 hover:text-stone-950 dark:hover:text-stone-100 transition-colors font-semibold uppercase tracking-wider"
             >
@@ -296,7 +351,7 @@ export default function PublicFusionPage() {
                 </div>
               )}
               <div className="text-[11px] text-stone-400 dark:text-stone-500 text-center">
-                Or read the <a href="/shared" className="underline hover:text-stone-700 dark:hover:text-stone-200">latest posts</a> · <a href="/feed.xml" className="underline hover:text-stone-700 dark:hover:text-stone-200">RSS feed</a>
+                Or read the <a href="/shared" className="underline hover:text-stone-700 dark:hover:text-stone-200">latest posts</a> · <a href="/shared/notes" className="underline hover:text-stone-700 dark:hover:text-stone-200">notes</a> · <a href="/feed.xml" className="underline hover:text-stone-700 dark:hover:text-stone-200">RSS feed</a>
               </div>
             </form>
           )}

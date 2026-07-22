@@ -141,6 +141,18 @@ export default function PublicFusionIndexPage() {
           </Link>
           <div className="flex items-center gap-4">
             <a
+              href="/shared/notes"
+              className="text-xs font-semibold text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
+            >
+              Notes
+            </a>
+            <a
+              href="/shared/discover"
+              className="text-xs font-semibold text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
+            >
+              Discover
+            </a>
+            <a
               href="/feed.xml"
               className="text-xs font-semibold text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
               title="RSS feed"

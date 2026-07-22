@@ -20,6 +20,9 @@ const LEGACY_SNAPSHOT_PATH = path.resolve(process.env.HUMANBOARD_SNAPSHOT_PATH |
 const USER_DATA_DIR = path.resolve(process.env.HUMANBOARD_USER_DATA_DIR || path.join(__dirname, 'data', 'users'));
 const PUBLIC_DATA_DIR = path.resolve(process.env.HUMANBOARD_PUBLIC_DATA_DIR || path.join(__dirname, 'data', 'public'));
 const SUBSCRIBERS_PATH = path.join(PUBLIC_DATA_DIR, 'subscribers.json');
+const NOTES_PATH = path.join(PUBLIC_DATA_DIR, 'notes.json');
+const VIEWS_PATH = path.join(PUBLIC_DATA_DIR, 'views.json');
+const LIKES_PATH = path.join(PUBLIC_DATA_DIR, 'likes.json');
 const AI_ERA_DB_PATH = process.env.AI_ERA_KB_PATH || 'F:/backtest/ai-era-kb/ai_era_kb.sqlite3';
 const AI_BASE_URL = String(process.env.AI_BASE_URL || process.env.GEMMA_BASE_URL || 'http://127.0.0.1:11434/v1').replace(/\/+$/, '');
 const AI_API_KEY = String(process.env.AI_API_KEY || process.env.GEMMA_API_KEY || '').trim();
@@ -784,9 +787,17 @@ app.get('/api/public/fusion/:id', async (req, res) => {
                   createdAt: item.createdAt,
                   type: item.type
                 }));
-                
+              const views = await loadPublicViews();
+              const likes = await loadPublicLikes();
+              const ip = getClientIp(req);
+              const likeList = likes.fusion?.[foundItem.id] || [];
               return res.json({
-                fusion: foundItem,
+                fusion: {
+                  ...foundItem,
+                  viewCount: views.fusion?.[foundItem.id] || 0,
+                  likeCount: likeList.length,
+                  liked: likeList.includes(ip),
+                },
                 otherFusions
               });
             }
@@ -835,7 +846,7 @@ app.post('/api/public/subscribe', express.json({ limit: '10kb' }), async (req, r
 
 app.get('/api/public/fusions', async (_req, res) => {
   try {
-    const fusions = await listAllPublicFusions();
+    const fusions = await decorateFusionList(await listAllPublicFusions());
     res.json({ fusions, count: fusions.length });
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to list public fusions' });
@@ -860,11 +871,237 @@ app.get('/api/public/author/:name', async (req, res) => {
         name: matches[0].authorName,
         bio: matches[0].authorBio,
       },
-      fusions: matches,
+      fusions: await decorateFusionList(matches),
       count: matches.length,
     });
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load author' });
+  }
+});
+
+// Public Notes — Substack-style short-form posts
+app.get('/api/public/notes', async (req, res) => {
+  try {
+    const { authorId, linkedFusionId, tag } = req.query;
+    let notes = await loadPublicNotes();
+    if (authorId) notes = notes.filter((n) => n.authorId === authorId);
+    if (linkedFusionId) notes = notes.filter((n) => n.linkedFusionId === linkedFusionId);
+    if (tag) notes = notes.filter((n) => Array.isArray(n.tags) && n.tags.includes(String(tag)));
+    notes.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    notes = await decorateNoteList(notes);
+    res.json({ notes, count: notes.length });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load notes' });
+  }
+});
+
+app.get('/api/public/notes/:id', async (req, res) => {
+  try {
+    const notes = await loadPublicNotes();
+    const found = notes.find((n) => n.id === req.params.id);
+    if (!found) {
+      res.status(404).json({ error: 'Note not found' });
+      return;
+    }
+    const ip = getClientIp(req);
+    const [views, likes] = await Promise.all([loadPublicViews(), getLikeStatus('note', found.id, ip)]);
+    res.json({
+      ...found,
+      viewCount: views.note?.[found.id] || 0,
+      likeCount: likes.count,
+      liked: likes.liked,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load note' });
+  }
+});
+
+app.post('/api/public/notes', express.json({ limit: '50kb' }), async (req, res) => {
+  const userId = await requireUserId(req, res);
+  if (!userId) return;
+  try {
+    const content = String(req.body?.content || '').trim();
+    if (content.length < 1) {
+      res.status(400).json({ error: 'Note content cannot be empty' });
+      return;
+    }
+    if (content.length > 5000) {
+      res.status(400).json({ error: 'Note content too long (max 5000 chars)' });
+      return;
+    }
+    const tags = Array.isArray(req.body?.tags)
+      ? req.body.tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean).slice(0, 8)
+      : [];
+    const linkedFusionId = req.body?.linkedFusionId ? String(req.body.linkedFusionId).trim().slice(0, 128) : null;
+    let linkedFusionTitle = null;
+    if (linkedFusionId) {
+      const f = lookupFusionTitle(linkedFusionId);
+      if (!f || !f.isPublic) {
+        res.status(400).json({ error: 'Linked fusion not found or not public' });
+        return;
+      }
+      linkedFusionTitle = f.title;
+    }
+    // Look up author info from the user's snapshot
+    const snapshot = await loadSnapshotSafe(userId);
+    const fusion = (snapshot.fusionItems || []).find((f) => f.id === linkedFusionId);
+    const authorName = (fusion && fusion.authorName) || (snapshot.fusionItems.find((f) => f.authorName)?.authorName) || 'HumanBoard Creator';
+    const authorBio = (fusion && fusion.authorBio) || '';
+    const now = new Date().toISOString();
+    const note = {
+      id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      content,
+      authorId: userId,
+      authorName,
+      authorBio: authorBio || '',
+      linkedFusionId: linkedFusionId || null,
+      linkedFusionTitle,
+      tags,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const notes = await loadPublicNotes();
+    notes.push(note);
+    await savePublicNotes(notes);
+    pushRuntimeEvent('info', 'public_note_published', `Public note published by ${authorName}`, { noteId: note.id, linkedFusionId });
+    res.json({ success: true, note });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create note' });
+  }
+});
+
+app.delete('/api/public/notes/:id', async (req, res) => {
+  const userId = await requireUserId(req, res);
+  if (!userId) return;
+  try {
+    const notes = await loadPublicNotes();
+    const target = notes.find((n) => n.id === req.params.id);
+    if (!target) {
+      res.status(404).json({ error: 'Note not found' });
+      return;
+    }
+    if (target.authorId !== userId) {
+      res.status(403).json({ error: 'Only the author can delete this note' });
+      return;
+    }
+    const filtered = notes.filter((n) => n.id !== req.params.id);
+    await savePublicNotes(filtered);
+    res.json({ success: true, count: filtered.length });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to delete note' });
+  }
+});
+
+app.post('/api/public/view', express.json({ limit: '1kb' }), async (req, res) => {
+  const type = String(req.body?.type || '');
+  const id = String(req.body?.id || '').trim().slice(0, 128);
+  if (!['fusion', 'note'].includes(type) || !id) {
+    res.status(400).json({ error: 'Invalid type or id' });
+    return;
+  }
+  try {
+    const ip = getClientIp(req);
+    const incremented = await recordView(type, id, ip);
+    const count = await getViewCount(type, id);
+    res.json({ success: true, count, counted: incremented });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to record view' });
+  }
+});
+
+app.get('/api/public/like', async (req, res) => {
+  const type = String(req.query?.type || '');
+  const id = String(req.query?.id || '').trim().slice(0, 128);
+  if (!['fusion', 'note'].includes(type) || !id) {
+    res.status(400).json({ error: 'Invalid type or id' });
+    return;
+  }
+  try {
+    const ip = getClientIp(req);
+    const status = await getLikeStatus(type, id, ip);
+    res.json(status);
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to get like status' });
+  }
+});
+
+app.post('/api/public/like', express.json({ limit: '1kb' }), async (req, res) => {
+  const type = String(req.body?.type || '');
+  const id = String(req.body?.id || '').trim().slice(0, 128);
+  if (!['fusion', 'note'].includes(type) || !id) {
+    res.status(400).json({ error: 'Invalid type or id' });
+    return;
+  }
+  try {
+    const ip = getClientIp(req);
+    const result = await toggleLike(type, id, ip);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to toggle like' });
+  }
+});
+
+// Discovery feed — combined fusions + notes, ranked
+app.get('/api/public/discover', async (req, res) => {
+  const sort = String(req.query?.sort || 'trending');
+  const tagsParam = String(req.query?.tags || '').trim();
+  const interestTags = tagsParam ? tagsParam.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean) : [];
+  try {
+    const [fusions, notes] = await Promise.all([listAllPublicFusions(), loadPublicNotes()]);
+    const views = await loadPublicViews();
+    const likes = await loadPublicLikes();
+    const decoratedFusions = fusions.map((f) => ({
+      ...f,
+      viewCount: views.fusion?.[f.id] || 0,
+      likeCount: (likes.fusion?.[f.id] || []).length,
+    }));
+    const decoratedNotes = notes.map((n) => ({
+      ...n,
+      viewCount: views.note?.[n.id] || 0,
+      likeCount: (likes.note?.[n.id] || []).length,
+    }));
+    // Tag overlap scoring
+    const tagOverlap = (item) => {
+      if (!interestTags.length) return 0;
+      const itemTags = (item.tags || []).map((t) => t.toLowerCase());
+      return interestTags.filter((t) => itemTags.includes(t)).length;
+    };
+    const score = (item, createdAt) => {
+      // Trending score: views in last 7d * 1 + likes * 5 + recency bonus
+      const ageDays = Math.max(1, (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24));
+      const recency = 1 / ageDays;
+      return (item.viewCount * 1) + (item.likeCount * 5) + (recency * 20);
+    };
+    let items = [
+      ...decoratedFusions.map((f) => ({ ...f, _kind: 'fusion' })),
+      ...decoratedNotes.map((n) => ({ ...n, _kind: 'note' })),
+    ];
+    // Apply tag filter if any
+    if (interestTags.length) {
+      items = items.filter((it) => tagOverlap(it) > 0);
+    }
+    if (sort === 'latest') {
+      items.sort((a, b) => (b.createdAt || b.updatedAt || '').localeCompare(a.createdAt || a.updatedAt || ''));
+    } else if (sort === 'forYou') {
+      items.sort((a, b) => {
+        const tagDelta = tagOverlap(b) - tagOverlap(a);
+        if (tagDelta !== 0) return tagDelta;
+        return score(b, b.createdAt) - score(a, a.createdAt);
+      });
+    } else {
+      // trending (default)
+      items.sort((a, b) => score(b, b.createdAt) - score(a, a.createdAt));
+    }
+    // Strip internal fields
+    items = items.map(({ _kind, ...rest }) => ({ ...rest, kind: _kind }));
+    res.json({
+      items: items.slice(0, 60),
+      count: items.length,
+      sort,
+      interestTags,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to load discovery feed' });
   }
 });
 
@@ -1375,6 +1612,167 @@ function buildOgImageSvg({ title, summary, author, type }) {
   <text x="80" y="580" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="22" font-weight="600" fill="#1c1917">${authorText}</text>
   <text x="1120" y="580" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="18" font-weight="700" fill="#a8a29e" text-anchor="end" letter-spacing="2">HUMANBOARD</text>
 </svg>`;
+}
+
+async function loadPublicNotes() {
+  if (!existsSync(NOTES_PATH)) return [];
+  try {
+    const raw = await fs.readFile(NOTES_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function savePublicNotes(notes) {
+  await fs.mkdir(PUBLIC_DATA_DIR, { recursive: true });
+  const tmp = `${NOTES_PATH}.tmp`;
+  await fs.writeFile(tmp, JSON.stringify(notes, null, 2), 'utf-8');
+  await fs.rename(tmp, NOTES_PATH);
+}
+
+async function loadPublicViews() {
+  if (!existsSync(VIEWS_PATH)) {
+    return { updatedAt: new Date().toISOString(), fusion: {}, note: {}, ips: {} };
+  }
+  try {
+    const raw = await fs.readFile(VIEWS_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    return {
+      updatedAt: parsed.updatedAt || new Date().toISOString(),
+      fusion: parsed.fusion || {},
+      note: parsed.note || {},
+      ips: parsed.ips || {},
+    };
+  } catch {
+    return { updatedAt: new Date().toISOString(), fusion: {}, note: {}, ips: {} };
+  }
+}
+
+async function savePublicViews(views) {
+  await fs.mkdir(PUBLIC_DATA_DIR, { recursive: true });
+  const tmp = `${VIEWS_PATH}.tmp`;
+  await fs.writeFile(tmp, JSON.stringify(views, null, 2), 'utf-8');
+  await fs.rename(tmp, VIEWS_PATH);
+}
+
+async function loadPublicLikes() {
+  if (!existsSync(LIKES_PATH)) {
+    return { updatedAt: new Date().toISOString(), fusion: {}, note: {} };
+  }
+  try {
+    const raw = await fs.readFile(LIKES_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    return {
+      updatedAt: parsed.updatedAt || new Date().toISOString(),
+      fusion: parsed.fusion || {},
+      note: parsed.note || {},
+    };
+  } catch {
+    return { updatedAt: new Date().toISOString(), fusion: {}, note: {} };
+  }
+}
+
+async function savePublicLikes(likes) {
+  await fs.mkdir(PUBLIC_DATA_DIR, { recursive: true });
+  const tmp = `${LIKES_PATH}.tmp`;
+  await fs.writeFile(tmp, JSON.stringify(likes, null, 2), 'utf-8');
+  await fs.rename(tmp, LIKES_PATH);
+}
+
+function getClientIp(req) {
+  const raw = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  return String(raw).split(',')[0].trim().slice(0, 64) || 'unknown';
+}
+
+async function recordView(type, id, ip) {
+  if (!['fusion', 'note'].includes(type) || !id) return false;
+  const views = await loadPublicViews();
+  const now = Date.now();
+  // Debounce: same IP can't increment same target within 1 hour
+  if (!views.ips[ip]) views.ips[ip] = { fusion: {}, note: {} };
+  const last = views.ips[ip][type]?.[id] || 0;
+  if (now - last < 60 * 60 * 1000) {
+    return false;
+  }
+  if (!views[type][id]) views[type][id] = 0;
+  views[type][id] += 1;
+  if (!views.ips[ip][type]) views.ips[ip][type] = {};
+  views.ips[ip][type][id] = now;
+  views.updatedAt = new Date(now).toISOString();
+  await savePublicViews(views);
+  return true;
+}
+
+async function toggleLike(type, id, ip) {
+  if (!['fusion', 'note'].includes(type) || !id) {
+    return { liked: false, count: 0 };
+  }
+  const likes = await loadPublicLikes();
+  if (!likes[type][id]) likes[type][id] = [];
+  const list = likes[type][id];
+  const idx = list.indexOf(ip);
+  let liked;
+  if (idx >= 0) {
+    list.splice(idx, 1);
+    liked = false;
+  } else {
+    list.push(ip);
+    liked = true;
+  }
+  likes.updatedAt = new Date().toISOString();
+  await savePublicLikes(likes);
+  return { liked, count: list.length };
+}
+
+async function getLikeStatus(type, id, ip) {
+  const likes = await loadPublicLikes();
+  const list = likes[type]?.[id] || [];
+  return { liked: list.includes(ip), count: list.length };
+}
+
+async function getViewCount(type, id) {
+  const views = await loadPublicViews();
+  return views[type]?.[id] || 0;
+}
+
+async function decorateFusionList(fusions) {
+  const views = await loadPublicViews();
+  const likes = await loadPublicLikes();
+  return fusions.map((f) => ({
+    ...f,
+    viewCount: views.fusion?.[f.id] || 0,
+    likeCount: (likes.fusion?.[f.id] || []).length,
+  }));
+}
+
+async function decorateNoteList(notes) {
+  const views = await loadPublicViews();
+  const likes = await loadPublicLikes();
+  return notes.map((n) => ({
+    ...n,
+    viewCount: views.note?.[n.id] || 0,
+    likeCount: (likes.note?.[n.id] || []).length,
+  }));
+}
+
+function lookupFusionTitle(fusionId) {
+  if (!existsSync(USER_DATA_DIR)) return null;
+  try {
+    const entries = fs.readdirSync(USER_DATA_DIR, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const snapshotPath = path.join(USER_DATA_DIR, entry.name, 'snapshot.json');
+      if (!existsSync(snapshotPath)) continue;
+      try {
+        const parsed = JSON.parse(fs.readFileSync(snapshotPath, 'utf-8'));
+        const f = (parsed.fusionItems || []).find((x) => x.id === fusionId);
+        if (f) return { title: f.title, type: f.type, isPublic: f.isPublic };
+      } catch {}
+    }
+  } catch {}
+  return null;
 }
 
 app.use(async (req, res, next) => {

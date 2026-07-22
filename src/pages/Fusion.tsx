@@ -4,6 +4,7 @@ import { FileText, Plus, Search, Sparkles, CheckCircle2, PenSquare, WandSparkles
 import { cn } from '../lib/utils';
 import { type FusionAudience, type FusionItem, type FusionStatus, type FusionType, type FusionSuggestion, useAppStore } from '../store';
 import { askGemma } from '../lib/ai';
+import { ComposeNoteModal } from '../components/ComposeNoteModal';
 
 const fusionTypes: FusionType[] = ['Post', 'Writing', 'Thesis', 'Report'];
 const fusionStatuses: FusionStatus[] = ['Draft', 'Synthesizing', 'Ready', 'Completed'];
@@ -35,6 +36,7 @@ export default function FusionPage() {
 
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [isComposeNoteOpen, setIsComposeNoteOpen] = useState(false);
 
   const runSynthesisInsightScan = async (force = false) => {
     if (isScanning) return;
@@ -206,14 +208,24 @@ Respond ONLY with a valid JSON array of objects, with no markdown code block for
           <h1 className="text-3xl font-semibold tracking-tight text-stone-900 dark:text-stone-100">Fusion</h1>
           <p className="mt-2 text-stone-600 dark:text-stone-300">Turn notes and ideas into shareable conclusions.</p>
         </div>
-        <button
-          type="button"
-          onClick={handleCreateFusion}
-          className="inline-flex items-center gap-2 rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200"
-        >
-          <Plus className="h-4 w-4" />
-          New Fusion
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsComposeNoteOpen(true)}
+            className="inline-flex items-center gap-2 rounded-xl border border-amber-300 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/30 px-4 py-2 text-sm font-medium text-amber-900 dark:text-amber-300 transition hover:bg-amber-100 dark:hover:bg-amber-950/50"
+          >
+            <FileText className="h-4 w-4" />
+            Write a Note
+          </button>
+          <button
+            type="button"
+            onClick={handleCreateFusion}
+            className="inline-flex items-center gap-2 rounded-xl bg-stone-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200"
+          >
+            <Plus className="h-4 w-4" />
+            New Fusion
+          </button>
+        </div>
       </header>
 
       {/* Daily Synthesis Insights suggestion deck */}
@@ -353,6 +365,11 @@ Respond ONLY with a valid JSON array of objects, with no markdown code block for
       <FusionSection title="Drafting" icon={PenSquare} items={draftingItems} onOpen={(id) => navigate(`/fusion/${id}`)} onDelete={deleteFusionItem} />
       <FusionSection title="Ready to Share" icon={Sparkles} items={readyItems} onOpen={(id) => navigate(`/fusion/${id}`)} onDelete={deleteFusionItem} />
       <FusionSection title="Completed" icon={CheckCircle2} items={completedItems} onOpen={(id) => navigate(`/fusion/${id}`)} onDelete={deleteFusionItem} />
+      <ComposeNoteModal
+        open={isComposeNoteOpen}
+        onClose={() => setIsComposeNoteOpen(false)}
+        onPublished={() => setIsComposeNoteOpen(false)}
+      />
     </div>
   );
 }
