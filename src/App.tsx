@@ -588,8 +588,6 @@ function Sidebar({ onOpenTutorial, onOpenSettings, onOpenDocs }: { onOpenTutoria
               )}
               <NavLink
                 to={item.to}
-                target={item.to.startsWith('/shared') ? '_blank' : undefined}
-                rel={item.to.startsWith('/shared') ? 'noreferrer' : undefined}
                 data-tour={item.label === 'Inbox' ? 'tour-sidebar-inbox' : item.label === 'Ideas' ? 'tour-sidebar-ideas' : item.label === 'Goals' ? 'tour-sidebar-goals' : item.label === 'Incubation' ? 'tour-sidebar-incubation' : item.label === 'Review' ? 'tour-sidebar-review' : item.label === 'Projects' ? 'tour-sidebar-projects' : undefined}
                 className={({ isActive }) =>
                   cn(
