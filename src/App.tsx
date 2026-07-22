@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
-import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogOut, HelpCircle, X, LayoutDashboard, Menu, ArrowRight, Check, MessageSquareText, ShieldCheck, Sparkles, Image, Bell, GitBranch, WandSparkles, ChevronDown, Settings as SettingsIcon, FileText, BookOpen, Users, Compass, Globe, Layers } from 'lucide-react';
+import { Inbox, Lightbulb, RefreshCw, FolderKanban, Search as SearchIcon, Network, Moon, Sun, Target, Radar, LogOut, HelpCircle, X, LayoutDashboard, Menu, ArrowRight, Check, MessageSquareText, ShieldCheck, Sparkles, Image, Bell, GitBranch, WandSparkles, ChevronDown, Settings as SettingsIcon, FileText, BookOpen, Users, Compass, Globe, Layers, User } from 'lucide-react';
 import { cn } from './lib/utils';
 import ReactMarkdown from 'react-markdown';
 import productDocs from '../docs/product-knowledge.md?raw';
@@ -21,6 +21,7 @@ import PublicAuthorPage from './pages/PublicAuthor';
 import PublicNotesPage from './pages/PublicNotes';
 import PublicNoteDetailPage from './pages/PublicNoteDetail';
 import PublicDiscoverPage from './pages/PublicDiscover';
+import PublicProfilePage from './pages/PublicProfile';
 import SubscribersPage from './pages/Subscribers';
 import { ComposeNoteModal } from './components/ComposeNoteModal';
 import Chatbot from './components/Chatbot';
@@ -555,10 +556,8 @@ function Sidebar({ onOpenTutorial, onOpenSettings, onOpenDocs }: { onOpenTutoria
     { to: '/search', icon: SearchIcon, label: 'Search' },
   ];
   const publicNavItems = [
-    { to: '/shared', icon: Layers, label: 'Posts' },
-    { to: '/shared/notes', icon: FileText, label: 'Notes' },
     { to: '/shared/discover', icon: Compass, label: 'Discover' },
-    { to: '/subscribers', icon: Users, label: 'Subscribers' },
+    { to: '/shared/profile', icon: User, label: 'Profile' },
   ];
   const navItems = [...workspaceNavItems, ...publicNavItems];
 
@@ -1287,10 +1286,8 @@ export default function App() {
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
     { to: '/fusion', icon: FileText, label: 'Fusion' },
     { to: '/search', icon: SearchIcon, label: 'Search' },
-    { to: '/shared', icon: Layers, label: 'Posts' },
-    { to: '/shared/notes', icon: FileText, label: 'Notes' },
     { to: '/shared/discover', icon: Compass, label: 'Discover' },
-    { to: '/subscribers', icon: Users, label: 'Subscribers' },
+    { to: '/shared/profile', icon: User, label: 'Profile' },
   ];
 
   useEffect(() => {
@@ -1369,6 +1366,7 @@ export default function App() {
           <Route path="/shared/fusion/:id" element={<PublicFusionPage />} />
           <Route path="/shared" element={<PublicFusionIndexPage />} />
           <Route path="/shared/author/:name" element={<PublicAuthorPage />} />
+          <Route path="/shared/profile" element={<PublicProfilePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
@@ -1458,6 +1456,7 @@ export default function App() {
             <Route path="/shared/fusion/:id" element={<PublicFusionPage />} />
             <Route path="/shared" element={<PublicFusionIndexPage />} />
             <Route path="/shared/author/:name" element={<PublicAuthorPage />} />
+            <Route path="/shared/profile" element={<PublicProfilePage />} />
             <Route path="/shared/notes" element={<PublicNotesPage />} />
             <Route path="/shared/notes/:id" element={<PublicNoteDetailPage />} />
             <Route path="/shared/discover" element={<PublicDiscoverPage />} />
